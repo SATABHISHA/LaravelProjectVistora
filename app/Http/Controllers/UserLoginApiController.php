@@ -50,4 +50,11 @@ class UserLoginApiController extends Controller
 
         return response()->json(['message' => 'Login successful', 'user' => $user]);
     }
+
+    // Get all users
+    public function index()
+    {
+        $users = UserLogin::all();
+        return response()->json($users);
+    }
 }
