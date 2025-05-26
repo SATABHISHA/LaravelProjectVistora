@@ -21,4 +21,4 @@ Route::middleware('auth:sanctum')->get('/user', function (Request $request) {
 
 Route::post('/userlogin/register', [UserLoginApiController::class, 'register']);
 Route::post('/userlogin/login', [UserLoginApiController::class, 'login']);
-Route::get('/userlogin/all', [UserLoginApiController::class, 'index']);
+Route::get('/userlogin/userslist', [UserLoginApiController::class, 'index']);
