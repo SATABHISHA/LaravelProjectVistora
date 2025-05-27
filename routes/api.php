@@ -3,6 +3,7 @@
 use App\Http\Controllers\UserLoginApiController;
 use App\Http\Controllers\CompanyDetailsApiController;
 use App\Http\Controllers\BusinessUnitApiController;
+use App\Http\Controllers\DepartmentApiController;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 
@@ -36,3 +37,8 @@ Route::delete('/company/delete/{company_id}/{corp_id}', [CompanyDetailsApiContro
 Route::post('/business_unit/add', [BusinessUnitApiController::class, 'store']);
 Route::put('/business_unit/update/{business_unit_id}', [BusinessUnitApiController::class, 'update']);
 Route::delete('/business_unit/delete/{business_unit_id}', [BusinessUnitApiController::class, 'destroy']);
+
+// Department Routes
+Route::post('/department/add', [DepartmentApiController::class, 'store']);
+Route::put('/department/update/{department_id}', [DepartmentApiController::class, 'update']);
+Route::delete('/department/delete/{department_id}', [DepartmentApiController::class, 'destroy']);
