@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\UserLoginApiController;
 use App\Http\Controllers\CompanyDetailsApiController;
+use App\Http\Controllers\BusinessUnitApiController;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 
@@ -30,3 +31,8 @@ Route::post('/company/register_company_details', [CompanyDetailsApiController::c
 Route::get('/company/details/{corp_id}', [CompanyDetailsApiController::class, 'show']);
 Route::put('/company/update/{company_id}/{corp_id}', [CompanyDetailsApiController::class, 'update']);
 Route::delete('/company/delete/{company_id}/{corp_id}', [CompanyDetailsApiController::class, 'destroy']);
+
+// Business Unit Routes
+Route::post('/business_unit/add', [BusinessUnitApiController::class, 'store']);
+Route::put('/business_unit/update/{business_unit_id}', [BusinessUnitApiController::class, 'update']);
+Route::delete('/business_unit/delete/{business_unit_id}', [BusinessUnitApiController::class, 'destroy']);
