@@ -4,6 +4,7 @@ use App\Http\Controllers\UserLoginApiController;
 use App\Http\Controllers\CompanyDetailsApiController;
 use App\Http\Controllers\BusinessUnitApiController;
 use App\Http\Controllers\DepartmentApiController;
+use App\Http\Controllers\LocationApiController;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 
@@ -42,3 +43,16 @@ Route::delete('/business_unit/delete/{business_unit_id}', [BusinessUnitApiContro
 Route::post('/department/add', [DepartmentApiController::class, 'store']);
 Route::put('/department/update/{department_id}', [DepartmentApiController::class, 'update']);
 Route::delete('/department/delete/{department_id}', [DepartmentApiController::class, 'destroy']);
+
+// Location Routes
+// Country
+Route::post('/location/add-country', [LocationApiController::class, 'addCountry']);
+Route::delete('/location/delete-country/{country_id}', [LocationApiController::class, 'deleteCountry']);
+
+// State
+Route::post('/location/add-state', [LocationApiController::class, 'addState']);
+Route::delete('/location/delete-state/{state_id}', [LocationApiController::class, 'deleteState']);
+
+// City
+Route::post('/location/add-city', [LocationApiController::class, 'addCity']);
+Route::delete('/location/delete-city/{city_id}', [LocationApiController::class, 'deleteCity']);
