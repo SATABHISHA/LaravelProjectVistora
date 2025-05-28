@@ -10,7 +10,10 @@ class IndustryApiController extends Controller
     // Add Industry
     public function store(Request $request)
     {
-        $request->validate(['industry_name' => 'required|string|unique:industries,industry_name']);
+        $request->validate(['industry_name' => 'required|string']);
+        if (Industry::where('industry_name', $request->industry_name)->exists()) {
+            return response()->json(['message' => 'Industry already exists, can\'t enter duplicate data'], 409);
+        }
         $industry = Industry::create(['industry_name' => $request->industry_name]);
         return response()->json(['message' => 'Industry added', 'industry' => $industry], 201);
     }
