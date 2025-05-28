@@ -12,7 +12,10 @@ class LocationApiController extends Controller
     // Add Country
     public function addCountry(Request $request)
     {
-        $request->validate(['country_name' => 'required|unique:countries,country_name']);
+        $request->validate(['country_name' => 'required|string']);
+        if (Country::where('country_name', $request->country_name)->exists()) {
+            return response()->json(['message' => 'Country already exists, can\'t enter duplicate data'], 409);
+        }
         $country = Country::create(['country_name' => $request->country_name]);
         return response()->json(['message' => 'Country added', 'country' => $country], 201);
     }
@@ -31,8 +34,12 @@ class LocationApiController extends Controller
     {
         $request->validate([
             'country_id' => 'required|exists:countries,country_id',
-            'state_name' => 'required'
+            'state_name' => 'required|string'
         ]);
+        if (State::where('country_id', $request->country_id)
+            ->where('state_name', $request->state_name)->exists()) {
+            return response()->json(['message' => 'State already exists for this country, can\'t enter duplicate data'], 409);
+        }
         $state = State::create([
             'country_id' => $request->country_id,
             'state_name' => $request->state_name
@@ -55,8 +62,13 @@ class LocationApiController extends Controller
         $request->validate([
             'country_id' => 'required|exists:countries,country_id',
             'state_id' => 'required|exists:states,state_id',
-            'city_name' => 'required'
+            'city_name' => 'required|string'
         ]);
+        if (City::where('country_id', $request->country_id)
+            ->where('state_id', $request->state_id)
+            ->where('city_name', $request->city_name)->exists()) {
+            return response()->json(['message' => 'City already exists for this state and country, can\'t enter duplicate data'], 409);
+        }
         $city = City::create([
             'country_id' => $request->country_id,
             'state_id' => $request->state_id,
