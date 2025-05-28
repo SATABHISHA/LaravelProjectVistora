@@ -48,6 +48,10 @@ class UserLoginApiController extends Controller
             return response()->json(['message' => 'Invalid credentials'], 401);
         }
 
+        if (!$user->active_yn) {
+            return response()->json(['message' => 'User not active or Inactive user, please contact admin'], 403);
+        }
+
         return response()->json(['message' => 'Login successful', 'user' => $user]);
     }
 
