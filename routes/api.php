@@ -5,6 +5,7 @@ use App\Http\Controllers\CompanyDetailsApiController;
 use App\Http\Controllers\BusinessUnitApiController;
 use App\Http\Controllers\DepartmentApiController;
 use App\Http\Controllers\LocationApiController;
+use App\Http\Controllers\IndustryApiController;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 
@@ -56,3 +57,7 @@ Route::delete('/location/delete-state/{state_id}', [LocationApiController::class
 // City
 Route::post('/location/add-city', [LocationApiController::class, 'addCity']);
 Route::delete('/location/delete-city/{city_id}', [LocationApiController::class, 'deleteCity']);
+
+// Industry Routes
+Route::post('/industry/add', [IndustryApiController::class, 'store']);
+Route::delete('/industry/delete/{industry_id}', [IndustryApiController::class, 'destroy']);
