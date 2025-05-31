@@ -26,4 +26,11 @@ class IndustryApiController extends Controller
         $industry->delete();
         return response()->json(['message' => 'Industry deleted']);
     }
+
+    // Get All Industries
+    public function getAllIndustries()
+    {
+        $industries = Industry::all();
+        return response()->json($industries);
+    }
 }

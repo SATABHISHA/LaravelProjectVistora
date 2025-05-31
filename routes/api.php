@@ -64,3 +64,4 @@ Route::get('/location/cities/{country_id}/{state_id}', [LocationApiController::c
 // Industry Routes
 Route::post('/industry/add', [IndustryApiController::class, 'store']);
 Route::delete('/industry/delete/{industry_id}', [IndustryApiController::class, 'destroy']);
+Route::get('/industry/all', [IndustryApiController::class, 'getAllIndustries']);
