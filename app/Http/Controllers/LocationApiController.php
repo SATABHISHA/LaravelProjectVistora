@@ -85,4 +85,27 @@ class LocationApiController extends Controller
         $city->delete();
         return response()->json(['message' => 'City deleted']);
     }
+
+    // Get All Countries
+    public function getAllCountries()
+    {
+        $countries = \App\Models\Country::all();
+        return response()->json($countries);
+    }
+
+    // Get States By Country
+    public function getStatesByCountry($country_id)
+    {
+        $states = \App\Models\State::where('country_id', $country_id)->get();
+        return response()->json($states);
+    }
+
+    // Get Cities By Country And State
+    public function getCitiesByCountryAndState($country_id, $state_id)
+    {
+        $cities = \App\Models\City::where('country_id', $country_id)
+            ->where('state_id', $state_id)
+            ->get();
+        return response()->json($cities);
+    }
 }
