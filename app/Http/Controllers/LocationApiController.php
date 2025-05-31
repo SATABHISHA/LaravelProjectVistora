@@ -93,18 +93,54 @@ class LocationApiController extends Controller
         return response()->json($countries);
     }
 
-    // Get States By Country
-    public function getStatesByCountry($country_id)
+    // Get All States
+    public function getAllStates()
     {
-        $states = \App\Models\State::where('country_id', $country_id)->get();
+        $states = \App\Models\State::all();
+        return response()->json($states);
+    }
+
+    // Get All Cities
+    public function getAllCities()
+    {
+        $cities = \App\Models\City::all();
+        return response()->json($cities);
+    }
+
+    // Get States By Country
+    public function getStatesByCountry(Request $request)
+    {
+        $countryName = $request->query('country');
+        $country = \App\Models\Country::where('name', $countryName)->first();
+
+        if (!$country) {
+            return response()->json(['error' => 'Country not found'], 404);
+        }
+
+        $states = \App\Models\State::where('country_id', $country->id)->get();
         return response()->json($states);
     }
 
     // Get Cities By Country And State
-    public function getCitiesByCountryAndState($country_id, $state_id)
+    public function getCitiesByCountryAndState(Request $request)
     {
-        $cities = \App\Models\City::where('country_id', $country_id)
-            ->where('state_id', $state_id)
+        $countryName = $request->query('country');
+        $stateName = $request->query('state');
+
+        $country = \App\Models\Country::where('name', $countryName)->first();
+        if (!$country) {
+            return response()->json(['error' => 'Country not found'], 404);
+        }
+
+        $state = \App\Models\State::where('name', $stateName)
+            ->where('country_id', $country->id)
+            ->first();
+        if (!$state) {
+            return response()->json(['error' => 'State not found'], 404);
+        }
+
+        $cities = \App\Models\City::where('country_id', $country->id)
+            ->where('state_id', $state->id)
             ->get();
         return response()->json($cities);
     }
