@@ -6,6 +6,7 @@ use App\Http\Controllers\BusinessUnitApiController;
 use App\Http\Controllers\DepartmentApiController;
 use App\Http\Controllers\LocationApiController;
 use App\Http\Controllers\IndustryApiController;
+use App\Http\Controllers\CurrencyApiController;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 
@@ -65,3 +66,8 @@ Route::get('/location/cities', [LocationApiController::class, 'getAllCities']);
 Route::post('/industry/add', [IndustryApiController::class, 'store']);
 Route::delete('/industry/delete/{industry_id}', [IndustryApiController::class, 'destroy']);
 Route::get('/industry/all', [IndustryApiController::class, 'getAllIndustries']);
+
+// Currency Routes
+Route::post('/currency/add', [CurrencyApiController::class, 'store']);
+Route::get('/currency/all', [CurrencyApiController::class, 'index']);
+Route::delete('/currency/delete', [CurrencyApiController::class, 'destroy']); // Pass id or name in body or query
