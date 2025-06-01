@@ -33,17 +33,13 @@ class LocationApiController extends Controller
     public function addState(Request $request)
     {
         $request->validate([
-            'country_id' => 'required|exists:countries,country_id',
-            'state_name' => 'required|string'
+            'state_name' => 'required|string|unique:states,state_name'
         ]);
-        if (State::where('country_id', $request->country_id)
-            ->where('state_name', $request->state_name)->exists()) {
-            return response()->json(['message' => 'State already exists for this country, can\'t enter duplicate data'], 409);
-        }
+
         $state = State::create([
-            'country_id' => $request->country_id,
             'state_name' => $request->state_name
         ]);
+
         return response()->json(['message' => 'State added', 'state' => $state], 201);
     }
 
@@ -60,20 +56,13 @@ class LocationApiController extends Controller
     public function addCity(Request $request)
     {
         $request->validate([
-            'country_id' => 'required|exists:countries,country_id',
-            'state_id' => 'required|exists:states,state_id',
-            'city_name' => 'required|string'
+            'city_name' => 'required|string|unique:cities,city_name'
         ]);
-        if (City::where('country_id', $request->country_id)
-            ->where('state_id', $request->state_id)
-            ->where('city_name', $request->city_name)->exists()) {
-            return response()->json(['message' => 'City already exists for this state and country, can\'t enter duplicate data'], 409);
-        }
+
         $city = City::create([
-            'country_id' => $request->country_id,
-            'state_id' => $request->state_id,
             'city_name' => $request->city_name
         ]);
+
         return response()->json(['message' => 'City added', 'city' => $city], 201);
     }
 

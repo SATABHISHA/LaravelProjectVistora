@@ -20,24 +20,16 @@ return new class extends Migration
 
         // State Table
         Schema::create('states', function (Blueprint $table) {
-            $table->bigIncrements('state_id');
-            $table->unsignedBigInteger('country_id');
+            $table->id('state_id');
             $table->string('state_name');
             $table->timestamps();
-
-            $table->foreign('country_id')->references('country_id')->on('countries')->onDelete('cascade');
         });
 
         // City Table
         Schema::create('cities', function (Blueprint $table) {
-            $table->bigIncrements('city_id');
-            $table->unsignedBigInteger('country_id');
-            $table->unsignedBigInteger('state_id');
+            $table->id('city_id');
             $table->string('city_name');
             $table->timestamps();
-
-            $table->foreign('country_id')->references('country_id')->on('countries')->onDelete('cascade');
-            $table->foreign('state_id')->references('state_id')->on('states')->onDelete('cascade');
         });
     }
 
