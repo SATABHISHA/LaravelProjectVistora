@@ -41,10 +41,16 @@ Route::post('/business_unit/add', [BusinessUnitApiController::class, 'store']);
 Route::put('/business_unit/update/{business_unit_id}', [BusinessUnitApiController::class, 'update']);
 Route::delete('/business_unit/delete/{business_unit_id}', [BusinessUnitApiController::class, 'destroy']);
 
+// Fetch all business units by corp_id
+Route::get('/business_unit/all/{corp_id}', [BusinessUnitApiController::class, 'getAllByCorpId']);
+
 // Department Routes
 Route::post('/department/add', [DepartmentApiController::class, 'store']);
 Route::put('/department/update/{department_id}', [DepartmentApiController::class, 'update']);
 Route::delete('/department/delete/{department_id}', [DepartmentApiController::class, 'destroy']);
+
+// Fetch all departments by corp_id
+Route::get('/department/all/{corp_id}', [DepartmentApiController::class, 'getAllByCorpId']);
 
 // Location Routes
 // Country

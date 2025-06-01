@@ -53,4 +53,11 @@ class DepartmentApiController extends Controller
 
         return response()->json(['message' => 'Department deleted successfully']);
     }
+
+    // Get all departments by corporation ID
+    public function getAllByCorpId($corp_id)
+    {
+        $departments = Department::where('corp_id', $corp_id)->get();
+        return response()->json($departments);
+    }
 }
