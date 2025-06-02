@@ -73,7 +73,8 @@ Route::post('/industry/add', [IndustryApiController::class, 'store']);
 Route::delete('/industry/delete/{industry_id}', [IndustryApiController::class, 'destroy']);
 Route::get('/industry/all', [IndustryApiController::class, 'getAllIndustries']);
 
-// Currency Routes
+// Currency
 Route::post('/currency/add', [CurrencyApiController::class, 'store']);
 Route::get('/currency/all', [CurrencyApiController::class, 'index']);
 Route::delete('/currency/delete', [CurrencyApiController::class, 'destroy']); // Pass id or name in body or query
+
