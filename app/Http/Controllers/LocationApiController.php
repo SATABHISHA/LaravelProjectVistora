@@ -12,13 +12,19 @@ class LocationApiController extends Controller
     // Add Country
     public function addCountry(Request $request)
     {
-        $request->validate(['country_name' => 'required|string']);
+        // $request->validate(['country_name' => 'required|string']);
         //if (Country::where('country_name', $request->country_name)->exists()) {
         //    return response()->json(['message' => 'Country already exists, can\'t enter duplicate data'], 409);
         //}
         //$country = Country::create(['country_name' => $request->country_name]);
-        return response()->json(['message' => 'Country added', 'country' => '$country'], 201);
+        // return response()->json(['message' => 'Country added', 'country' => '$country'], 201);
+        $request->validate(['country_name' => 'required|string|unique:countries,country_name']);
+
+    $country = Country::create(['country_name' => $request->country_name]);
+
+    return response()->json(['message' => 'Country added', 'country' => $country], 201);
     }
+    
 
     // Delete Country
     public function deleteCountry($country_id)
