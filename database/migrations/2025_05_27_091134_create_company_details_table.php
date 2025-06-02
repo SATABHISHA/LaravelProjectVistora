@@ -13,7 +13,7 @@ return new class extends Migration
     {
         Schema::create('company_details', function (Blueprint $table) {
             $table->bigIncrements('company_id');
-            $table->string('corp_id')->unique();
+            $table->string('corp_id');
             $table->string('company_name');
             $table->string('company_logo')->nullable();
             $table->string('registered_address');

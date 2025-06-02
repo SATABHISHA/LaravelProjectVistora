@@ -18,7 +18,7 @@ return new class extends Migration
             $table->boolean('active_yn')->default(true);
             $table->timestamps();
 
-            $table->foreign('corp_id')->references('corp_id')->on('company_details')->onDelete('cascade');
+            // $table->foreign('corp_id')->references('corp_id')->on('company_details')->onDelete('cascade');
         });
     }
 
