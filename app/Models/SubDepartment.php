@@ -9,6 +9,8 @@ class SubDepartment extends Model
 {
     use HasFactory;
 
+    protected $table = 'subdepartments'; // calling explicitly as it has created sub_departments table
+
     protected $primaryKey = 'sub_dept_id';
 
     protected $fillable = [

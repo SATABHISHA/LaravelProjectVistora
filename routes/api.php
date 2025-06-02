@@ -8,6 +8,7 @@ use App\Http\Controllers\LocationApiController;
 use App\Http\Controllers\IndustryApiController;
 use App\Http\Controllers\CurrencyApiController;
 use App\Http\Controllers\SubDepartmentApiController;
+use App\Http\Controllers\DesignationApiController;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 
@@ -84,4 +85,10 @@ Route::post('/subdepartment/add', [SubDepartmentApiController::class, 'store']);
 Route::get('/subdepartment/all/{corp_id}', [SubDepartmentApiController::class, 'getByCorpId']);
 Route::put('/subdepartment/update/{sub_dept_id}', [SubDepartmentApiController::class, 'update']);
 Route::delete('/subdepartment/delete/{corp_id}', [SubDepartmentApiController::class, 'deleteByCorpId']);
+
+// Designation Routes
+Route::post('/designation/add', [DesignationApiController::class, 'store']);
+Route::get('/designation/all/{corp_id}', [DesignationApiController::class, 'getByCorpId']);
+Route::put('/designation/update/{id}/{corp_id}', [DesignationApiController::class, 'update']);
+Route::delete('/designation/delete/{corp_id}', [DesignationApiController::class, 'deleteByCorpId']);
 
