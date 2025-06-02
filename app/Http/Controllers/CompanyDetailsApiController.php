@@ -12,7 +12,7 @@ class CompanyDetailsApiController extends Controller
     public function register(Request $request)
     {
         $request->validate([
-            'corp_id' => 'required|string|unique:company_details,corp_id',
+            'corp_id' => 'required|string',
             'company_name' => 'required|string',
             'company_logo' => 'nullable|file|mimes:jpg,jpeg,png,gif,svg|max:2048',
             'registered_address' => 'required|string',
