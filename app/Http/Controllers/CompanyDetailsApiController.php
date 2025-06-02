@@ -50,11 +50,8 @@ class CompanyDetailsApiController extends Controller
     // Fetch company details by corp_id
     public function show($corp_id)
     {
-        $company = CompanyDetails::where('corp_id', $corp_id)->first();
-        if (!$company) {
-            return response()->json(['message' => 'Company not found'], 404);
-        }
-        return response()->json($company);
+        $data = \App\Models\CompanyDetails::where('corp_id', $corp_id)->get();
+        return response()->json(['data' => $data]);
     }
 
     // Update company details by company_id and corp_id
