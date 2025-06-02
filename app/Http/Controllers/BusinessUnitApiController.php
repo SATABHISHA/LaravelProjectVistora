@@ -10,13 +10,24 @@ class BusinessUnitApiController extends Controller
     // Add business unit
     public function store(Request $request)
     {
-        $request->validate([
-            'corp_id' => 'required|string|exists:company_details,corp_id',
-            'business_unit_name' => 'required|string',
-            'active_yn' => 'boolean'
-        ]);
+        try {
+            $request->validate([
+                'company_name' => 'required|string',
+                'business_unit_name' => 'required|string',
+                'active_yn' => 'boolean'
+            ]);
+        } catch (\Illuminate\Validation\ValidationException $e) {
+            return response()->json([
+                'message' => 'Validation failed',
+                'errors' => $e->errors()
+            ], 422);
+        }
 
-        $unit = BusinessUnit::create($request->all());
+        $unit = BusinessUnit::create([
+            'company_name' => $request->company_name,
+            'business_unit_name' => $request->business_unit_name,
+            'active_yn' => $request->active_yn ?? true
+        ]);
 
         return response()->json(['message' => 'Business unit added successfully', 'unit' => $unit], 201);
     }

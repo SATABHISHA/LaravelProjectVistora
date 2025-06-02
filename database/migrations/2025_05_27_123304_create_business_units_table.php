@@ -12,13 +12,11 @@ return new class extends Migration
     public function up(): void
     {
         Schema::create('business_units', function (Blueprint $table) {
-            $table->bigIncrements('business_unit_id');
-            $table->string('corp_id');
+            $table->id('business_unit_id');
+            $table->string('company_name'); // Changed from corp_id to company_name
             $table->string('business_unit_name');
             $table->boolean('active_yn')->default(true);
             $table->timestamps();
-
-            // $table->foreign('corp_id')->references('corp_id')->on('company_details')->onDelete('cascade');
         });
     }
 
