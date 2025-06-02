@@ -11,7 +11,7 @@ class DepartmentApiController extends Controller
     public function store(Request $request)
     {
         $request->validate([
-            'corp_id' => 'required|string|exists:company_details,corp_id',
+            'corp_id' => 'required|string',
             'department_name' => 'required|string',
             'active_yn' => 'boolean'
         ]);
