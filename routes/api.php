@@ -7,6 +7,7 @@ use App\Http\Controllers\DepartmentApiController;
 use App\Http\Controllers\LocationApiController;
 use App\Http\Controllers\IndustryApiController;
 use App\Http\Controllers\CurrencyApiController;
+use App\Http\Controllers\SubDepartmentApiController;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 
@@ -77,4 +78,10 @@ Route::get('/industry/all', [IndustryApiController::class, 'getAllIndustries']);
 Route::post('/currency/add', [CurrencyApiController::class, 'store']);
 Route::get('/currency/all', [CurrencyApiController::class, 'index']);
 Route::delete('/currency/delete', [CurrencyApiController::class, 'destroy']); // Pass id or name in body or query
+
+// Sub-Department Routes
+Route::post('/subdepartment/add', [SubDepartmentApiController::class, 'store']);
+Route::get('/subdepartment/all/{corp_id}', [SubDepartmentApiController::class, 'getByCorpId']);
+Route::put('/subdepartment/update/{sub_dept_id}', [SubDepartmentApiController::class, 'update']);
+Route::delete('/subdepartment/delete/{corp_id}', [SubDepartmentApiController::class, 'deleteByCorpId']);
 
