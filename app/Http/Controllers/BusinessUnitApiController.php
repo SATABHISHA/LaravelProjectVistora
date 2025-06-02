@@ -65,10 +65,10 @@ class BusinessUnitApiController extends Controller
         return response()->json(['message' => 'Business unit deleted successfully']);
     }
 
-    // Get all business units by corporate ID
+    // Get all business units (fetch all, ignore corp_id)
     public function getAllByCorpId($corp_id)
     {
-        $businessUnits = BusinessUnit::where('corp_id', $corp_id)->get();
-        return response()->json($businessUnits);
+        $businessUnits = BusinessUnit::all();
+        return response()->json(['data' => $businessUnits]);
     }
 }
