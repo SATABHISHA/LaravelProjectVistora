@@ -8,4 +8,7 @@ use Illuminate\Database\Eloquent\Model;
 class Currency extends Model
 {
     use HasFactory;
+
+    protected $primaryKey = 'currency_id';
+    protected $fillable = ['name'];
 }
