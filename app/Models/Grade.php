@@ -7,6 +7,7 @@ use Illuminate\Database\Eloquent\Model;
 
 class Grade extends Model
 {
+    
     use HasFactory;
 
     protected $primaryKey = 'grade_id';
