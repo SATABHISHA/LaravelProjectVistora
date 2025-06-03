@@ -23,8 +23,8 @@ class DesignationApiController extends Controller
     // Fetch all designations by corp_id
     public function getByCorpId($corp_id)
     {
-        $designations = Designation::where('corp_id', $corp_id)->get();
-        return response()->json($designations);
+        $designations = \App\Models\Designation::where('corp_id', $corp_id)->get();
+        return response()->json(['data' => $designations]);
     }
 
     // Update designation by corp_id and id
