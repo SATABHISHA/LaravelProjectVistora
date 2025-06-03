@@ -9,6 +9,7 @@ use App\Http\Controllers\IndustryApiController;
 use App\Http\Controllers\CurrencyApiController;
 use App\Http\Controllers\SubDepartmentApiController;
 use App\Http\Controllers\DesignationApiController;
+use App\Http\Controllers\GradeApiController;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 
@@ -91,4 +92,8 @@ Route::post('/designation/add', [DesignationApiController::class, 'store']);
 Route::get('/designation/all/{corp_id}', [DesignationApiController::class, 'getByCorpId']);
 Route::put('/designation/update/{id}/{corp_id}', [DesignationApiController::class, 'update']);
 Route::delete('/designation/delete/{corp_id}', [DesignationApiController::class, 'deleteByCorpId']);
+
+// Grade Routes
+Route::post('/grade/add', [GradeApiController::class, 'store']);
+Route::get('/grade/all/{corp_id}', [GradeApiController::class, 'getByCorpId']);
 
