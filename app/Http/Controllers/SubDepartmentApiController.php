@@ -26,7 +26,7 @@ class SubDepartmentApiController extends Controller
     public function getByCorpId($corp_id)
     {
         $subDepts = SubDepartment::where('corp_id', $corp_id)->get();
-        return response()->json($subDepts);
+        return response()->json(['data' => $subDepts]);
     }
 
     // Update SubDepartment
