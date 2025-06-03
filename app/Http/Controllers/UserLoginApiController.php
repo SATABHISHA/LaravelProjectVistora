@@ -40,19 +40,41 @@ class UserLoginApiController extends Controller
             'password' => 'required|string',
         ]);
 
+        // Null check for input values
+        if (
+            is_null($request->corp_id) ||
+            is_null($request->email_id) ||
+            is_null($request->password)
+        ) {
+            return response()->json([
+                'status' => false,
+                'message' => 'corp_id, email_id, and password fields are required'
+            ], 400);
+        }
+
         $user = UserLogin::where('corp_id', $request->corp_id)
             ->where('email_id', $request->email_id)
             ->first();
 
         if (!$user || !Hash::check($request->password, $user->password)) {
-            return response()->json(['message' => 'Invalid credentials'], 401);
+            return response()->json([
+                'status' => false,
+                'message' => 'Invalid credentials'
+            ], 401);
         }
 
         if (!$user->active_yn) {
-            return response()->json(['message' => 'User not active or Inactive user, please contact admin'], 403);
+            return response()->json([
+                'status' => false,
+                'message' => 'User not active or Inactive user, please contact admin'
+            ], 403);
         }
 
-        return response()->json(['message' => 'Login successful', 'user' => $user]);
+        return response()->json([
+            'status' => true,
+            'message' => 'Login successful',
+            'user' => $user
+        ]);
     }
 
     // Get all users
