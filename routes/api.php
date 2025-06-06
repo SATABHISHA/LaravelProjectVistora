@@ -12,6 +12,7 @@ use App\Http\Controllers\DesignationApiController;
 use App\Http\Controllers\GradeApiController;
 use App\Http\Controllers\DocumentTypeApiController;
 use App\Http\Controllers\DocumentFormListApiController;
+use App\Http\Controllers\DocumentFieldListApiController;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 
@@ -108,4 +109,9 @@ Route::delete('/document_type/delete/{corp_id}/{id}', [DocumentTypeApiController
 Route::post('/document_form_list/add', [DocumentFormListApiController::class, 'store']);
 Route::get('/document_form_list/all/{corp_id}', [DocumentFormListApiController::class, 'getByCorpId']);
 Route::delete('/document_form_list/delete/{corp_id}/{id}', [DocumentFormListApiController::class, 'destroy']);
+
+// Document Field List Routes
+Route::post('/document_field_list/add', [DocumentFieldListApiController::class, 'store']);
+Route::get('/document_field_list/all/{corp_id}', [DocumentFieldListApiController::class, 'getByCorpId']);
+Route::delete('/document_field_list/delete/{corp_id}/{id}', [DocumentFieldListApiController::class, 'destroy']);
 
