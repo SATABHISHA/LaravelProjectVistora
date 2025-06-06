@@ -24,7 +24,7 @@ class DocumentTypeApiController extends Controller
     public function getByCorpId($corp_id)
     {
         $docTypes = DocumentType::where('corp_id', $corp_id)->get();
-        return response()->json($docTypes);
+        return response()->json(['data'=>$docTypes]);
     }
 
     // Delete document type by corp_id and id
