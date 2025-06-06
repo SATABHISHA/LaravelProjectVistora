@@ -10,6 +10,7 @@ use App\Http\Controllers\CurrencyApiController;
 use App\Http\Controllers\SubDepartmentApiController;
 use App\Http\Controllers\DesignationApiController;
 use App\Http\Controllers\GradeApiController;
+use App\Http\Controllers\DocumentTypeApiController;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 
@@ -96,4 +97,9 @@ Route::delete('/designation/delete/{corp_id}', [DesignationApiController::class,
 // Grade Routes
 Route::post('/grade/add', [GradeApiController::class, 'store']);
 Route::get('/grade/all/{corp_id}', [GradeApiController::class, 'getByCorpId']);
+
+// Document Type Routes
+Route::post('/document_type/add', [DocumentTypeApiController::class, 'store']);
+Route::get('/document_type/all/{corp_id}', [DocumentTypeApiController::class, 'getByCorpId']);
+Route::delete('/document_type/delete/{corp_id}/{id}', [DocumentTypeApiController::class, 'destroy']);
 
