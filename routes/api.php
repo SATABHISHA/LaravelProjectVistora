@@ -11,6 +11,7 @@ use App\Http\Controllers\SubDepartmentApiController;
 use App\Http\Controllers\DesignationApiController;
 use App\Http\Controllers\GradeApiController;
 use App\Http\Controllers\DocumentTypeApiController;
+use App\Http\Controllers\DocumentFormListApiController;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 
@@ -102,4 +103,9 @@ Route::get('/grade/all/{corp_id}', [GradeApiController::class, 'getByCorpId']);
 Route::post('/document_type/add', [DocumentTypeApiController::class, 'store']);
 Route::get('/document_type/all/{corp_id}', [DocumentTypeApiController::class, 'getByCorpId']);
 Route::delete('/document_type/delete/{corp_id}/{id}', [DocumentTypeApiController::class, 'destroy']);
+
+// Document Form List Routes
+Route::post('/document_form_list/add', [DocumentFormListApiController::class, 'store']);
+Route::get('/document_form_list/all/{corp_id}', [DocumentFormListApiController::class, 'getByCorpId']);
+Route::delete('/document_form_list/delete/{corp_id}/{id}', [DocumentFormListApiController::class, 'destroy']);
 
