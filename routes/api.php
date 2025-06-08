@@ -126,6 +126,7 @@ Route::put('/document/update/{corp_id}/{id}', [DocumentApiController::class, 'up
 
 // Qualification Routes
 Route::post('/qualification/add', [QualificationApiController::class, 'store']);
+Route::get('/qualification/all/{corp_id}', [QualificationApiController::class, 'getByCorpId']);
 Route::delete('/qualification/delete/{corp_id}/{id}', [QualificationApiController::class, 'destroy']);
 
 // Specialization Routes

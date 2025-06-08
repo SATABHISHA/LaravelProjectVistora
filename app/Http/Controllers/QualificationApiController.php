@@ -15,7 +15,16 @@ class QualificationApiController extends Controller
             'qualification_name' => 'required|string',
         ]);
 
-        $qualification = Qualification::create($request->all());
+        // Check if qualification already exists for this corp_id
+        $exists = \App\Models\Qualification::where('corp_id', $request->corp_id)
+            ->where('qualification_name', $request->qualification_name)
+            ->exists();
+
+        if ($exists) {
+            return response()->json(['message' => 'Qualification already exists for this corp_id'], 409);
+        }
+
+        $qualification = \App\Models\Qualification::create($request->all());
 
         return response()->json(['message' => 'Qualification added successfully', 'qualification' => $qualification], 201);
     }
@@ -32,5 +41,12 @@ class QualificationApiController extends Controller
         $qualification->delete();
 
         return response()->json(['message' => 'Qualification deleted successfully']);
+    }
+
+    // Fetch all qualifications by corp_id
+    public function getByCorpId($corp_id)
+    {
+        $qualifications = \App\Models\Qualification::where('corp_id', $corp_id)->get();
+        return response()->json(['data' => $qualifications]);
     }
 }
