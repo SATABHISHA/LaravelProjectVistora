@@ -17,6 +17,7 @@ use App\Http\Controllers\DocumentApiController;
 use App\Http\Controllers\QualificationApiController;
 use App\Http\Controllers\SpecializationApiController;
 use App\Http\Controllers\BlacklistApiController;
+use App\Http\Controllers\JobFunctionApiController;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 
@@ -139,4 +140,9 @@ Route::get('/specialization/qualifications/{corp_id}', [SpecializationApiControl
 Route::post('/blacklist/add', [BlacklistApiController::class, 'store']);
 Route::delete('/blacklist/delete/{corp_id}/{id}', [BlacklistApiController::class, 'destroy']);
 Route::get('/blacklist/all/{corp_id}', [BlacklistApiController::class, 'getByCorpId']);
+
+// Job Function Routes
+Route::post('/jobfunction/add', [JobFunctionApiController::class, 'store']);
+Route::delete('/jobfunction/delete/{corp_id}/{id}', [JobFunctionApiController::class, 'destroy']);
+Route::get('/jobfunction/all/{corp_id}', [JobFunctionApiController::class, 'getByCorpId']);
 
