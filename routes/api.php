@@ -20,6 +20,7 @@ use App\Http\Controllers\BlacklistApiController;
 use App\Http\Controllers\JobFunctionApiController;
 use App\Http\Controllers\SkillApiController;
 use App\Http\Controllers\SkillProficiencyApiController;
+use App\Http\Controllers\BankApiController;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 
@@ -157,4 +158,9 @@ Route::get('/skill/all/{corp_id}', [SkillApiController::class, 'getByCorpId']);
 Route::post('/skillproficiency/add', [SkillProficiencyApiController::class, 'store']);
 Route::delete('/skillproficiency/delete/{corp_id}/{id}', [SkillProficiencyApiController::class, 'destroy']);
 Route::get('/skillproficiency/all/{corp_id}', [SkillProficiencyApiController::class, 'getByCorpId']);
+
+// Bank Routes
+Route::post('/bank/add', [BankApiController::class, 'store']);
+Route::delete('/bank/delete/{corp_id}/{id}', [BankApiController::class, 'destroy']);
+Route::get('/bank/all/{corp_id}', [BankApiController::class, 'getByCorpId']);
 
