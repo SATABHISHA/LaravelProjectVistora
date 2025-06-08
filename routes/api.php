@@ -15,6 +15,7 @@ use App\Http\Controllers\DocumentFormListApiController;
 use App\Http\Controllers\DocumentFieldListApiController;
 use App\Http\Controllers\DocumentApiController;
 use App\Http\Controllers\QualificationApiController;
+use App\Http\Controllers\SpecializationApiController;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 
@@ -126,4 +127,9 @@ Route::put('/document/update/{corp_id}/{id}', [DocumentApiController::class, 'up
 // Qualification Routes
 Route::post('/qualification/add', [QualificationApiController::class, 'store']);
 Route::delete('/qualification/delete/{corp_id}/{id}', [QualificationApiController::class, 'destroy']);
+
+// Specialization Routes
+Route::post('/specialization/add', [SpecializationApiController::class, 'store']);
+Route::delete('/specialization/delete/{corp_id}/{id}', [SpecializationApiController::class, 'destroy']);
+Route::get('/specialization/qualifications/{corp_id}', [SpecializationApiController::class, 'getQualificationsWithSpecializationCount']);
 
