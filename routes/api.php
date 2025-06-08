@@ -18,6 +18,7 @@ use App\Http\Controllers\QualificationApiController;
 use App\Http\Controllers\SpecializationApiController;
 use App\Http\Controllers\BlacklistApiController;
 use App\Http\Controllers\JobFunctionApiController;
+use App\Http\Controllers\SkillApiController;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 
@@ -145,4 +146,9 @@ Route::get('/blacklist/all/{corp_id}', [BlacklistApiController::class, 'getByCor
 Route::post('/jobfunction/add', [JobFunctionApiController::class, 'store']);
 Route::delete('/jobfunction/delete/{corp_id}/{id}', [JobFunctionApiController::class, 'destroy']);
 Route::get('/jobfunction/all/{corp_id}', [JobFunctionApiController::class, 'getByCorpId']);
+
+// Skill Routes
+Route::post('/skill/add', [SkillApiController::class, 'store']);
+Route::delete('/skill/delete/{corp_id}/{id}', [SkillApiController::class, 'destroy']);
+Route::get('/skill/all/{corp_id}', [SkillApiController::class, 'getByCorpId']);
 
