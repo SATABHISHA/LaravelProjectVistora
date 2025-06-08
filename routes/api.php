@@ -16,6 +16,7 @@ use App\Http\Controllers\DocumentFieldListApiController;
 use App\Http\Controllers\DocumentApiController;
 use App\Http\Controllers\QualificationApiController;
 use App\Http\Controllers\SpecializationApiController;
+use App\Http\Controllers\BlacklistApiController;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 
@@ -133,4 +134,9 @@ Route::delete('/qualification/delete/{corp_id}/{id}', [QualificationApiControlle
 Route::post('/specialization/add', [SpecializationApiController::class, 'store']);
 Route::delete('/specialization/delete/{corp_id}/{id}', [SpecializationApiController::class, 'destroy']);
 Route::get('/specialization/qualifications/{corp_id}', [SpecializationApiController::class, 'getQualificationsWithSpecializationCount']);
+
+// Blacklist Routes
+Route::post('/blacklist/add', [BlacklistApiController::class, 'store']);
+Route::delete('/blacklist/delete/{corp_id}/{id}', [BlacklistApiController::class, 'destroy']);
+Route::get('/blacklist/all/{corp_id}', [BlacklistApiController::class, 'getByCorpId']);
 
