@@ -21,6 +21,7 @@ use App\Http\Controllers\JobFunctionApiController;
 use App\Http\Controllers\SkillApiController;
 use App\Http\Controllers\SkillProficiencyApiController;
 use App\Http\Controllers\BankApiController;
+use App\Http\Controllers\BankChallanReportApiController;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 
@@ -163,4 +164,9 @@ Route::get('/skillproficiency/all/{corp_id}', [SkillProficiencyApiController::cl
 Route::post('/bank/add', [BankApiController::class, 'store']);
 Route::delete('/bank/delete/{corp_id}/{id}', [BankApiController::class, 'destroy']);
 Route::get('/bank/all/{corp_id}', [BankApiController::class, 'getByCorpId']);
+
+// Bank Challan Report Routes
+Route::post('/bankchallanreport/add', [BankChallanReportApiController::class, 'store']);
+Route::delete('/bankchallanreport/delete/{corp_id}/{id}', [BankChallanReportApiController::class, 'destroy']);
+Route::get('/bankchallanreport/all/{corp_id}', [BankChallanReportApiController::class, 'getByCorpId']);
 
