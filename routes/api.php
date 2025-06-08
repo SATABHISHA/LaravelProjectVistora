@@ -14,6 +14,7 @@ use App\Http\Controllers\DocumentTypeApiController;
 use App\Http\Controllers\DocumentFormListApiController;
 use App\Http\Controllers\DocumentFieldListApiController;
 use App\Http\Controllers\DocumentApiController;
+use App\Http\Controllers\QualificationApiController;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 
@@ -121,4 +122,8 @@ Route::post('/document/add', [DocumentApiController::class, 'store']);
 Route::get('/document/all/{corp_id}', [DocumentApiController::class, 'getByCorpId']);
 Route::delete('/document/delete/{corp_id}/{id}', [DocumentApiController::class, 'destroy']);
 Route::put('/document/update/{corp_id}/{id}', [DocumentApiController::class, 'update']);
+
+// Qualification Routes
+Route::post('/qualification/add', [QualificationApiController::class, 'store']);
+Route::delete('/qualification/delete/{corp_id}/{id}', [QualificationApiController::class, 'destroy']);
 
