@@ -20,7 +20,17 @@ class SpecializationApiController extends Controller
             'specialization_name.required' => 'specialization_name field was blank',
         ]);
 
-        $specialization = Specialization::create($request->all());
+        // Check for duplicate specialization under the same corp_id and qualification_name
+        $exists = \App\Models\Specialization::where('corp_id', $request->corp_id)
+            ->where('qualification_name', $request->qualification_name)
+            ->where('specialization_name', $request->specialization_name)
+            ->exists();
+
+        if ($exists) {
+            return response()->json(['message' => 'Specialization already exists for this qualification and corp_id'], 409);
+        }
+
+        $specialization = \App\Models\Specialization::create($request->all());
 
         return response()->json(['message' => 'Specialization added successfully', 'specialization' => $specialization], 201);
     }
