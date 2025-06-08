@@ -19,6 +19,7 @@ use App\Http\Controllers\SpecializationApiController;
 use App\Http\Controllers\BlacklistApiController;
 use App\Http\Controllers\JobFunctionApiController;
 use App\Http\Controllers\SkillApiController;
+use App\Http\Controllers\SkillProficiencyApiController;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 
@@ -151,4 +152,9 @@ Route::get('/jobfunction/all/{corp_id}', [JobFunctionApiController::class, 'getB
 Route::post('/skill/add', [SkillApiController::class, 'store']);
 Route::delete('/skill/delete/{corp_id}/{id}', [SkillApiController::class, 'destroy']);
 Route::get('/skill/all/{corp_id}', [SkillApiController::class, 'getByCorpId']);
+
+// Skill Proficiency Routes
+Route::post('/skillproficiency/add', [SkillProficiencyApiController::class, 'store']);
+Route::delete('/skillproficiency/delete/{corp_id}/{id}', [SkillProficiencyApiController::class, 'destroy']);
+Route::get('/skillproficiency/all/{corp_id}', [SkillProficiencyApiController::class, 'getByCorpId']);
 
