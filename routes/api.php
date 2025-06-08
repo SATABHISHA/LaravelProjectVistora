@@ -22,6 +22,7 @@ use App\Http\Controllers\SkillApiController;
 use App\Http\Controllers\SkillProficiencyApiController;
 use App\Http\Controllers\BankApiController;
 use App\Http\Controllers\BankChallanReportApiController;
+use App\Http\Controllers\PaymentBankApiController;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 
@@ -169,4 +170,10 @@ Route::get('/bank/all/{corp_id}', [BankApiController::class, 'getByCorpId']);
 Route::post('/bankchallanreport/add', [BankChallanReportApiController::class, 'store']);
 Route::delete('/bankchallanreport/delete/{corp_id}/{id}', [BankChallanReportApiController::class, 'destroy']);
 Route::get('/bankchallanreport/all/{corp_id}', [BankChallanReportApiController::class, 'getByCorpId']);
+
+// Payment Bank Routes
+Route::post('/paymentbank/add', [PaymentBankApiController::class, 'store']);
+Route::get('/paymentbank/all/{corp_id}', [PaymentBankApiController::class, 'getByCorpId']);
+Route::put('/paymentbank/update/{corp_id}/{id}', [PaymentBankApiController::class, 'update']);
+Route::delete('/paymentbank/delete/{corp_id}/{id}', [PaymentBankApiController::class, 'destroy']);
 
