@@ -24,6 +24,7 @@ use App\Http\Controllers\BankApiController;
 use App\Http\Controllers\BankChallanReportApiController;
 use App\Http\Controllers\PaymentBankApiController;
 use App\Http\Controllers\VendorApiController;
+use App\Http\Controllers\CustomerDetailApiController;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 
@@ -183,4 +184,10 @@ Route::post('/vendor/add', [VendorApiController::class, 'store']);
 Route::put('/vendor/update/{corp_id}/{id}', [VendorApiController::class, 'update']);
 Route::delete('/vendor/delete/{corp_id}/{id}', [VendorApiController::class, 'destroy']);
 Route::get('/vendor/all/{corp_id}', [VendorApiController::class, 'getByCorpId']);
+
+// Customer Routes
+Route::post('/customer/add', [CustomerDetailApiController::class, 'store']);
+Route::get('/customer/all/{corp_id}', [CustomerDetailApiController::class, 'getByCorpId']);
+Route::put('/customer/update/{corp_id}/{id}', [CustomerDetailApiController::class, 'update']);
+Route::delete('/customer/delete/{corp_id}/{id}', [CustomerDetailApiController::class, 'destroy']);
 
