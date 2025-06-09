@@ -23,6 +23,7 @@ use App\Http\Controllers\SkillProficiencyApiController;
 use App\Http\Controllers\BankApiController;
 use App\Http\Controllers\BankChallanReportApiController;
 use App\Http\Controllers\PaymentBankApiController;
+use App\Http\Controllers\VendorApiController;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 
@@ -176,4 +177,10 @@ Route::post('/paymentbank/add', [PaymentBankApiController::class, 'store']);
 Route::get('/paymentbank/all/{corp_id}', [PaymentBankApiController::class, 'getByCorpId']);
 Route::put('/paymentbank/update/{corp_id}/{id}', [PaymentBankApiController::class, 'update']);
 Route::delete('/paymentbank/delete/{corp_id}/{id}', [PaymentBankApiController::class, 'destroy']);
+
+// Vendor Routes
+Route::post('/vendor/add', [VendorApiController::class, 'store']);
+Route::put('/vendor/update/{corp_id}/{id}', [VendorApiController::class, 'update']);
+Route::delete('/vendor/delete/{corp_id}/{id}', [VendorApiController::class, 'destroy']);
+Route::get('/vendor/all/{corp_id}', [VendorApiController::class, 'getByCorpId']);
 
