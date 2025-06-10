@@ -26,6 +26,7 @@ use App\Http\Controllers\PaymentBankApiController;
 use App\Http\Controllers\VendorApiController;
 use App\Http\Controllers\CustomerDetailApiController;
 use App\Http\Controllers\ProfileAccessSettingApiController;
+use App\Http\Controllers\SocialProfileAccessApiController;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 
@@ -197,4 +198,10 @@ Route::post('/profileaccess/add', [ProfileAccessSettingApiController::class, 'st
 Route::get('/profileaccess/all/{corp_id}', [ProfileAccessSettingApiController::class, 'getByCorpId']);
 Route::put('/profileaccess/update/{corp_id}/{id}', [ProfileAccessSettingApiController::class, 'update']);
 Route::delete('/profileaccess/delete/{corp_id}/{id}', [ProfileAccessSettingApiController::class, 'destroy']);
+
+// Social Profile Access Routes
+Route::post('/socialprofileaccess/add', [SocialProfileAccessApiController::class, 'store']);
+Route::get('/socialprofileaccess/all/{corp_id}', [SocialProfileAccessApiController::class, 'getByCorpId']);
+Route::put('/socialprofileaccess/update/{corp_id}/{id}', [SocialProfileAccessApiController::class, 'update']);
+Route::delete('/socialprofileaccess/delete/{corp_id}/{id}', [SocialProfileAccessApiController::class, 'destroy']);
 
