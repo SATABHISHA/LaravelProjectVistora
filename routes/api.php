@@ -133,7 +133,7 @@ Route::delete('/document_field_list/delete/{corp_id}/{id}', [DocumentFieldListAp
 Route::post('/document/add', [DocumentApiController::class, 'store']);
 Route::get('/document/all/{corp_id}', [DocumentApiController::class, 'getByCorpId']);
 Route::delete('/document/delete/{corp_id}/{id}', [DocumentApiController::class, 'destroy']);
-Route::put('/document/update/{corp_id}/{id}', [DocumentApiController::class, 'update']);
+Route::post('/document/update/{corp_id}/{id}', [DocumentApiController::class, 'update']);
 
 // Qualification Routes
 Route::post('/qualification/add', [QualificationApiController::class, 'store']);
