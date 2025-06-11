@@ -119,6 +119,10 @@ class DocumentApiController extends Controller
 
         // Handle file upload
         if ($request->hasFile('doc_upload')) {
+            // Delete old file if it exists
+            if ($document->doc_upload) {
+                Storage::disk('public')->delete($document->doc_upload);
+            }
             $path = $request->file('doc_upload')->store('documents', 'public');
             $document->doc_upload = $path;
         }
