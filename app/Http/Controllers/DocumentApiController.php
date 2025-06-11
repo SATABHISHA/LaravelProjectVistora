@@ -83,60 +83,48 @@ class DocumentApiController extends Controller
     // Update document
     public function update(Request $request, $corp_id, $id)
     {
-        $document = \App\Models\Document::where('corp_id', $corp_id)->where('id', $id)->first();
-
+        $document = Document::where('corp_id', $corp_id)->where('id', $id)->first();
         if (!$document) {
             return response()->json(['message' => 'Document not found'], 404);
         }
 
+        // Validate fields
         $request->validate([
-            'corp_id' => 'sometimes|required|string',
-            'name' => 'sometimes|required|string',
-            'doc_type' => 'sometimes|required|string',
-            'track_send_alert_yn' => 'sometimes|integer',
-            'candidate_view_yn' => 'sometimes|integer',
-            'candidate_edit_yn' => 'sometimes|integer',
-            'emp_view_yn' => 'sometimes|integer',
-            'emp_edit_yn' => 'sometimes|integer',
+            'name' => 'sometimes|string',
+            'doc_type' => 'sometimes|string',
+            'track_send_alert_yn' => 'sometimes|boolean',
+            'candidate_view_yn' => 'sometimes|boolean',
+            'candidate_edit_yn' => 'sometimes|boolean',
+            'emp_view_yn' => 'sometimes|boolean',
+            'emp_edit_yn' => 'sometimes|boolean',
             'mandatory_employee_yn' => 'sometimes|integer',
             'mandatory_candidate_yn' => 'sometimes|integer',
             'mandatory_to_convert_emp_yn' => 'sometimes|integer',
             'mandatory_upcoming_join_yn' => 'sometimes|integer',
-            'form_list' => 'sometimes|nullable|string',
-            'field_list' => 'sometimes|nullable|string',
-            'doc_upload' => 'sometimes|nullable|file|max:5120|mimes:pdf,xls,xlsx'
-        ], [
-            'doc_upload.max' => 'The document must not be greater than 5MB.',
-            'doc_upload.mimes' => 'The document must be a file of type: pdf, xls, xlsx.',
+            'form_list' => 'sometimes|string|nullable',
+            'field_list' => 'sometimes|string|nullable',
+            'doc_upload' => 'sometimes|file|max:5120|mimes:pdf,xls,xlsx'
         ]);
 
-        $path = $document->doc_upload;
-        if ($request->hasFile('doc_upload')) {
-            // Delete the old file from storage
-            if ($path) {
-                Storage::disk('public')->delete($path);
+        // Update fields if present
+        foreach ([
+            'name', 'doc_type', 'track_send_alert_yn', 'candidate_view_yn', 'candidate_edit_yn',
+            'emp_view_yn', 'emp_edit_yn', 'mandatory_employee_yn', 'mandatory_candidate_yn',
+            'mandatory_to_convert_emp_yn', 'mandatory_upcoming_join_yn', 'form_list', 'field_list'
+        ] as $field) {
+            if ($request->has($field)) {
+                $document->$field = $request->$field;
             }
-            $path = $request->file('doc_upload')->store('documents', 'public');
         }
 
-        $document->update([
-            'corp_id' => $request->corp_id ?? $document->corp_id,
-            'name' => $request->name ?? $document->name,
-            'doc_type' => $request->doc_type ?? $document->doc_type,
-            'track_send_alert_yn' => $request->track_send_alert_yn ?? $document->track_send_alert_yn,
-            'candidate_view_yn' => $request->candidate_view_yn ?? $document->candidate_view_yn,
-            'candidate_edit_yn' => $request->candidate_edit_yn ?? $document->candidate_edit_yn,
-            'emp_view_yn' => $request->emp_view_yn ?? $document->emp_view_yn,
-            'emp_edit_yn' => $request->emp_edit_yn ?? $document->emp_edit_yn,
-            'mandatory_employee_yn' => $request->mandatory_employee_yn ?? $document->mandatory_employee_yn,
-            'mandatory_candidate_yn' => $request->mandatory_candidate_yn ?? $document->mandatory_candidate_yn,
-            'mandatory_to_convert_emp_yn' => $request->mandatory_to_convert_emp_yn ?? $document->mandatory_to_convert_emp_yn,
-            'mandatory_upcoming_join_yn' => $request->mandatory_upcoming_join_yn ?? $document->mandatory_upcoming_join_yn,
-            'form_list' => $request->form_list ?? $document->form_list,
-            'field_list' => $request->field_list ?? $document->field_list,
-            'doc_upload' => $path,
-        ]);
+        // Handle file upload
+        if ($request->hasFile('doc_upload')) {
+            $path = $request->file('doc_upload')->store('documents', 'public');
+            $document->doc_upload = $path;
+        }
 
-        return response()->json(['message' => 'Document updated successfully', 'document' => $document]);
+        $document->save();
+
+        return response()->json(['message' => 'Document updated', 'data' => $document]);
     }
 }
