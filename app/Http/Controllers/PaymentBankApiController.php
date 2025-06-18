@@ -54,9 +54,9 @@ class PaymentBankApiController extends Controller
                 ->where('id', '!=', $id)
                 ->exists();
 
-            if ($exists) {
+           /* if ($exists) {
                 return response()->json(['message' => 'Account number already exists for this corp_id'], 409);
-            }
+            }*/
         }
 
         $paymentBank->update($request->all());
