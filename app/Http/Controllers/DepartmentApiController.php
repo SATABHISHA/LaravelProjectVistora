@@ -58,6 +58,6 @@ class DepartmentApiController extends Controller
     public function getAllByCorpId($corp_id)
     {
         $departments = Department::where('corp_id', $corp_id)->get();
-        return response()->json($departments);
+        return response()->json(['data' => $departments]);
     }
 }
