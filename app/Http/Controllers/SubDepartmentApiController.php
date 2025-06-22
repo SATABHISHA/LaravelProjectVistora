@@ -58,4 +58,18 @@ class SubDepartmentApiController extends Controller
             return response()->json(['message' => 'No SubDepartments found for this corp_id'], 404);
         }
     }
+
+    // Delete SubDepartment by corp_id and sub_dept_id
+    public function deleteByCorpIdAndSubDeptId($corp_id, $sub_dept_id)
+    {
+        $deleted = SubDepartment::where('corp_id', $corp_id)
+            ->where('sub_dept_id', $sub_dept_id)
+            ->delete();
+
+        if ($deleted) {
+            return response()->json(['message' => 'SubDepartment deleted successfully']);
+        } else {
+            return response()->json(['message' => 'SubDepartment not found'], 404);
+        }
+    }
 }

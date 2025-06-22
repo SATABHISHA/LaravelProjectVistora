@@ -102,7 +102,7 @@ Route::delete('/currency/delete', [CurrencyApiController::class, 'destroy']); //
 Route::post('/subdepartment/add', [SubDepartmentApiController::class, 'store']);
 Route::get('/subdepartment/all/{corp_id}', [SubDepartmentApiController::class, 'getByCorpId']);
 Route::put('/subdepartment/update/{sub_dept_id}', [SubDepartmentApiController::class, 'update']);
-Route::delete('/subdepartment/delete/{corp_id}', [SubDepartmentApiController::class, 'deleteByCorpId']);
+Route::delete('/subdepartment/delete/{corp_id}/{sub_dept_id}', [SubDepartmentApiController::class, 'deleteByCorpIdAndSubDeptId']);
 
 // Designation Routes
 Route::post('/designation/add', [DesignationApiController::class, 'store']);
