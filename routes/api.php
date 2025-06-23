@@ -108,7 +108,7 @@ Route::delete('/subdepartment/delete/{corp_id}/{sub_dept_id}', [SubDepartmentApi
 Route::post('/designation/add', [DesignationApiController::class, 'store']);
 Route::get('/designation/all/{corp_id}', [DesignationApiController::class, 'getByCorpId']);
 Route::put('/designation/update/{id}/{corp_id}', [DesignationApiController::class, 'update']);
-Route::delete('/designation/delete/{corp_id}', [DesignationApiController::class, 'deleteByCorpId']);
+Route::delete('/designation/delete/{corp_id}/{id}', [DesignationApiController::class, 'destroy']);
 
 // Grade Routes
 Route::post('/grade/add', [GradeApiController::class, 'store']);

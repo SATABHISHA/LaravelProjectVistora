@@ -54,4 +54,15 @@ class DesignationApiController extends Controller
             return response()->json(['message' => 'No designation found for this corp_id'], 404);
         }
     }
+
+    // Delete designation by corp_id and id
+    public function destroy($corp_id, $id)
+    {
+        $designation = \App\Models\Designation::where('corp_id', $corp_id)->where('id', $id)->first();
+        if (!$designation) {
+            return response()->json(['message' => 'Designation not found'], 404);
+        }
+        $designation->delete();
+        return response()->json(['message' => 'Designation deleted']);
+    }
 }
