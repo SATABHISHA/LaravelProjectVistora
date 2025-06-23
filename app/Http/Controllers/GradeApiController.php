@@ -26,4 +26,15 @@ class GradeApiController extends Controller
         $grades = Grade::where('corp_id', $corp_id)->get();
         return response()->json(['data' => $grades]);
     }
+
+    // Delete grade
+    public function destroy($corp_id, $grade_id)
+    {
+        $grade = Grade::where('corp_id', $corp_id)->where('grade_id', $grade_id)->first();
+        if (!$grade) {
+            return response()->json(['message' => 'Grade not found'], 404);
+        }
+        $grade->delete();
+        return response()->json(['message' => 'Grade deleted']);
+    }
 }

@@ -113,6 +113,7 @@ Route::delete('/designation/delete/{corp_id}/{id}', [DesignationApiController::c
 // Grade Routes
 Route::post('/grade/add', [GradeApiController::class, 'store']);
 Route::get('/grade/all/{corp_id}', [GradeApiController::class, 'getByCorpId']);
+Route::delete('/grade/delete/{corp_id}/{grade_id}', [GradeApiController::class, 'destroy']);
 
 // Document Type Routes
 Route::post('/document_type/add', [DocumentTypeApiController::class, 'store']);
