@@ -10,5 +10,5 @@ class Country extends Model
     use HasFactory;
 
     protected $primaryKey = 'country_id';
-    protected $fillable = ['country_name'];
+    protected $fillable = ['country_name', 'corp_id'];
 }

@@ -12,24 +12,27 @@ class LocationApiController extends Controller
     // Add Country
     public function addCountry(Request $request)
     {
-        // $request->validate(['country_name' => 'required|string']);
-        //if (Country::where('country_name', $request->country_name)->exists()) {
-        //    return response()->json(['message' => 'Country already exists, can\'t enter duplicate data'], 409);
-        //}
-        //$country = Country::create(['country_name' => $request->country_name]);
-        // return response()->json(['message' => 'Country added', 'country' => '$country'], 201);
-        $request->validate(['country_name' => 'required|string|unique:countries,country_name']);
+        $request->validate([
+            'country_name' => 'required|string',
+            'corp_id' => 'required|string'
+        ]);
 
-    $country = Country::create(['country_name' => $request->country_name]);
+        if (Country::where('country_name', $request->country_name)->where('corp_id', $request->corp_id)->exists()) {
+            return response()->json(['message' => 'Duplicate entry for country'], 409);
+        }
 
-    return response()->json(['message' => 'Country added', 'country' => $country], 201);
+        $country = Country::create([
+            'country_name' => $request->country_name,
+            'corp_id' => $request->corp_id
+        ]);
+
+        return response()->json(['message' => 'Country added', 'country' => $country], 201);
     }
-    
 
-    // Delete Country
-    public function deleteCountry($country_id)
+    // Delete Country by country_id and corp_id
+    public function deleteCountry($country_id, $corp_id)
     {
-        $country = Country::find($country_id);
+        $country = Country::where('id', $country_id)->where('corp_id', $corp_id)->first();
         if (!$country) return response()->json(['message' => 'Country not found'], 404);
         $country->delete();
         return response()->json(['message' => 'Country deleted']);
@@ -39,20 +42,31 @@ class LocationApiController extends Controller
     public function addState(Request $request)
     {
         $request->validate([
-            'state_name' => 'required|string|unique:states,state_name'
+            'state_name' => 'required|string',
+            'country_id' => 'required|integer',
+            'corp_id' => 'required|string'
         ]);
 
+        if (State::where('state_name', $request->state_name)
+            ->where('country_id', $request->country_id)
+            ->where('corp_id', $request->corp_id)
+            ->exists()) {
+            return response()->json(['message' => 'Duplicate entry for state'], 409);
+        }
+
         $state = State::create([
-            'state_name' => $request->state_name
+            'state_name' => $request->state_name,
+            'country_id' => $request->country_id,
+            'corp_id' => $request->corp_id
         ]);
 
         return response()->json(['message' => 'State added', 'state' => $state], 201);
     }
 
-    // Delete State
-    public function deleteState($state_id)
+    // Delete State by state_id and corp_id
+    public function deleteState($state_id, $corp_id)
     {
-        $state = State::find($state_id);
+        $state = State::where('id', $state_id)->where('corp_id', $corp_id)->first();
         if (!$state) return response()->json(['message' => 'State not found'], 404);
         $state->delete();
         return response()->json(['message' => 'State deleted']);
@@ -62,81 +76,70 @@ class LocationApiController extends Controller
     public function addCity(Request $request)
     {
         $request->validate([
-            'city_name' => 'required|string|unique:cities,city_name'
+            'city_name' => 'required|string',
+            'country_id' => 'required|integer',
+            'state_id' => 'required|integer',
+            'corp_id' => 'required|string'
         ]);
 
+        if (City::where('city_name', $request->city_name)
+            ->where('country_id', $request->country_id)
+            ->where('state_id', $request->state_id)
+            ->where('corp_id', $request->corp_id)
+            ->exists()) {
+            return response()->json(['message' => 'Duplicate entry for city'], 409);
+        }
+
         $city = City::create([
-            'city_name' => $request->city_name
+            'city_name' => $request->city_name,
+            'country_id' => $request->country_id,
+            'state_id' => $request->state_id,
+            'corp_id' => $request->corp_id
         ]);
 
         return response()->json(['message' => 'City added', 'city' => $city], 201);
     }
 
-    // Delete City
-    public function deleteCity($city_id)
+    // Delete City by city_id and corp_id
+    public function deleteCity($city_id, $corp_id)
     {
-        $city = City::find($city_id);
+        $city = City::where('id', $city_id)->where('corp_id', $corp_id)->first();
         if (!$city) return response()->json(['message' => 'City not found'], 404);
         $city->delete();
         return response()->json(['message' => 'City deleted']);
     }
 
-    // Get All Countries
-    public function getAllCountries()
+    // Get All Countries (optionally by corp_id)
+    public function getAllCountries(Request $request)
     {
-        $countries = \App\Models\Country::all();
-        return response()->json($countries);
+        $corp_id = $request->query('corp_id');
+        $countries = $corp_id
+            ? Country::where('corp_id', $corp_id)->get()
+            : Country::all();
+        return response()->json(['data' => $countries]);
     }
 
-    // Get All States
-    public function getAllStates()
+    // Get States by country_id and corp_id
+    public function getStates(Request $request)
     {
-        $states = \App\Models\State::all();
-        return response()->json($states);
-    }
-
-    // Get All Cities
-    public function getAllCities()
-    {
-        $cities = \App\Models\City::all();
-        return response()->json($cities);
-    }
-
-    // Get States By Country
-    public function getStatesByCountry(Request $request)
-    {
-        $countryName = $request->query('country');
-        $country = \App\Models\Country::where('name', $countryName)->first();
-
-        if (!$country) {
-            return response()->json(['error' => 'Country not found'], 404);
-        }
-
-        $states = \App\Models\State::where('country_id', $country->id)->get();
-        return response()->json($states);
-    }
-
-    // Get Cities By Country And State
-    public function getCitiesByCountryAndState(Request $request)
-    {
-        $countryName = $request->query('country');
-        $stateName = $request->query('state');
-
-        $country = \App\Models\Country::where('name', $countryName)->first();
-        if (!$country) {
-            return response()->json(['error' => 'Country not found'], 404);
-        }
-
-        $state = \App\Models\State::where('name', $stateName)
-            ->where('country_id', $country->id)
-            ->first();
-        if (!$state) {
-            return response()->json(['error' => 'State not found'], 404);
-        }
-
-        $cities = \App\Models\City::where('country_id', $country->id)
-            ->where('state_id', $state->id)
+        $country_id = $request->query('country_id');
+        $corp_id = $request->query('corp_id');
+        $states = State::where('country_id', $country_id)
+            ->where('corp_id', $corp_id)
             ->get();
-        return response()->json($cities);
+        return response()->json(['data' => $states]);
+    }
+
+    // Get Cities by country_id, state_id, corp_id
+    public function getCities(Request $request)
+    {
+        $country_id = $request->query('country_id');
+        $state_id = $request->query('state_id');
+        $corp_id = $request->query('corp_id');
+        $cities = City::where('country_id', $country_id)
+            ->where('state_id', $state_id)
+            ->where('corp_id', $corp_id)
+            ->get();
+        return response()->json(['data' => $cities]);
     }
 }

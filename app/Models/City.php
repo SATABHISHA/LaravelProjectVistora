@@ -11,5 +11,5 @@ class City extends Model
 
 
     protected $primaryKey = 'city_id';
-    protected $fillable = ['city_name'];
+    protected $fillable = ['city_name', 'country_id', 'state_id', 'corp_id'];
 }
