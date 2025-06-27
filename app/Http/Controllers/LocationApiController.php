@@ -110,35 +110,26 @@ class LocationApiController extends Controller
     }
 
     // Get All Countries (optionally by corp_id)
-    public function getAllCountries(Request $request)
+    public function getAllCountries($corp_id)
     {
-        $corp_id = $request->query('corp_id');
-        $countries = $corp_id
-            ? Country::where('corp_id', $corp_id)->get()
-            : Country::all();
+        $countries = Country::where('corp_id', $corp_id)->get();
         return response()->json(['data' => $countries]);
     }
 
     // Get States by country_id and corp_id
-    public function getStates(Request $request)
+    public function getStates($corp_id, $country_id)
     {
-        $country_id = $request->query('country_id');
-        $corp_id = $request->query('corp_id');
-        $states = State::where('country_id', $country_id)
-            ->where('corp_id', $corp_id)
+        $states = State::where('corp_id', $corp_id)
+            ->where('country_id', $country_id)
             ->get();
         return response()->json(['data' => $states]);
     }
 
     // Get Cities by country_id, state_id, corp_id
-    public function getCities(Request $request)
+    public function getCities($corp_id, $state_id)
     {
-        $country_id = $request->query('country_id');
-        $state_id = $request->query('state_id');
-        $corp_id = $request->query('corp_id');
-        $cities = City::where('country_id', $country_id)
+        $cities = City::where('corp_id', $corp_id)
             ->where('state_id', $state_id)
-            ->where('corp_id', $corp_id)
             ->get();
         return response()->json(['data' => $cities]);
     }

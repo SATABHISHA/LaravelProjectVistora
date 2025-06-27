@@ -81,12 +81,12 @@ Route::get('/location/countries/{corp_id}', [LocationApiController::class, 'getA
 // State
 Route::post('/location/add-state', [LocationApiController::class, 'addState']);
 Route::delete('/location/delete-state/{corp_id}/{state_id}', [LocationApiController::class, 'deleteState']);
-Route::get('/location/states/{corp_id}/{country_id}', [LocationApiController::class, 'getAllStates']);
+Route::get('/location/states/{corp_id}/{country_id}', [LocationApiController::class, 'getStates']);
 
 // City
 Route::post('/location/add-city', [LocationApiController::class, 'addCity']);
 Route::delete('/location/delete-city/{corp_id}/{city_id}', [LocationApiController::class, 'deleteCity']);
-Route::get('/location/cities/{corp_id}/{state_id}', [LocationApiController::class, 'getAllCities']);
+Route::get('/location/cities/{corp_id}/{state_id}', [LocationApiController::class, 'getCities']);
 
 // Industry Routes
 Route::post('/industry/add', [IndustryApiController::class, 'store']);
