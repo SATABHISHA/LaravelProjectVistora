@@ -27,6 +27,7 @@ use App\Http\Controllers\VendorApiController;
 use App\Http\Controllers\CustomerDetailApiController;
 use App\Http\Controllers\ProfileAccessSettingApiController;
 use App\Http\Controllers\SocialProfileAccessApiController;
+use App\Http\Controllers\EmploymentDetailApiController;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 
@@ -205,4 +206,9 @@ Route::post('/socialprofileaccess/add', [SocialProfileAccessApiController::class
 Route::get('/socialprofileaccess/all/{corp_id}', [SocialProfileAccessApiController::class, 'getByCorpId']);
 Route::put('/socialprofileaccess/update/{corp_id}/{id}', [SocialProfileAccessApiController::class, 'update']);
 Route::delete('/socialprofileaccess/delete/{corp_id}/{id}', [SocialProfileAccessApiController::class, 'destroy']);
+
+// Employment Details APIs
+Route::post('/employment/add', [EmploymentDetailApiController::class, 'store']);
+Route::put('/employment/update/{corp_id}/{EmpCode}', [EmploymentDetailApiController::class, 'update']);
+Route::delete('/employment/delete/{corp_id}/{EmpCode}', [EmploymentDetailApiController::class, 'destroy']);
 
