@@ -29,6 +29,7 @@ use App\Http\Controllers\ProfileAccessSettingApiController;
 use App\Http\Controllers\SocialProfileAccessApiController;
 use App\Http\Controllers\EmploymentDetailApiController;
 use App\Http\Controllers\EmployeeDetailApiController;
+use App\Http\Controllers\EmployeeStatutoryDetailApiController;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 
@@ -219,4 +220,10 @@ Route::post('/employee/add', [EmployeeDetailApiController::class, 'store']);
 Route::put('/employee/update/{corp_id}/{EmpCode}/{id}', [EmployeeDetailApiController::class, 'update']);
 Route::delete('/employee/delete/{corp_id}/{EmpCode}/{id}', [EmployeeDetailApiController::class, 'destroy']);
 Route::get('/employee/{corp_id}/{EmpCode}/{id}', [EmployeeDetailApiController::class, 'show']);
+
+// Employee Statutory Details APIs
+Route::post('/statutory/add', [EmployeeStatutoryDetailApiController::class, 'store']);
+Route::put('/statutory/update/{corp_id}/{EmpCode}/{id}', [EmployeeStatutoryDetailApiController::class, 'update']);
+Route::delete('/statutory/delete/{corp_id}/{EmpCode}/{id}', [EmployeeStatutoryDetailApiController::class, 'destroy']);
+Route::get('/statutory/{corp_id}/{EmpCode}/{id}', [EmployeeStatutoryDetailApiController::class, 'show']);
 
