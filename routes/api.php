@@ -211,4 +211,5 @@ Route::delete('/socialprofileaccess/delete/{corp_id}/{id}', [SocialProfileAccess
 Route::post('/employment/add', [EmploymentDetailApiController::class, 'store']);
 Route::put('/employment/update/{corp_id}/{EmpCode}', [EmploymentDetailApiController::class, 'update']);
 Route::delete('/employment/delete/{corp_id}/{EmpCode}', [EmploymentDetailApiController::class, 'destroy']);
+Route::get('/employment/{corp_id}/{EmpCode}', [EmploymentDetailApiController::class, 'show']);
 
