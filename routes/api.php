@@ -28,6 +28,7 @@ use App\Http\Controllers\CustomerDetailApiController;
 use App\Http\Controllers\ProfileAccessSettingApiController;
 use App\Http\Controllers\SocialProfileAccessApiController;
 use App\Http\Controllers\EmploymentDetailApiController;
+use App\Http\Controllers\EmployeeDetailApiController;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 
@@ -212,4 +213,10 @@ Route::post('/employment/add', [EmploymentDetailApiController::class, 'store']);
 Route::put('/employment/update/{corp_id}/{EmpCode}', [EmploymentDetailApiController::class, 'update']);
 Route::delete('/employment/delete/{corp_id}/{EmpCode}', [EmploymentDetailApiController::class, 'destroy']);
 Route::get('/employment/{corp_id}/{EmpCode}', [EmploymentDetailApiController::class, 'show']);
+
+// Employee Details APIs
+Route::post('/employee/add', [EmployeeDetailApiController::class, 'store']);
+Route::put('/employee/update/{corp_id}/{EmpCode}/{id}', [EmployeeDetailApiController::class, 'update']);
+Route::delete('/employee/delete/{corp_id}/{EmpCode}/{id}', [EmployeeDetailApiController::class, 'destroy']);
+Route::get('/employee/{corp_id}/{EmpCode}/{id}', [EmployeeDetailApiController::class, 'show']);
 
