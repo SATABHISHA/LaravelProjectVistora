@@ -62,4 +62,33 @@ class EmploymentDetailApiController extends Controller
 
         return response()->json(['data' => $employment]);
     }
+
+     // Fetch last EmpCode by corp_id and return incremented EmpCode, or EMP001 if none exists
+    public function getNextEmpCode($corp_id)
+    {
+        $empCodes = EmploymentDetail::where('corp_id', $corp_id)
+            ->pluck('EmpCode')
+            ->toArray();
+
+        $maxNumber = 0;
+        $prefix = 'EMP';
+
+        foreach ($empCodes as $code) {
+            if (preg_match('/^([A-Za-z]*)(\d+)$/', $code, $matches)) {
+                $prefix = $matches[1] ?: $prefix;
+                $number = (int)$matches[2];
+                if ($number > $maxNumber) {
+                    $maxNumber = $number;
+                }
+            }
+        }
+
+        if ($maxNumber === 0) {
+            $nextEmpCode = $prefix . '001';
+        } else {
+            $nextEmpCode = $prefix . str_pad($maxNumber + 1, 3, '0', STR_PAD_LEFT);
+        }
+
+        return response()->json(['nextEmpCode' => $nextEmpCode]);
+    }
 }
