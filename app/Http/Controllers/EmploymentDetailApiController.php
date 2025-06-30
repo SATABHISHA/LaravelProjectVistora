@@ -106,6 +106,18 @@ class EmploymentDetailApiController extends Controller
                 ->where('EmpCode', $employment->EmpCode)
                 ->first();
 
+            // Prepare name parts
+            $firstName = $employee && $employee->FirstName ? $employee->FirstName : '';
+            $middleName = $employee && $employee->MiddleName ? $employee->MiddleName : '';
+            $lastName = $employee && $employee->LastName ? $employee->LastName : '';
+
+            // Merge name logic
+            if ($firstName === '' && $lastName === '') {
+                $fullName = 'N/A';
+            } else {
+                $fullName = trim($firstName . ' ' . ($middleName !== '' ? $middleName . ' ' : '') . $lastName);
+            }
+
             $row = [
                 'EmpCode'            => $employment->EmpCode ?? 'N/A',
                 'company_name'       => $employment->company_name ?? 'N/A',
@@ -117,6 +129,7 @@ class EmploymentDetailApiController extends Controller
                 'dateOfJoining'      => $employment->dateOfJoining ?? 'N/A',
                 'WorkEmail'          => $employee && $employee->WorkEmail ? $employee->WorkEmail : 'N/A',
                 'Mobile'             => $employee && $employee->Mobile ? $employee->Mobile : 'N/A',
+                'FullName'           => $fullName,
             ];
 
             $result[] = $row;
@@ -135,6 +148,7 @@ class EmploymentDetailApiController extends Controller
                 'dateOfJoining'      => 'N/A',
                 'WorkEmail'          => 'N/A',
                 'Mobile'             => 'N/A',
+                'FullName'           => 'N/A',
             ];
         }
 
