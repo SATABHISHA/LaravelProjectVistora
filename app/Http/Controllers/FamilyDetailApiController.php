@@ -54,6 +54,18 @@ class FamilyDetailApiController extends Controller
     public function show($corp_id, $EmpCode)
     {
         $family = FamilyDetail::where('corp_id', $corp_id)->where('EmpCode', $EmpCode)->get();
-        return response()->json(['data' => $family]);
+
+        if ($family->isEmpty()) {
+            return response()->json([
+                'status' => false,
+                'message' => 'No family details found',
+                'data' => []
+            ]);
+        }
+
+        return response()->json([
+            'status' => true,
+            'data' => $family
+        ]);
     }
 }

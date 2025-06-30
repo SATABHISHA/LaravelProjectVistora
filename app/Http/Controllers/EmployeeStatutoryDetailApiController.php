@@ -50,18 +50,25 @@ class EmployeeStatutoryDetailApiController extends Controller
         return response()->json(['message' => 'Deleted successfully']);
     }
 
-    // Fetch by corp_id, EmpCode, id
-    public function show($corp_id, $EmpCode, $id)
+  
+    // Fetch all by corp_id, EmpCode
+    public function show($corp_id, $EmpCode)
     {
         $statutory = EmployeeStatutoryDetail::where('corp_id', $corp_id)
             ->where('EmpCode', $EmpCode)
-            ->where('id', $id)
-            ->first();
+            ->get();
 
-        if (!$statutory) {
-            return response()->json(['message' => 'Not found.'], 404);
+        if ($statutory->isEmpty()) {
+            return response()->json([
+                'status' => false,
+                'message' => 'No statutory details found',
+                'data' => []
+            ]);
         }
 
-        return response()->json(['data' => $statutory]);
+        return response()->json([
+            'status' => true,
+            'data' => $statutory
+        ]);
     }
 }
