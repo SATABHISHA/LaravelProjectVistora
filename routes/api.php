@@ -30,6 +30,7 @@ use App\Http\Controllers\SocialProfileAccessApiController;
 use App\Http\Controllers\EmploymentDetailApiController;
 use App\Http\Controllers\EmployeeDetailApiController;
 use App\Http\Controllers\EmployeeStatutoryDetailApiController;
+use App\Http\Controllers\FamilyDetailApiController;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 
@@ -226,4 +227,10 @@ Route::post('/statutory/add', [EmployeeStatutoryDetailApiController::class, 'sto
 Route::put('/statutory/update/{corp_id}/{EmpCode}/{id}', [EmployeeStatutoryDetailApiController::class, 'update']);
 Route::delete('/statutory/delete/{corp_id}/{EmpCode}/{id}', [EmployeeStatutoryDetailApiController::class, 'destroy']);
 Route::get('/statutory/{corp_id}/{EmpCode}/{id}', [EmployeeStatutoryDetailApiController::class, 'show']);
+
+// Family Details APIs
+Route::post('/family/add', [FamilyDetailApiController::class, 'store']);
+Route::put('/family/update/{corp_id}/{EmpCode}', [FamilyDetailApiController::class, 'update']);
+Route::delete('/family/delete/{corp_id}/{EmpCode}', [FamilyDetailApiController::class, 'destroy']);
+Route::get('/family/{corp_id}/{EmpCode}', [FamilyDetailApiController::class, 'show']);
 
