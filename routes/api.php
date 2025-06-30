@@ -39,6 +39,10 @@ use App\Http\Controllers\EmployeeSkillApiController;
 use App\Http\Controllers\EmployeeInsurancePolicyApiController;
 use App\Http\Controllers\EmployeeNomineeDetailApiController;
 use App\Http\Controllers\EmployeeBankDetailApiController;
+use App\Http\Controllers\RegionApiController;
+use App\Http\Controllers\BranchApiController;
+use App\Http\Controllers\SubBranchApiController;
+use App\Http\Controllers\EmploymentTypeApiController;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 
@@ -293,3 +297,26 @@ Route::put('/employee/bank/update/{corp_id}/{empcode}', [EmployeeBankDetailApiCo
 Route::delete('/employee/bank/delete/{corp_id}/{empcode}', [EmployeeBankDetailApiController::class, 'destroy']);
 Route::get('/employee/bank/{corp_id}/{empcode}', [EmployeeBankDetailApiController::class, 'show']);
 
+// Region APIs
+Route::post('/region/add', [RegionApiController::class, 'store']);
+Route::put('/region/update/{corp_id}/{id}', [RegionApiController::class, 'update']);
+Route::delete('/region/delete/{corp_id}/{id}', [RegionApiController::class, 'destroy']);
+Route::get('/region/all/{corp_id}', [RegionApiController::class, 'getByCorpId']);
+
+// Branch APIs
+Route::post('/branch/add', [BranchApiController::class, 'store']);
+Route::put('/branch/update/{corp_id}/{id}', [BranchApiController::class, 'update']);
+Route::delete('/branch/delete/{corp_id}/{id}', [BranchApiController::class, 'destroy']);
+Route::get('/branch/all/{corp_id}', [BranchApiController::class, 'getByCorpId']);
+
+// Sub-Branch APIs
+Route::post('/subbranch/add', [SubBranchApiController::class, 'store']);
+Route::put('/subbranch/update/{corp_id}/{id}', [SubBranchApiController::class, 'update']);
+Route::delete('/subbranch/delete/{corp_id}/{id}', [SubBranchApiController::class, 'destroy']);
+Route::get('/subbranch/all/{corp_id}', [SubBranchApiController::class, 'getByCorpId']);
+
+// Employment Type Routes
+Route::post('/employment-type/add', [EmploymentTypeApiController::class, 'store']);
+Route::put('/employment-type/update/{corp_id}/{id}', [EmploymentTypeApiController::class, 'update']);
+Route::delete('/employment-type/delete/{corp_id}/{id}', [EmploymentTypeApiController::class, 'destroy']);
+Route::get('/employment-type/all/{corp_id}', [EmploymentTypeApiController::class, 'getByCorpId']);
