@@ -32,6 +32,7 @@ use App\Http\Controllers\EmployeeDetailApiController;
 use App\Http\Controllers\EmployeeStatutoryDetailApiController;
 use App\Http\Controllers\FamilyDetailApiController;
 use App\Http\Controllers\ChildApiController;
+use App\Http\Controllers\EmployeeWorkExperienceApiController;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 
@@ -240,4 +241,10 @@ Route::post('/child/add', [ChildApiController::class, 'store']);
 Route::put('/child/update/{corp_id}/{EmpCode}', [ChildApiController::class, 'update']);
 Route::delete('/child/delete/{corp_id}/{EmpCode}/{id}', [ChildApiController::class, 'destroy']);
 Route::get('/child/{corp_id}/{EmpCode}', [ChildApiController::class, 'show']);
+
+// Work Experience Routes
+Route::post('/workexperience/add', [EmployeeWorkExperienceApiController::class, 'store']);
+Route::put('/workexperience/update/{corp_id}/{empcode}/{id}', [EmployeeWorkExperienceApiController::class, 'update']);
+Route::delete('/workexperience/delete/{corp_id}/{empcode}/{id}', [EmployeeWorkExperienceApiController::class, 'destroy']);
+Route::get('/workexperience/{corp_id}/{empcode}', [EmployeeWorkExperienceApiController::class, 'show']);
 
