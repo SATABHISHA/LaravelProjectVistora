@@ -37,6 +37,7 @@ use App\Http\Controllers\RelationApiController;
 use App\Http\Controllers\EmployeeEducationApiController;
 use App\Http\Controllers\EmployeeSkillApiController;
 use App\Http\Controllers\EmployeeInsurancePolicyApiController;
+use App\Http\Controllers\EmployeeNomineeDetailApiController;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 
@@ -274,4 +275,10 @@ Route::post('/employee/insurance-policy/add', [EmployeeInsurancePolicyApiControl
 Route::put('/employee/insurance-policy/update/{corp_id}/{empcode}/{id}', [EmployeeInsurancePolicyApiController::class, 'update']);
 Route::delete('/employee/insurance-policy/delete/{corp_id}/{empcode}/{id}', [EmployeeInsurancePolicyApiController::class, 'destroy']);
 Route::get('/employee/insurance-policy/{corp_id}/{empcode}', [EmployeeInsurancePolicyApiController::class, 'show']);
+
+// Employee Nominee Details Routes
+Route::post('/employee/nominee/add', [EmployeeNomineeDetailApiController::class, 'store']);
+Route::put('/employee/nominee/update/{corp_id}/{empcode}/{id}', [EmployeeNomineeDetailApiController::class, 'update']);
+Route::delete('/employee/nominee/delete/{corp_id}/{empcode}/{id}', [EmployeeNomineeDetailApiController::class, 'destroy']);
+Route::get('/employee/nominee/{corp_id}/{empcode}', [EmployeeNomineeDetailApiController::class, 'show']);
 
