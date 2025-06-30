@@ -70,30 +70,4 @@ class EmployeeDetailApiController extends Controller
             'data' => $employee
         ]);
     }
-
-    // Fetch last EmpCode by corp_id and return incremented EmpCode, or EMP001 if none exists
-    public function getNextEmpCode($corp_id)
-    {
-        $last = EmployeeDetail::where('corp_id', $corp_id)
-            ->orderByDesc('id')
-            ->first();
-
-        if (!$last || !isset($last->EmpCode)) {
-            // No employee found, return default
-            return response()->json(['nextEmpCode' => 'EMP001']);
-        }
-
-        // Extract prefix and numeric part
-        if (preg_match('/^([A-Za-z]*)(\d+)$/', $last->EmpCode, $matches)) {
-            $prefix = $matches[1];
-            $number = $matches[2];
-            $newNumber = str_pad((int)$number + 1, strlen($number), '0', STR_PAD_LEFT);
-            $nextEmpCode = $prefix . $newNumber;
-        } else {
-            // If format is not matched, just append 1
-            $nextEmpCode = $last->EmpCode . '1';
-        }
-
-        return response()->json(['nextEmpCode' => $nextEmpCode]);
-    }
 }
