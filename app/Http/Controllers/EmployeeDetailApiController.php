@@ -50,18 +50,24 @@ class EmployeeDetailApiController extends Controller
         return response()->json(['message' => 'Deleted successfully']);
     }
 
-    // Fetch by corp_id, EmpCode, id
-    public function show($corp_id, $EmpCode, $id)
+    // Fetch by corp_id, EmpCode
+    public function show($corp_id, $EmpCode)
     {
         $employee = EmployeeDetail::where('corp_id', $corp_id)
             ->where('EmpCode', $EmpCode)
-            ->where('id', $id)
-            ->first();
+            ->get();
 
-        if (!$employee) {
-            return response()->json(['message' => 'Employee not found.'], 404);
+        if ($employee->isEmpty()) {
+            return response()->json([
+                'status' => false,
+                'message' => 'No employee found',
+                'data' => []
+            ]);
         }
 
-        return response()->json(['data' => $employee]);
+        return response()->json([
+            'status' => true,
+            'data' => $employee
+        ]);
     }
 }
