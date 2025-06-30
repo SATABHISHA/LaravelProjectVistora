@@ -36,6 +36,7 @@ use App\Http\Controllers\EmployeeWorkExperienceApiController;
 use App\Http\Controllers\RelationApiController;
 use App\Http\Controllers\EmployeeEducationApiController;
 use App\Http\Controllers\EmployeeSkillApiController;
+use App\Http\Controllers\EmployeeInsurancePolicyApiController;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 
@@ -267,4 +268,10 @@ Route::post('/employee/skills/add', [EmployeeSkillApiController::class, 'store']
 Route::put('/employee/skills/update/{corp_id}/{empcode}/{id}', [EmployeeSkillApiController::class, 'update']);
 Route::delete('/employee/skills/delete/{corp_id}/{empcode}/{id}', [EmployeeSkillApiController::class, 'destroy']);
 Route::get('/employee/skills/{corp_id}/{empcode}', [EmployeeSkillApiController::class, 'show']);
+
+// Employee Insurance Policy Routes
+Route::post('/employee/insurance-policy/add', [EmployeeInsurancePolicyApiController::class, 'store']);
+Route::put('/employee/insurance-policy/update/{corp_id}/{empcode}/{id}', [EmployeeInsurancePolicyApiController::class, 'update']);
+Route::delete('/employee/insurance-policy/delete/{corp_id}/{empcode}/{id}', [EmployeeInsurancePolicyApiController::class, 'destroy']);
+Route::get('/employee/insurance-policy/{corp_id}/{empcode}', [EmployeeInsurancePolicyApiController::class, 'show']);
 
