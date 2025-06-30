@@ -97,6 +97,7 @@ class EmploymentDetailApiController extends Controller
     {
         // Get all employment details for the corp_id
         $employmentDetails = EmploymentDetail::where('corp_id', $corp_id)->get();
+        $employeeDetailsCount = EmployeeDetail::where('corp_id', $corp_id)->count();
 
         $result = [];
 
@@ -133,6 +134,14 @@ class EmploymentDetailApiController extends Controller
             ];
 
             $result[] = $row;
+        }
+
+        // If both tables are empty, return message and empty data array
+        if ($employmentDetails->isEmpty() && $employeeDetailsCount === 0) {
+            return response()->json([
+                'message' => 'No data',
+                'data' => []
+            ]);
         }
 
         // If no employment details, return one row with all N/A
