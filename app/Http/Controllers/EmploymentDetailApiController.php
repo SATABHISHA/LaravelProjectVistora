@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use Illuminate\Http\Request;
 use App\Models\EmploymentDetail;
+use App\Models\EmployeeDetail;
 
 class EmploymentDetailApiController extends Controller
 {
@@ -90,5 +91,53 @@ class EmploymentDetailApiController extends Controller
         }
 
         return response()->json(['nextEmpCode' => $nextEmpCode]);
+    }
+
+    public function fetchEmploymentAndEmployeeDetails($corp_id)
+    {
+        // Get all employment details for the corp_id
+        $employmentDetails = EmploymentDetail::where('corp_id', $corp_id)->get();
+
+        $result = [];
+
+        foreach ($employmentDetails as $employment) {
+            // Try to find the corresponding employee detail by corp_id and EmpCode
+            $employee = EmployeeDetail::where('corp_id', $corp_id)
+                ->where('EmpCode', $employment->EmpCode)
+                ->first();
+
+            $row = [
+                'EmpCode'            => $employment->EmpCode ?? 'N/A',
+                'company_name'       => $employment->company_name ?? 'N/A',
+                'Region'             => $employment->Region ?? 'N/A',
+                'Branch'             => $employment->Branch ?? 'N/A',
+                'SubBranch'          => $employment->SubBranch ?? 'N/A',
+                'ReportingManager'   => $employment->ReportingManager ?? 'N/A',
+                'FunctionalManager'  => $employment->FunctionalManager ?? 'N/A',
+                'dateOfJoining'      => $employment->dateOfJoining ?? 'N/A',
+                'WorkEmail'          => $employee && $employee->WorkEmail ? $employee->WorkEmail : 'N/A',
+                'Mobile'             => $employee && $employee->Mobile ? $employee->Mobile : 'N/A',
+            ];
+
+            $result[] = $row;
+        }
+
+        // If no employment details, return one row with all N/A
+        if (empty($result)) {
+            $result[] = [
+                'EmpCode'            => 'N/A',
+                'company_name'       => 'N/A',
+                'Region'             => 'N/A',
+                'Branch'             => 'N/A',
+                'SubBranch'          => 'N/A',
+                'ReportingManager'   => 'N/A',
+                'FunctionalManager'  => 'N/A',
+                'dateOfJoining'      => 'N/A',
+                'WorkEmail'          => 'N/A',
+                'Mobile'             => 'N/A',
+            ];
+        }
+
+        return response()->json(['data' => $result]);
     }
 }
