@@ -35,6 +35,7 @@ use App\Http\Controllers\ChildApiController;
 use App\Http\Controllers\EmployeeWorkExperienceApiController;
 use App\Http\Controllers\RelationApiController;
 use App\Http\Controllers\EmployeeEducationApiController;
+use App\Http\Controllers\EmployeeSkillApiController;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 
@@ -260,4 +261,10 @@ Route::post('/education/add', [EmployeeEducationApiController::class, 'store']);
 Route::put('/education/update/{corp_id}/{empcode}/{id}', [EmployeeEducationApiController::class, 'update']);
 Route::delete('/education/delete/{corp_id}/{empcode}/{id}', [EmployeeEducationApiController::class, 'destroy']);
 Route::get('/education/{corp_id}/{empcode}', [EmployeeEducationApiController::class, 'show']);
+
+// Employee Skills Routes
+Route::post('/employee/skills/add', [EmployeeSkillApiController::class, 'store']);
+Route::put('/employee/skills/update/{corp_id}/{empcode}/{id}', [EmployeeSkillApiController::class, 'update']);
+Route::delete('/employee/skills/delete/{corp_id}/{empcode}/{id}', [EmployeeSkillApiController::class, 'destroy']);
+Route::get('/employee/skills/{corp_id}/{empcode}', [EmployeeSkillApiController::class, 'show']);
 
