@@ -38,6 +38,7 @@ use App\Http\Controllers\EmployeeEducationApiController;
 use App\Http\Controllers\EmployeeSkillApiController;
 use App\Http\Controllers\EmployeeInsurancePolicyApiController;
 use App\Http\Controllers\EmployeeNomineeDetailApiController;
+use App\Http\Controllers\EmployeeBankDetailApiController;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 
@@ -281,4 +282,10 @@ Route::post('/employee/nominee/add', [EmployeeNomineeDetailApiController::class,
 Route::put('/employee/nominee/update/{corp_id}/{empcode}/{id}', [EmployeeNomineeDetailApiController::class, 'update']);
 Route::delete('/employee/nominee/delete/{corp_id}/{empcode}/{id}', [EmployeeNomineeDetailApiController::class, 'destroy']);
 Route::get('/employee/nominee/{corp_id}/{empcode}', [EmployeeNomineeDetailApiController::class, 'show']);
+
+// Employee Bank Details Routes
+Route::post('/employee/bank/add', [EmployeeBankDetailApiController::class, 'store']);
+Route::put('/employee/bank/update/{corp_id}/{empcode}', [EmployeeBankDetailApiController::class, 'update']);
+Route::delete('/employee/bank/delete/{corp_id}/{empcode}', [EmployeeBankDetailApiController::class, 'destroy']);
+Route::get('/employee/bank/{corp_id}/{empcode}', [EmployeeBankDetailApiController::class, 'show']);
 
