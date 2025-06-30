@@ -33,6 +33,7 @@ use App\Http\Controllers\EmployeeStatutoryDetailApiController;
 use App\Http\Controllers\FamilyDetailApiController;
 use App\Http\Controllers\ChildApiController;
 use App\Http\Controllers\EmployeeWorkExperienceApiController;
+use App\Http\Controllers\RelationApiController;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 
@@ -247,4 +248,9 @@ Route::post('/workexperience/add', [EmployeeWorkExperienceApiController::class, 
 Route::put('/workexperience/update/{corp_id}/{empcode}/{id}', [EmployeeWorkExperienceApiController::class, 'update']);
 Route::delete('/workexperience/delete/{corp_id}/{empcode}/{id}', [EmployeeWorkExperienceApiController::class, 'destroy']);
 Route::get('/workexperience/{corp_id}/{empcode}', [EmployeeWorkExperienceApiController::class, 'show']);
+
+// Relation Routes
+Route::post('/relation/add', [RelationApiController::class, 'store']);
+Route::delete('/relation/delete/{corp_id}', [RelationApiController::class, 'destroy']);
+Route::get('/relation/all/{corp_id}', [RelationApiController::class, 'getByCorpId']);
 
