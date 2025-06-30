@@ -34,6 +34,7 @@ use App\Http\Controllers\FamilyDetailApiController;
 use App\Http\Controllers\ChildApiController;
 use App\Http\Controllers\EmployeeWorkExperienceApiController;
 use App\Http\Controllers\RelationApiController;
+use App\Http\Controllers\EmployeeEducationApiController;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 
@@ -253,4 +254,10 @@ Route::get('/workexperience/{corp_id}/{empcode}', [EmployeeWorkExperienceApiCont
 Route::post('/relation/add', [RelationApiController::class, 'store']);
 Route::delete('/relation/delete/{corp_id}', [RelationApiController::class, 'destroy']);
 Route::get('/relation/all/{corp_id}', [RelationApiController::class, 'getByCorpId']);
+
+// Education Routes
+Route::post('/education/add', [EmployeeEducationApiController::class, 'store']);
+Route::put('/education/update/{corp_id}/{empcode}/{id}', [EmployeeEducationApiController::class, 'update']);
+Route::delete('/education/delete/{corp_id}/{empcode}/{id}', [EmployeeEducationApiController::class, 'destroy']);
+Route::get('/education/{corp_id}/{empcode}', [EmployeeEducationApiController::class, 'show']);
 
