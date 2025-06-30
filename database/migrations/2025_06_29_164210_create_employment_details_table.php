@@ -37,6 +37,7 @@ return new class extends Migration
             $table->string('PensionNumber')->nullable();
             $table->integer('PF')->nullable();
             $table->integer('Gratuity')->nullable();
+            $table->integer('DraftYN')->nullable();
             $table->timestamps();
         });
     }

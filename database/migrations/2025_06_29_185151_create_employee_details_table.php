@@ -42,6 +42,7 @@ return new class extends Migration
             $table->string('CrntAddress')->nullable();
             $table->string('CrntState')->nullable();
             $table->string('CrntCity')->nullable();
+            $table->integer('DraftYN')->nullable();
             $table->timestamps();
         });
     }

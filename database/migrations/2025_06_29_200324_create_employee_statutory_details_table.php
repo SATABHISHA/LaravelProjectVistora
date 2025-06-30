@@ -45,6 +45,7 @@ return new class extends Migration
             $table->string('SalaryBank')->nullable();
             $table->string('ReimbursementMode')->nullable();
             $table->string('ReimbursementBank')->nullable();
+            $table->integer('DraftYN')->nullable();
             $table->timestamps();
         });
     }
