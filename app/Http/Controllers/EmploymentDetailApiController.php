@@ -163,4 +163,18 @@ class EmploymentDetailApiController extends Controller
 
         return response()->json(['data' => $result]);
     }
+
+    public function checkEmpCodeExists(Request $request)
+    {
+        $corp_id = $request->input('corp_id');
+        $EmpCode = $request->input('EmpCode');
+
+        $exists = EmploymentDetail::where('corp_id', $corp_id)
+            ->where('EmpCode', $EmpCode)
+            ->exists();
+
+        return response()->json([
+            'status' => $exists
+        ]);
+    }
 }
