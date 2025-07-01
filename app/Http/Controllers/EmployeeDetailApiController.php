@@ -70,4 +70,19 @@ class EmployeeDetailApiController extends Controller
             'data' => $employee
         ]);
     }
+
+    // Check if EmpCode exists for a given corp_id
+    public function checkEmpCodeExists(Request $request)
+    {
+        $corp_id = $request->input('corp_id');
+        $EmpCode = $request->input('EmpCode');
+
+        $exists = EmployeeDetail::where('corp_id', $corp_id)
+            ->where('EmpCode', $EmpCode)
+            ->exists();
+
+        return response()->json([
+            'status' => $exists
+        ]);
+    }
 }
