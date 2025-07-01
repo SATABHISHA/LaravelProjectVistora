@@ -43,6 +43,7 @@ use App\Http\Controllers\RegionApiController;
 use App\Http\Controllers\BranchApiController;
 use App\Http\Controllers\SubBranchApiController;
 use App\Http\Controllers\EmploymentTypeApiController;
+use App\Http\Controllers\EmploymentStatusApiController;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 
@@ -320,3 +321,9 @@ Route::post('/employment-type/add', [EmploymentTypeApiController::class, 'store'
 Route::put('/employment-type/update/{corp_id}/{id}', [EmploymentTypeApiController::class, 'update']);
 Route::delete('/employment-type/delete/{corp_id}/{id}', [EmploymentTypeApiController::class, 'destroy']);
 Route::get('/employment-type/all/{corp_id}', [EmploymentTypeApiController::class, 'getByCorpId']);
+
+// Employment Status Routes
+Route::post('/employment-status/add', [EmploymentStatusApiController::class, 'store']);
+Route::put('/employment-status/update/{corp_id}/{id}', [EmploymentStatusApiController::class, 'update']);
+Route::delete('/employment-status/delete/{corp_id}/{id}', [EmploymentStatusApiController::class, 'destroy']);
+Route::get('/employment-status/all/{corp_id}', [EmploymentStatusApiController::class, 'getByCorpId']);
