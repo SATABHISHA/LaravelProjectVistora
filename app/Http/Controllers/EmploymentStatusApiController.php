@@ -38,6 +38,6 @@ class EmploymentStatusApiController extends Controller
     public function getByCorpId($corp_id)
     {
         $statuses = EmploymentStatus::where('corp_id', $corp_id)->get();
-        return response()->json($statuses);
+        return response()->json(['data' => $statuses]);
     }
 }

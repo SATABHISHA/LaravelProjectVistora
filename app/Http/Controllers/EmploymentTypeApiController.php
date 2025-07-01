@@ -37,7 +37,7 @@ class EmploymentTypeApiController extends Controller
     // Fetch all by corp_id
     public function getByCorpId($corp_id)
     {
-        $emptypes = EmploymentType::where('corp_id', $corp_id)->get();
-        return response()->json($emptypes);
+        $types = EmploymentType::where('corp_id', $corp_id)->get();
+        return response()->json(['data' => $types]);
     }
 }

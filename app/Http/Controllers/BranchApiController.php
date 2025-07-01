@@ -38,6 +38,6 @@ class BranchApiController extends Controller
     public function getByCorpId($corp_id)
     {
         $branches = Branch::where('corp_id', $corp_id)->get();
-        return response()->json($branches);
+        return response()->json(['data' => $branches]);
     }
 }

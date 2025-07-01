@@ -38,6 +38,6 @@ class SubBranchApiController extends Controller
     public function getByCorpId($corp_id)
     {
         $subbranches = SubBranch::where('corp_id', $corp_id)->get();
-        return response()->json($subbranches);
+        return response()->json(['data' => $subbranches]);
     }
 }
