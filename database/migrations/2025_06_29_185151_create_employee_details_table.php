@@ -36,12 +36,15 @@ return new class extends Migration
             $table->string('EmgNumber')->nullable();
             $table->string('EmgContactRelation')->nullable();
             $table->string('PmntAddress')->nullable();
+            $table->string('PmntCountry')->nullable();
             $table->string('PmntState')->nullable();
             $table->string('PmntCity')->nullable();
             $table->string('PmntPincode')->nullable();
             $table->string('CrntAddress')->nullable();
+            $table->string('CrntCountry')->nullable();
             $table->string('CrntState')->nullable();
             $table->string('CrntCity')->nullable();
+            $table->integer('SameAsPmntAddYN')->nullable();
             $table->integer('DraftYN')->nullable();
             $table->timestamps();
         });
