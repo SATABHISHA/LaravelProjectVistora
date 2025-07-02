@@ -247,7 +247,9 @@ Route::get('/employee/{corp_id}/{EmpCode}', [EmployeeDetailApiController::class,
 Route::post('/statutory/add', [EmployeeStatutoryDetailApiController::class, 'store']);
 Route::put('/statutory/update/{corp_id}/{EmpCode}/{id}', [EmployeeStatutoryDetailApiController::class, 'update']);
 Route::delete('/statutory/delete/{corp_id}/{EmpCode}/{id}', [EmployeeStatutoryDetailApiController::class, 'destroy']);
+Route::get('/statutory/exists/{corp_id}/{EmpCode}', [EmployeeStatutoryDetailApiController::class, 'exists']);
 Route::get('/statutory/{corp_id}/{EmpCode}', [EmployeeStatutoryDetailApiController::class, 'show']);
+
 
 // Family Details APIs
 Route::post('/family/add', [FamilyDetailApiController::class, 'store']);

@@ -50,7 +50,6 @@ class EmployeeStatutoryDetailApiController extends Controller
         return response()->json(['message' => 'Deleted successfully']);
     }
 
-  
     // Fetch all by corp_id, EmpCode
     public function show($corp_id, $EmpCode)
     {
@@ -69,6 +68,19 @@ class EmployeeStatutoryDetailApiController extends Controller
         return response()->json([
             'status' => true,
             'data' => $statutory
+        ]);
+    }
+
+    // Check if statutory data exists by corp_id, EmpCode
+    public function exists($corp_id, $EmpCode)
+    {
+        $exists = EmployeeStatutoryDetail::where('corp_id', $corp_id)
+            ->where('EmpCode', $EmpCode)
+            ->exists();
+
+        return response()->json([
+            'status' => $exists,
+            'message' => $exists ? 'Statutory data exists.' : 'No statutory data found.'
         ]);
     }
 }
