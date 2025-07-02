@@ -13,6 +13,8 @@ class EmployeeDetail extends Model
         'corp_id', 'EmpCode', 'prefix', 'FirstName', 'MiddleName', 'LastName', 'MaritalStatus', 'DOB',
         'Gender', 'BloodGroup', 'Nationality', 'WorkEmail', 'Mobile', 'SkillType', 'Pan', 'Adhaar',
         'Passport', 'PassportExpiryDate', 'PersonalEmail', 'EmgContactName', 'EmgNumber', 'EmgContactRelation',
-        'PmntAddress', 'PmntState', 'PmntCity', 'PmntPincode', 'CrntAddress', 'CrntState', 'CrntCity'
+        'PmntAddress', 'PmntCountry', 'PmntState', 'PmntCity', 'PmntPincode',
+        'CrntAddress', 'CrntCountry', 'CrntState', 'CrntCity',
+        'SameAsPmntAddYN', 'DraftYN'
     ];
 }
