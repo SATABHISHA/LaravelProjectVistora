@@ -53,15 +53,23 @@ class EmploymentDetailApiController extends Controller
     // Fetch by corp_id and EmpCode
     public function show($corp_id, $EmpCode)
     {
-        $employment = EmploymentDetail::where('corp_id', $corp_id)
+        $employment = \App\Models\EmploymentDetail::where('corp_id', $corp_id)
             ->where('EmpCode', $EmpCode)
             ->first();
 
         if (!$employment) {
-            return response()->json(['message' => 'Employment detail not found.'], 404);
+            return response()->json([
+                'status' => false,
+                'message' => 'No employment record found for the given corp_id and EmpCode.',
+                'data' => (object)[]
+            ]);
         }
 
-        return response()->json(['data' => $employment]);
+        return response()->json([
+            'status' => true,
+            'message' => 'Employment record found.',
+            'data' => $employment
+        ]);
     }
 
      // Fetch last EmpCode by corp_id and return incremented EmpCode, or EMP001 if none exists

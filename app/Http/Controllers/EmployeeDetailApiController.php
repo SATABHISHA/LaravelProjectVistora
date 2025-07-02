@@ -53,20 +53,21 @@ class EmployeeDetailApiController extends Controller
     // Fetch by corp_id, EmpCode
     public function show($corp_id, $EmpCode)
     {
-        $employee = EmployeeDetail::where('corp_id', $corp_id)
+        $employee = \App\Models\EmployeeDetail::where('corp_id', $corp_id)
             ->where('EmpCode', $EmpCode)
-            ->get();
+            ->first();
 
-        if ($employee->isEmpty()) {
+        if (!$employee) {
             return response()->json([
                 'status' => false,
-                'message' => 'No employee found',
-                'data' => []
+                'message' => 'No employee found for the given corp_id and EmpCode.',
+                'data' => (object)[]
             ]);
         }
 
         return response()->json([
             'status' => true,
+            'message' => 'Employee found.',
             'data' => $employee
         ]);
     }
