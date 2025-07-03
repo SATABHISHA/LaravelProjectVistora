@@ -17,9 +17,9 @@ return new class extends Migration
             $table->string('empcode');
             $table->string('statutory_type');
             $table->string('relation');
-            $table->date('dob');
+            $table->string('dob');
             $table->string('gender');
-            $table->decimal('share_percent', 5, 2);
+            $table->string('share_percent');
             $table->string('contact_no');
             $table->string('addr');
             $table->string('remarks')->nullable();
