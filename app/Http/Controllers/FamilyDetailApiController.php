@@ -68,4 +68,17 @@ class FamilyDetailApiController extends Controller
             'data' => $family
         ]);
     }
+
+    // Check if Family Detail exists by corp_id and EmpCode
+    public function exists($corp_id, $EmpCode)
+    {
+        $exists = FamilyDetail::where('corp_id', $corp_id)
+            ->where('EmpCode', $EmpCode)
+            ->exists();
+
+        return response()->json([
+            'status' => $exists,
+            'message' => $exists ? 'Family details exist.' : 'No family details found.'
+        ]);
+    }
 }
