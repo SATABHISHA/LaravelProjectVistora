@@ -17,12 +17,12 @@ return new class extends Migration
             $table->string('empcode');
             $table->string('name');
             $table->string('relationship');
-            $table->date('dob');
+            $table->string('dob');
             $table->string('gender');
             $table->string('policy_no');
             $table->string('insurance_type');
-            $table->decimal('assured_sum', 15, 2);
-            $table->decimal('premium', 15, 2);
+            $table->string('assured_sum');
+            $table->string('premium');
             $table->string('issue_date');
             $table->string('valid_upto');
             $table->string('color', 7); // Add this line before $table->timestamps()
