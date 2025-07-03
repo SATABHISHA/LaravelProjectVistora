@@ -10,7 +10,7 @@ class EmployeeNomineeDetail extends Model
     use HasFactory;
 
     protected $fillable = [
-        'corp_id', 'empcode', 'statutory_type', 'relation', 'dob', 'gender',
+        'corp_id', 'empcode', 'statutory_type', 'nominee_name', 'relation', 'dob', 'gender',
         'share_percent', 'contact_no', 'addr', 'remarks', 'minor_yn', 'color'
     ];
 }

@@ -16,6 +16,7 @@ return new class extends Migration
             $table->string('corp_id');
             $table->string('empcode');
             $table->string('statutory_type');
+            $table->string('nominee_name'); // <-- Add this line
             $table->string('relation');
             $table->string('dob');
             $table->string('gender');
