@@ -17,6 +17,7 @@ return new class extends Migration
             $table->string('empcode');
             $table->string('SkillName');
             $table->string('Proficiency');
+            $table->string('Description')->nullable();
             $table->timestamps();
         });
     }
