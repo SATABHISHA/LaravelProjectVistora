@@ -15,16 +15,17 @@ return new class extends Migration
             $table->bigIncrements('id');
             $table->string('corp_id');
             $table->string('empcode');
-            $table->string('SlryPayMode');
-            $table->string('SlryBankName');
-            $table->string('SlryBranchName');
-            $table->string('SlryIFSCCode');
-            $table->string('SlryAcntNo');
-            $table->string('RimbPayMode');
-            $table->string('RimbBankName');
-            $table->string('RimbBranchName');
-            $table->string('RimbIFSCCode');
-            $table->string('RimbAcntNo');
+            $table->string('SlryPayMode')->nullable();
+            $table->string('SlryBankName')->nullable();
+            $table->string('SlryBranchName')->nullable();
+            $table->string('SlryIFSCCode')->nullable();
+            $table->string('SlryAcntNo')->nullable();
+            $table->string('RimbPayMode')->nullable();
+            $table->string('RimbBankName')->nullable();
+            $table->string('RimbBranchName')->nullable();
+            $table->string('RimbIFSCCode')->nullable();
+            $table->string('RimbAcntNo')->nullable();
+            $table->integer('same_as_salary_yn')->default(1);
             $table->timestamps();
         });
     }

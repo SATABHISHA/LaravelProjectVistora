@@ -11,6 +11,6 @@ class EmployeeBankDetail extends Model
 
     protected $fillable = [
         'corp_id', 'empcode', 'SlryPayMode', 'SlryBankName', 'SlryBranchName', 'SlryIFSCCode', 'SlryAcntNo',
-        'RimbPayMode', 'RimbBankName', 'RimbBranchName', 'RimbIFSCCode', 'RimbAcntNo'
+        'RimbPayMode', 'RimbBankName', 'RimbBranchName', 'RimbIFSCCode', 'RimbAcntNo', 'same_as_salary_yn'
     ];
 }
