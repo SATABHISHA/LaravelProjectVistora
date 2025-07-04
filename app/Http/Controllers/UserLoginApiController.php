@@ -16,19 +16,48 @@ class UserLoginApiController extends Controller
             'email_id' => 'required|email|unique:userlogin,email_id',
             'username' => 'required|string',
             'password' => 'required|string|min:6',
+            'empcode' => 'nullable|string',
+        ], [
+            'email_id.unique' => 'This email ID is already registered.',
         ]);
 
-        $user = UserLogin::create([
-            'corp_id' => $request->corp_id,
-            'email_id' => $request->email_id,
-            'username' => $request->username,
-            'password' => Hash::make($request->password),
-            'active_yn' => $request->active_yn ?? true,
-            'admin_yn' => $request->admin_yn ?? false,
-            'supervisor_yn' => $request->supervisor_yn ?? false,
-        ]);
+        // Check for duplicate empcode for the same corp_id
+        if ($request->empcode) {
+            $empcodeExists = UserLogin::where('corp_id', $request->corp_id)
+                ->where('empcode', $request->empcode)
+                ->exists();
 
-        return response()->json(['message' => 'User registered successfully', 'user' => $user], 201);
+            if ($empcodeExists) {
+                return response()->json([
+                    'status' => false,
+                    'message' => 'This empcode is already registered for this corp_id.'
+                ], 409);
+            }
+        }
+
+        try {
+            $user = UserLogin::create([
+                'corp_id' => $request->corp_id,
+                'email_id' => $request->email_id,
+                'username' => $request->username,
+                'password' => Hash::make($request->password),
+                'empcode' => $request->empcode,
+                'active_yn' => $request->active_yn ?? true,
+                'admin_yn' => $request->admin_yn ?? false,
+                'supervisor_yn' => $request->supervisor_yn ?? false,
+            ]);
+        } catch (\Exception $e) {
+            return response()->json([
+                'status' => false,
+                'message' => 'Registration failed: ' . $e->getMessage()
+            ], 500);
+        }
+
+        return response()->json([
+            'status' => true,
+            'message' => 'User registered successfully',
+            'user' => $user
+        ], 201);
     }
 
     // Login API

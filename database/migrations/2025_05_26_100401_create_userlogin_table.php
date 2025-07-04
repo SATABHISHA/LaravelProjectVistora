@@ -17,6 +17,7 @@ return new class extends Migration
             $table->string('email_id')->unique();
             $table->string('username');
             $table->string('password');
+            $table->string('empcode')->nullable(); // <-- Add this line
             $table->boolean('active_yn')->default(true);
             $table->boolean('admin_yn')->default(false);
             $table->boolean('supervisor_yn')->default(false);
