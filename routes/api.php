@@ -306,6 +306,7 @@ Route::delete('/employee/bank/delete/{corp_id}/{empcode}', [EmployeeBankDetailAp
 Route::post('/employee/bank/check-empcode', [EmployeeBankDetailApiController::class, 'checkEmpCodeExists']);
 Route::get('/employee/bank/{corp_id}/{empcode}', [EmployeeBankDetailApiController::class, 'show']);
 
+
 // Region APIs
 Route::post('/region/add', [RegionApiController::class, 'store']);
 Route::put('/region/update/{corp_id}/{id}', [RegionApiController::class, 'update']);
