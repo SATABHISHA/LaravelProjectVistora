@@ -89,4 +89,19 @@ class EmployeeBankDetailApiController extends Controller
             'data' => $bankDetails
         ]);
     }
+
+    // Check if employee code exists
+    public function checkEmpCodeExists(Request $request)
+    {
+        $corp_id = $request->input('corp_id');
+        $empcode = $request->input('empcode');
+
+        $exists = EmployeeBankDetail::where('corp_id', $corp_id)
+            ->where('empcode', $empcode)
+            ->exists();
+
+        return response()->json([
+            'status' => $exists
+        ]);
+    }
 }

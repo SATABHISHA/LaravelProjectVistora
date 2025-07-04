@@ -303,6 +303,7 @@ Route::get('/employee/nominee/{corp_id}/{empcode}', [EmployeeNomineeDetailApiCon
 Route::post('/employee/bank/add', [EmployeeBankDetailApiController::class, 'store']);
 Route::put('/employee/bank/update/{corp_id}/{empcode}', [EmployeeBankDetailApiController::class, 'update']);
 Route::delete('/employee/bank/delete/{corp_id}/{empcode}', [EmployeeBankDetailApiController::class, 'destroy']);
+Route::post('/employee/bank/check-empcode', [EmployeeBankDetailApiController::class, 'checkEmpCodeExists']);
 Route::get('/employee/bank/{corp_id}/{empcode}', [EmployeeBankDetailApiController::class, 'show']);
 
 // Region APIs
