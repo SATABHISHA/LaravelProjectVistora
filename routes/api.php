@@ -114,8 +114,8 @@ Route::get('/industry/all/{corp_id}', [IndustryApiController::class, 'getAllByCo
 
 // Currency
 Route::post('/currency/add', [CurrencyApiController::class, 'store']);
-Route::get('/currency/all', [CurrencyApiController::class, 'index']);
-Route::delete('/currency/delete', [CurrencyApiController::class, 'destroy']); // Pass id or name in body or query
+Route::get('/currency/all/{corp_id}', [CurrencyApiController::class, 'index']);
+Route::delete('/currency/delete/{corp_id}', [CurrencyApiController::class, 'destroy']); // Pass id or name in body
 
 // Sub-Department Routes
 Route::post('/subdepartment/add', [SubDepartmentApiController::class, 'store']);

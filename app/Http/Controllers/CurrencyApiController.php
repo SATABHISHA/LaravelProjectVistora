@@ -11,31 +11,44 @@ class CurrencyApiController extends Controller
     public function store(Request $request)
     {
         $request->validate([
-            'name' => 'required|string|unique:currencies,name'
+            'corp_id' => 'required|string',
+            'name' => 'required|string'
         ]);
 
-        $currency = Currency::create(['name' => $request->name]);
+        // Prevent duplicate currency for the same corp_id
+        if (Currency::where('corp_id', $request->corp_id)->where('name', $request->name)->exists()) {
+            return response()->json([
+                'message' => 'Currency already exists for this corp_id, can\'t enter duplicate data'
+            ], 409);
+        }
+
+        $currency = Currency::create([
+            'corp_id' => $request->corp_id,
+            'name' => $request->name
+        ]);
         return response()->json(['message' => 'Currency added', 'currency' => $currency], 201);
     }
 
-    // Get All Currencies
-    public function index()
+    // Get All Currencies by corp_id
+    public function index($corp_id)
     {
-        return response()->json(Currency::all());
+        return response()->json([
+            'data' => Currency::where('corp_id', $corp_id)->get()
+        ]);
     }
 
-    // Delete Currency by ID or Name
-    public function destroy(Request $request)
+    // Delete Currency by corp_id and ID or Name
+    public function destroy(Request $request, $corp_id)
     {
         $request->validate([
-            'id' => 'nullable|integer|exists:currencies,id',
-            'name' => 'nullable|string|exists:currencies,name'
+            'id' => 'nullable|integer',
+            'name' => 'nullable|string'
         ]);
 
         if ($request->id) {
-            $currency = Currency::find($request->id);
+            $currency = Currency::where('corp_id', $corp_id)->where('id', $request->id)->first();
         } elseif ($request->name) {
-            $currency = Currency::where('name', $request->name)->first();
+            $currency = Currency::where('corp_id', $corp_id)->where('name', $request->name)->first();
         } else {
             return response()->json(['message' => 'Provide id or name'], 400);
         }

@@ -10,5 +10,5 @@ class Currency extends Model
     use HasFactory;
 
     protected $primaryKey = 'currency_id';
-    protected $fillable = ['name'];
+    protected $fillable = ['corp_id','name'];
 }
