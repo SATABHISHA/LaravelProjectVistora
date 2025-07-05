@@ -98,10 +98,13 @@ class BusinessUnitApiController extends Controller
         ]);
     }
 
-    // Get all business units (fetch all, ignore corp_id)
+    // Get all business units by corp_id
     public function getAllByCorpId($corp_id)
     {
-        $businessUnits = BusinessUnit::all();
-        return response()->json(['data' => $businessUnits]);
+        $businessUnits = BusinessUnit::where('corp_id', $corp_id)->get();
+        return response()->json([
+            'status' => true,
+            'data' => $businessUnits
+        ]);
     }
 }
