@@ -45,6 +45,7 @@ use App\Http\Controllers\SubBranchApiController;
 use App\Http\Controllers\EmploymentTypeApiController;
 use App\Http\Controllers\EmploymentStatusApiController;
 use App\Http\Controllers\ConfirmationStatusApiController;
+use App\Http\Controllers\CorporateIdApiController;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 
@@ -342,3 +343,8 @@ Route::post('/confirmation-status/add', [ConfirmationStatusApiController::class,
 Route::put('/confirmation-status/update/{corp_id}/{id}', [ConfirmationStatusApiController::class, 'update']);
 Route::delete('/confirmation-status/delete/{corp_id}/{id}', [ConfirmationStatusApiController::class, 'destroy']);
 Route::get('/confirmation-status/all/{corp_id}', [ConfirmationStatusApiController::class, 'getByCorpId']);
+
+// Corporate ID Routes
+Route::post('/corporateid/add', [CorporateIdApiController::class, 'store']);
+Route::delete('/corporateid/delete/{corp_id_name}', [CorporateIdApiController::class, 'destroy']);
+Route::get('/corporateid/all', [CorporateIdApiController::class, 'getAll']);
