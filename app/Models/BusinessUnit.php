@@ -13,6 +13,6 @@ class BusinessUnit extends Model
     protected $primaryKey = 'business_unit_id';
 
     protected $fillable = [
-        'company_name', 'business_unit_name', 'active_yn'
+        'corp_id','company_name', 'business_unit_name', 'active_yn'
     ];
 }

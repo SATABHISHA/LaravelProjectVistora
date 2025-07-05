@@ -13,7 +13,8 @@ return new class extends Migration
     {
         Schema::create('business_units', function (Blueprint $table) {
             $table->id('business_unit_id');
-            $table->string('company_name'); // Changed from corp_id to company_name
+            $table->string('corp_id'); // <-- Added corp_id
+            $table->string('company_name');
             $table->string('business_unit_name');
             $table->boolean('active_yn')->default(true);
             $table->timestamps();

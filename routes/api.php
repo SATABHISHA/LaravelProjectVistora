@@ -77,8 +77,8 @@ Route::delete('/company/delete/{company_id}/{corp_id}', [CompanyDetailsApiContro
 
 // Business Unit Routes
 Route::post('/business_unit/add', [BusinessUnitApiController::class, 'store']);
-Route::put('/business_unit/update/{business_unit_id}', [BusinessUnitApiController::class, 'update']);
-Route::delete('/business_unit/delete/{business_unit_id}', [BusinessUnitApiController::class, 'destroy']);
+Route::put('/business_unit/update/{corp_id}/{business_unit_id}', [BusinessUnitApiController::class, 'update']);
+Route::delete('/business_unit/delete/{corp_id}/{business_unit_id}', [BusinessUnitApiController::class, 'destroy']);
 
 // Fetch all business units by corp_id
 Route::get('/business_unit/all/{corp_id}', [BusinessUnitApiController::class, 'getAllByCorpId']);

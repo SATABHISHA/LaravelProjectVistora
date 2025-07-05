@@ -10,59 +10,92 @@ class BusinessUnitApiController extends Controller
     // Add business unit
     public function store(Request $request)
     {
-        try {
-            $request->validate([
-                'company_name' => 'required|string',
-                'business_unit_name' => 'required|string',
-                'active_yn' => 'boolean'
-            ]);
-        } catch (\Illuminate\Validation\ValidationException $e) {
-            return response()->json([
-                'message' => 'Validation failed',
-                'errors' => $e->errors()
-            ], 422);
-        }
-
-        $unit = BusinessUnit::create([
-            'company_name' => $request->company_name,
-            'business_unit_name' => $request->business_unit_name,
-            'active_yn' => $request->active_yn ?? true
+        $request->validate([
+            'corp_id' => 'required|string',
+            'company_name' => 'required|string',
+            'business_unit_name' => 'required|string',
+            'active_yn' => 'boolean',
         ]);
 
-        return response()->json(['message' => 'Business unit added successfully', 'unit' => $unit], 201);
+        // Check for duplicate business unit for the same corp_id
+        $exists = \App\Models\BusinessUnit::where('corp_id', $request->corp_id)
+            ->where('business_unit_name', $request->business_unit_name)
+            ->exists();
+
+        if ($exists) {
+            return response()->json([
+                'status' => false,
+                'message' => 'This business unit already exists for the given corp_id.'
+            ], 409);
+        }
+
+        $unit = \App\Models\BusinessUnit::create([
+            'corp_id' => $request->corp_id,
+            'company_name' => $request->company_name,
+            'business_unit_name' => $request->business_unit_name,
+            'active_yn' => $request->active_yn ?? true,
+        ]);
+
+        return response()->json([
+            'status' => true,
+            'message' => 'Business unit created successfully',
+            'data' => $unit
+        ], 201);
     }
 
     // Update business unit
-    public function update(Request $request, $business_unit_id)
+    public function update(Request $request, $corp_id, $business_unit_id)
     {
-        $unit = BusinessUnit::find($business_unit_id);
-
-        if (!$unit) {
-            return response()->json(['message' => 'Business unit not found'], 404);
-        }
-
         $request->validate([
-            'business_unit_name' => 'sometimes|required|string',
-            'active_yn' => 'boolean'
+            'company_name' => 'required|string',
+            'business_unit_name' => 'required|string',
+            'active_yn' => 'boolean',
         ]);
 
-        $unit->update($request->all());
+        $unit = BusinessUnit::where('business_unit_id', $business_unit_id)
+            ->where('corp_id', $corp_id)
+            ->first();
 
-        return response()->json(['message' => 'Business unit updated successfully', 'unit' => $unit]);
+        if (!$unit) {
+            return response()->json([
+                'status' => false,
+                'message' => 'Business unit not found'
+            ], 404);
+        }
+
+        $unit->update([
+            'company_name' => $request->company_name,
+            'business_unit_name' => $request->business_unit_name,
+            'active_yn' => $request->active_yn ?? $unit->active_yn,
+        ]);
+
+        return response()->json([
+            'status' => true,
+            'message' => 'Business unit updated successfully',
+            'data' => $unit
+        ]);
     }
 
     // Delete business unit
-    public function destroy($business_unit_id)
+    public function destroy($corp_id, $business_unit_id)
     {
-        $unit = BusinessUnit::find($business_unit_id);
+        $unit = \App\Models\BusinessUnit::where('business_unit_id', $business_unit_id)
+            ->where('corp_id', $corp_id)
+            ->first();
 
         if (!$unit) {
-            return response()->json(['message' => 'Business unit not found'], 404);
+            return response()->json([
+                'status' => false,
+                'message' => 'Business unit not found'
+            ], 404);
         }
 
         $unit->delete();
 
-        return response()->json(['message' => 'Business unit deleted successfully']);
+        return response()->json([
+            'status' => true,
+            'message' => 'Business unit deleted successfully'
+        ]);
     }
 
     // Get all business units (fetch all, ignore corp_id)
