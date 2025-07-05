@@ -109,8 +109,8 @@ Route::get('/location/cities/{corp_id}/{state_id}', [LocationApiController::clas
 
 // Industry Routes
 Route::post('/industry/add', [IndustryApiController::class, 'store']);
-Route::delete('/industry/delete/{industry_id}', [IndustryApiController::class, 'destroy']);
-Route::get('/industry/all', [IndustryApiController::class, 'getAllIndustries']);
+Route::delete('/industry/delete/{corp_id}/{industry_id}', [IndustryApiController::class, 'destroy']);
+Route::get('/industry/all/{corp_id}', [IndustryApiController::class, 'getAllByCorpId']);
 
 // Currency
 Route::post('/currency/add', [CurrencyApiController::class, 'store']);

@@ -13,6 +13,7 @@ return new class extends Migration
     {
         Schema::create('industries', function (Blueprint $table) {
             $table->bigIncrements('industry_id');
+            $table->string('corp_id'); // <-- Added corp_id
             $table->string('industry_name')->unique();
             $table->timestamps();
         });

@@ -10,5 +10,5 @@ class Industry extends Model
     use HasFactory;
 
     protected $primaryKey = 'industry_id';
-    protected $fillable = ['industry_name'];
+    protected $fillable = ['corp_id','industry_name'];
 }
