@@ -48,6 +48,7 @@ use App\Http\Controllers\ConfirmationStatusApiController;
 use App\Http\Controllers\CorporateIdApiController;
 use App\Http\Controllers\RoleApiController;
 use App\Http\Controllers\EmployeeAssignedRoleApiController;
+use App\Http\Controllers\LevelApiController;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 
@@ -362,3 +363,8 @@ Route::post('/employee-assigned-role/add', [EmployeeAssignedRoleApiController::c
 Route::put('/employee-assigned-role/update/{corp_id}/{id}', [EmployeeAssignedRoleApiController::class, 'update']);
 Route::delete('/employee-assigned-role/delete/{corp_id}/{id}', [EmployeeAssignedRoleApiController::class, 'destroy']);
 Route::get('/employee-assigned-role/all/{corp_id}', [EmployeeAssignedRoleApiController::class, 'getByCorpId']);
+
+// Level Routes
+Route::post('/level/add', [LevelApiController::class, 'store']);
+Route::get('/level/all/{corp_id}', [LevelApiController::class, 'getByCorpId']);
+Route::delete('/level/delete/{corp_id}/{id}', [LevelApiController::class, 'destroy']);
