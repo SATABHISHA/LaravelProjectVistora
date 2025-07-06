@@ -98,4 +98,44 @@ class EmployeeAssignedRoleApiController extends Controller
 
         return response()->json(['data' => $result]);
     }
+
+    // Update EmployeeAssignedRole by corp_id and id
+    public function update(Request $request, $corp_id, $id)
+    {
+        $role = EmployeeAssignedRole::where('corp_id', $corp_id)->where('id', $id)->first();
+        if (!$role) {
+            return response()->json(['message' => 'Record not found'], 404);
+        }
+
+        $request->validate([
+            'role_name' => 'sometimes|string',
+            'employee_name' => 'sometimes|string',
+            'empcode' => 'nullable|string',
+            'company_names' => 'sometimes|string',
+            'business_unit' => 'sometimes|string',
+            'department' => 'sometimes|string',
+            'sub_department_names' => 'sometimes|string',
+            'designation' => 'sometimes|string',
+            'grade' => 'sometimes|string',
+            'level' => 'sometimes|string',
+            'region' => 'sometimes|string',
+            'branch' => 'sometimes|string',
+            'sub_branch' => 'sometimes|string',
+        ]);
+
+        $role->update($request->all());
+
+        return response()->json(['message' => 'Record updated', 'data' => $role]);
+    }
+
+    // Delete EmployeeAssignedRole by corp_id and id
+    public function destroy($corp_id, $id)
+    {
+        $role = EmployeeAssignedRole::where('corp_id', $corp_id)->where('id', $id)->first();
+        if (!$role) {
+            return response()->json(['message' => 'Record not found'], 404);
+        }
+        $role->delete();
+        return response()->json(['message' => 'Record deleted']);
+    }
 }

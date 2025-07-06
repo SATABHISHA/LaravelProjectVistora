@@ -358,4 +358,6 @@ Route::delete('/role/delete/{corp_id}/{role_name}', [RoleApiController::class, '
 
 // Employee Assigned Role Routes
 Route::post('/employee-assigned-role/add', [EmployeeAssignedRoleApiController::class, 'store']);
+Route::put('/employee-assigned-role/update/{corp_id}/{id}', [EmployeeAssignedRoleApiController::class, 'update']);
+Route::delete('/employee-assigned-role/delete/{corp_id}/{id}', [EmployeeAssignedRoleApiController::class, 'destroy']);
 Route::get('/employee-assigned-role/all/{corp_id}', [EmployeeAssignedRoleApiController::class, 'getByCorpId']);
