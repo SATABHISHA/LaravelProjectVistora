@@ -245,6 +245,7 @@ Route::put('/employee/update/{corp_id}/{EmpCode}/{id}', [EmployeeDetailApiContro
 Route::delete('/employee/delete/{corp_id}/{EmpCode}/{id}', [EmployeeDetailApiController::class, 'destroy']);
 Route::post('/employee/check-empcode', [EmployeeDetailApiController::class, 'checkEmpCodeExists']);
 Route::get('/employee/{corp_id}/{EmpCode}', [EmployeeDetailApiController::class, 'show']);
+Route::get('/employee-details/by-corp/{corp_id}', [EmployeeDetailApiController::class, 'getByCorpId']);
 
 // Employee Statutory Details APIs
 Route::post('/statutory/add', [EmployeeStatutoryDetailApiController::class, 'store']);

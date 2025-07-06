@@ -86,4 +86,22 @@ class EmployeeDetailApiController extends Controller
             'status' => $exists
         ]);
     }
+
+    // Get employees by corp_id
+    public function getByCorpId($corp_id)
+    {
+        $employees = \App\Models\EmployeeDetail::where('corp_id', $corp_id)
+            ->get(['id', 'corp_id', 'EmpCode', 'first_name', 'middle_name', 'last_name']);
+
+        $data = $employees->map(function ($emp) {
+            return [
+                'id' => $emp->id,
+                'corp_id' => $emp->corp_id,
+                'emp_code' => $emp->EmpCode,
+                'full_name' => trim("{$emp->first_name} {$emp->middle_name} {$emp->last_name}")
+            ];
+        });
+
+        return response()->json(['data' => $data]);
+    }
 }
