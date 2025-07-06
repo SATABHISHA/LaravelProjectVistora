@@ -47,6 +47,7 @@ use App\Http\Controllers\EmploymentStatusApiController;
 use App\Http\Controllers\ConfirmationStatusApiController;
 use App\Http\Controllers\CorporateIdApiController;
 use App\Http\Controllers\RoleApiController;
+use App\Http\Controllers\EmployeeAssignedRoleApiController;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 
@@ -354,3 +355,7 @@ Route::get('/corporateid/all', [CorporateIdApiController::class, 'getAll']);
 Route::post('/role/add', [RoleApiController::class, 'store']);
 Route::get('/role/all/{corp_id}', [RoleApiController::class, 'getByCorpId']);
 Route::delete('/role/delete/{corp_id}/{role_name}', [RoleApiController::class, 'destroy']);
+
+// Employee Assigned Role Routes
+Route::post('/employee-assigned-role/add', [EmployeeAssignedRoleApiController::class, 'store']);
+Route::get('/employee-assigned-role/all/{corp_id}', [EmployeeAssignedRoleApiController::class, 'getByCorpId']);
