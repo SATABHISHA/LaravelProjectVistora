@@ -372,5 +372,5 @@ Route::delete('/level/delete/{corp_id}/{id}', [LevelApiController::class, 'destr
 
 // Workflow Routes
 Route::post('/workflow/add', [WorkflowApiController::class, 'store']);
-Route::delete('/workflow/delete', [WorkflowApiController::class, 'destroy']); // expects corpid & workflow in body
+Route::delete('/workflow/delete/{corpid}', [WorkflowApiController::class, 'destroyByCorpId']);
 Route::get('/workflow/{corpid}', [WorkflowApiController::class, 'getByCorpId']);

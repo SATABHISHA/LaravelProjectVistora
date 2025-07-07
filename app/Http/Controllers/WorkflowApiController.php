@@ -60,6 +60,24 @@ class WorkflowApiController extends Controller
         }
     }
 
+    // Delete all workflows by corpid
+    public function destroyByCorpId($corpid)
+    {
+        $deleted = Workflow::where('corpid', $corpid)->delete();
+
+        if ($deleted) {
+            return response()->json([
+                'status' => true,
+                'message' => 'All workflows deleted for this corpid.'
+            ]);
+        } else {
+            return response()->json([
+                'status' => false,
+                'message' => 'No workflows found for this corpid.'
+            ], 404);
+        }
+    }
+
     // Fetch workflows by corpid
     public function getByCorpId($corpid)
     {
