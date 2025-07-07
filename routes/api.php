@@ -51,6 +51,7 @@ use App\Http\Controllers\EmployeeAssignedRoleApiController;
 use App\Http\Controllers\LevelApiController;
 use App\Http\Controllers\WorkflowApiController;
 use App\Http\Controllers\RequestTypeApiController;
+use App\Http\Controllers\ApproverApiController;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 
@@ -380,3 +381,8 @@ Route::get('/workflow/{corpid}', [WorkflowApiController::class, 'getByCorpId']);
 Route::post('/requesttype/add', [RequestTypeApiController::class, 'store']);
 Route::delete('/requesttype/delete/{corp_id}', [RequestTypeApiController::class, 'destroyByCorpId']);
 Route::get('/requesttype/{corp_id}', [RequestTypeApiController::class, 'getByCorpId']);
+
+// Approver Routes
+Route::post('/approver/add', [ApproverApiController::class, 'store']);
+Route::delete('/approver/delete/{corp_id}/{id}', [ApproverApiController::class, 'destroy']);
+Route::post('/approver/fetch', [ApproverApiController::class, 'fetch']); // Use POST for flexible filtering
