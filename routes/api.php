@@ -50,6 +50,7 @@ use App\Http\Controllers\RoleApiController;
 use App\Http\Controllers\EmployeeAssignedRoleApiController;
 use App\Http\Controllers\LevelApiController;
 use App\Http\Controllers\WorkflowApiController;
+use App\Http\Controllers\RequestTypeApiController;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 
@@ -374,3 +375,8 @@ Route::delete('/level/delete/{corp_id}/{id}', [LevelApiController::class, 'destr
 Route::post('/workflow/add', [WorkflowApiController::class, 'store']);
 Route::delete('/workflow/delete/{corpid}', [WorkflowApiController::class, 'destroyByCorpId']);
 Route::get('/workflow/{corpid}', [WorkflowApiController::class, 'getByCorpId']);
+
+// Request Type Routes
+Route::post('/requesttype/add', [RequestTypeApiController::class, 'store']);
+Route::delete('/requesttype/delete/{corp_id}', [RequestTypeApiController::class, 'destroyByCorpId']);
+Route::get('/requesttype/{corp_id}', [RequestTypeApiController::class, 'getByCorpId']);
