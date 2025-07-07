@@ -42,8 +42,14 @@ class EmployeeAssignedRoleApiController extends Controller
         foreach ($employee_names as $i => $ename) {
             $empcode = $empcodes[$i] ?? null;
 
-            // Check for duplicate empcode for the same corp_id
-            if ($empcode && EmployeeAssignedRole::where('corp_id', $request->corp_id)->where('empcode', $empcode)->exists()) {
+            // Allow same empcode+corp_id for different role_name, but not for same role_name
+            if (
+                $empcode &&
+                EmployeeAssignedRole::where('corp_id', $request->corp_id)
+                    ->where('empcode', $empcode)
+                    ->where('role_name', $request->role_name)
+                    ->exists()
+            ) {
                 // Skip this entry and continue with the next
                 continue;
             }
@@ -61,7 +67,7 @@ class EmployeeAssignedRoleApiController extends Controller
         }
 
         return response()->json([
-            'message' => 'Employee roles assigned (duplicates skipped for empcode within corp_id)',
+            'message' => 'Employee roles assigned (duplicates skipped for empcode+corp_id+role_name)',
             'data' => $inserted
         ], 201);
     }
