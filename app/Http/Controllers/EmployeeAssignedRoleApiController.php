@@ -39,6 +39,7 @@ class EmployeeAssignedRoleApiController extends Controller
         }
 
         $inserted = [];
+        $skipped_empcodes = [];
         foreach ($employee_names as $i => $ename) {
             $empcode = $empcodes[$i] ?? null;
 
@@ -50,7 +51,8 @@ class EmployeeAssignedRoleApiController extends Controller
                     ->where('role_name', $request->role_name)
                     ->exists()
             ) {
-                // Skip this entry and continue with the next
+                // Collect skipped empcode
+                $skipped_empcodes[] = $empcode;
                 continue;
             }
 
@@ -67,8 +69,9 @@ class EmployeeAssignedRoleApiController extends Controller
         }
 
         return response()->json([
-            'message' => 'Employee roles assigned (duplicates skipped for empcode+corp_id+role_name)',
-            'data' => $inserted
+            'message' => 'Employee roles assigned. Duplicates skipped for empcode+corp_id+role_name: ' . (empty($skipped_empcodes) ? 'None' : implode(', ', $skipped_empcodes)),
+            'data' => $inserted,
+            'skipped_empcodes' => $skipped_empcodes
         ], 201);
     }
 
