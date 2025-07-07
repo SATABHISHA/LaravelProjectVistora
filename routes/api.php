@@ -49,6 +49,7 @@ use App\Http\Controllers\CorporateIdApiController;
 use App\Http\Controllers\RoleApiController;
 use App\Http\Controllers\EmployeeAssignedRoleApiController;
 use App\Http\Controllers\LevelApiController;
+use App\Http\Controllers\WorkflowApiController;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 
@@ -368,3 +369,8 @@ Route::get('/employee-assigned-role/all/{corp_id}', [EmployeeAssignedRoleApiCont
 Route::post('/level/add', [LevelApiController::class, 'store']);
 Route::get('/level/all/{corp_id}', [LevelApiController::class, 'getByCorpId']);
 Route::delete('/level/delete/{corp_id}/{id}', [LevelApiController::class, 'destroy']);
+
+// Workflow Routes
+Route::post('/workflow/add', [WorkflowApiController::class, 'store']);
+Route::delete('/workflow/delete', [WorkflowApiController::class, 'destroy']); // expects corpid & workflow in body
+Route::get('/workflow/{corpid}', [WorkflowApiController::class, 'getByCorpId']);
