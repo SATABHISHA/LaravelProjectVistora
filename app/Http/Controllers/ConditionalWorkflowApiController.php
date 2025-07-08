@@ -96,10 +96,9 @@ class ConditionalWorkflowApiController extends Controller
 
         // Parse role_name as array if comma separated
         $workflows = $workflows->map(function ($item) {
-            $item->role_names = array_map('trim', explode(',', $item->role_name));
+            $item['role_names'] = array_map('trim', explode(',', $item->role_name));
             return $item;
         });
-
         return response()->json([
             'status' => true,
             'data' => $workflows
