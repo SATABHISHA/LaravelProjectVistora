@@ -52,6 +52,7 @@ use App\Http\Controllers\LevelApiController;
 use App\Http\Controllers\WorkflowApiController;
 use App\Http\Controllers\RequestTypeApiController;
 use App\Http\Controllers\ApproverApiController;
+use App\Http\Controllers\ConditionalWorkflowApiController;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 
@@ -386,3 +387,9 @@ Route::get('/requesttype/{corp_id}', [RequestTypeApiController::class, 'getByCor
 Route::post('/approver/add', [ApproverApiController::class, 'store']);
 Route::delete('/approver/delete/{corp_id}/{id}', [ApproverApiController::class, 'destroy']);
 Route::post('/approver/fetch', [ApproverApiController::class, 'fetch']); // Use POST for flexible filtering
+
+// Conditional Workflow Routes
+Route::post('/conditional-workflow/add', [ConditionalWorkflowApiController::class, 'store']);
+Route::delete('/conditional-workflow/delete/{corp_id}/{id}', [ConditionalWorkflowApiController::class, 'destroy']);
+Route::put('/conditional-workflow/update/{corp_id}/{id}', [ConditionalWorkflowApiController::class, 'update']);
+Route::post('/conditional-workflow/fetch', [ConditionalWorkflowApiController::class, 'fetch']);
