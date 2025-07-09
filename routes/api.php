@@ -54,6 +54,7 @@ use App\Http\Controllers\RequestTypeApiController;
 use App\Http\Controllers\ApproverApiController;
 use App\Http\Controllers\ConditionalWorkflowApiController;
 use App\Http\Controllers\ConditionTypeApiController;
+use App\Http\Controllers\WorkflowAutomationApiController;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 
@@ -399,3 +400,6 @@ Route::post('/conditional-workflow/fetch', [ConditionalWorkflowApiController::cl
 Route::post('/condition-type/add', [ConditionTypeApiController::class, 'store']);
 Route::get('/condition-type/all/{corp_id}', [ConditionTypeApiController::class, 'getByCorpId']);
 Route::delete('/condition-type/delete/{corp_id}/{id}', [ConditionTypeApiController::class, 'destroy']);
+
+// Workflow Automation Routes
+Route::post('/workflow-automation/add', [WorkflowAutomationApiController::class, 'store']);
