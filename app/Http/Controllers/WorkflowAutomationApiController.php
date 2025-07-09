@@ -27,7 +27,7 @@ class WorkflowAutomationApiController extends Controller
             'from_days' => 'required|string',
             'to_days' => 'required|string',
             'conditional_workflowYN' => 'required|integer',
-            'activeYN' => 'required|integer', // <-- Add this line
+            'activeYN' => 'required|integer',
         ]);
 
         // Check for duplicate workflow_name for same request_type and corp_id
@@ -40,32 +40,7 @@ class WorkflowAutomationApiController extends Controller
             ], 409);
         }
 
-        // If any workflow_*_yn is 1, check for duplicate request_type for same corp_id
-        $ynFields = [
-            'workflow_recruitment_yn',
-            'workflow_workforce_yn',
-            'workflow_officetime_yn',
-            'workflow_payroll_yn',
-            'workflow_expense_yn',
-            'workflow_performance_yn',
-            'workflow_asset_yn'
-        ];
-        $anyYnIsOne = false;
-        foreach ($ynFields as $field) {
-            if ($request->$field == 1) {
-                $anyYnIsOne = true;
-                break;
-            }
-        }
-        if ($anyYnIsOne) {
-            if (WorkflowAutomation::where('corp_id', $request->corp_id)
-                ->where('request_type', $request->request_type)
-                ->exists()) {
-                return response()->json([
-                    'message' => 'Duplicate request_type for this corp_id when any workflow_*_yn is 1'
-                ], 409);
-            }
-        }
+        // No duplicate check for request_type anymore
 
         $workflow = WorkflowAutomation::create($request->all());
 
