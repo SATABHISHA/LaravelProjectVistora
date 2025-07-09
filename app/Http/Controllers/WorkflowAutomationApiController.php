@@ -27,6 +27,7 @@ class WorkflowAutomationApiController extends Controller
             'from_days' => 'required|string',
             'to_days' => 'required|string',
             'conditional_workflowYN' => 'required|integer',
+            'activeYN' => 'required|integer', // <-- Add this line
         ]);
 
         // Check for duplicate workflow_name for same request_type and corp_id

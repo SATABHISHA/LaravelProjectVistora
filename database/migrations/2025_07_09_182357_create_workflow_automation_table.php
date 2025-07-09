@@ -30,6 +30,7 @@ return new class extends Migration
             $table->string('from_days');
             $table->string('to_days');
             $table->integer('conditional_workflowYN');
+            $table->integer('activeYN'); // <-- Add this line
             $table->timestamps();
         });
     }

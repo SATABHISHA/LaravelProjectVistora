@@ -29,5 +29,6 @@ class WorkflowAutomation extends Model
         'from_days',
         'to_days',
         'conditional_workflowYN',
+        'activeYN', // <-- Add this line
     ];
 }
