@@ -56,6 +56,8 @@ use App\Http\Controllers\ConditionalWorkflowApiController;
 use App\Http\Controllers\ConditionTypeApiController;
 use App\Http\Controllers\WorkflowAutomationApiController;
 use App\Http\Controllers\CustomCountryApiController;
+use App\Http\Controllers\CustomStateApiController;
+use App\Http\Controllers\CustomCityApiController;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 
@@ -409,3 +411,13 @@ Route::post('/workflow-automation/add', [WorkflowAutomationApiController::class,
 Route::post('/custom-country/add', [CustomCountryApiController::class, 'store']);
 Route::get('/custom-country/{corp_id}', [CustomCountryApiController::class, 'getByCorpId']);
 Route::delete('/custom-country/delete/{corp_id}/{country_name}', [CustomCountryApiController::class, 'destroyByCorpIdAndCountryName']);
+
+// Custom State Routes
+Route::post('/custom-state/add', [CustomStateApiController::class, 'store']);
+Route::get('/custom-state/{corp_id}', [CustomStateApiController::class, 'getByCorpId']);
+Route::delete('/custom-state/delete/{corp_id}/{state_name}', [CustomStateApiController::class, 'destroyByCorpIdAndStateName']);
+
+// Custom City Routes
+Route::post('/custom-city/add', [CustomCityApiController::class, 'store']);
+Route::get('/custom-city/{corp_id}', [CustomCityApiController::class, 'getByCorpId']);
+Route::delete('/custom-city/delete/{corp_id}/{city_name}', [CustomCityApiController::class, 'destroyByCorpIdAndCityName']);
