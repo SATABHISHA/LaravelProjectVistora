@@ -55,6 +55,7 @@ use App\Http\Controllers\ApproverApiController;
 use App\Http\Controllers\ConditionalWorkflowApiController;
 use App\Http\Controllers\ConditionTypeApiController;
 use App\Http\Controllers\WorkflowAutomationApiController;
+use App\Http\Controllers\CustomCountryApiController;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 
@@ -403,3 +404,8 @@ Route::delete('/condition-type/delete/{corp_id}/{id}', [ConditionTypeApiControll
 
 // Workflow Automation Routes
 Route::post('/workflow-automation/add', [WorkflowAutomationApiController::class, 'store']);
+
+// Custom Country Routes
+Route::post('/custom-country/add', [CustomCountryApiController::class, 'store']);
+Route::get('/custom-country/{corp_id}', [CustomCountryApiController::class, 'getByCorpId']);
+Route::delete('/custom-country/delete/{corp_id}/{country_name}', [CustomCountryApiController::class, 'destroyByCorpIdAndCountryName']);
