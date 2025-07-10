@@ -406,6 +406,7 @@ Route::delete('/condition-type/delete/{corp_id}/{id}', [ConditionTypeApiControll
 
 // Workflow Automation Routes
 Route::post('/workflow-automation/add', [WorkflowAutomationApiController::class, 'store']);
+Route::post('/workflow-automation/fetch', [WorkflowAutomationApiController::class, 'fetchAutomationData']);
 
 // Custom Country Routes
 Route::post('/custom-country/add', [CustomCountryApiController::class, 'store']);
