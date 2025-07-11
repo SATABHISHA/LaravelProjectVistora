@@ -73,6 +73,8 @@ class WorkflowAutomationApiController extends Controller
             'workflow_name',
             'description',
             'request_type',
+            'flow_type',
+            'applicability',
             'advance_applicability',
             'from_days',
             'to_days',
