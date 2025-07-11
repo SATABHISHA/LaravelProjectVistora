@@ -117,6 +117,9 @@ class WorkflowAutomationApiController extends Controller
                 }
                 $approversArr = $approversQuery->get();
 
+                // Get all approver names as comma-separated string
+                $approverNames = $approversArr->pluck('approver')->unique()->implode(',');
+
                 // Conditional workflows for this automation row
                 $condWorkflowsQuery = DB::table('conditional_workflows')
                     ->select(
@@ -138,11 +141,14 @@ class WorkflowAutomationApiController extends Controller
                 $automationArr[] = [
                     'workflow_name' => $item->workflow_name,
                     'description' => $item->description,
+                    'flow_type' => $item->flow_type,
+                    'applicability' => $item->applicability,
                     'advance_applicability' => $item->advance_applicability,
                     'from_days' => $item->from_days,
                     'to_days' => $item->to_days,
                     'conditional_workflowYN' => $item->conditional_workflowYN,
                     'activeYN' => $item->activeYN,
+                    'approver' => $approverNames, // <-- comma-separated names
                     'approvers' => $approversArr,
                     'conditional_workflow' => $condWorkflowsArr,
                 ];
