@@ -13,6 +13,7 @@ return new class extends Migration
     {
         Schema::create('approvers', function (Blueprint $table) {
             $table->bigIncrements('id');
+            $table->string('puid'); // <-- Add this line
             $table->string('corp_id');
             $table->string('workflow_name');
             $table->string('request_type');

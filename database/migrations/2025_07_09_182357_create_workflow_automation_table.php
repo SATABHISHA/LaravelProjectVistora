@@ -14,6 +14,7 @@ return new class extends Migration
         Schema::create('workflow_automation', function (Blueprint $table) {
             $table->id();
             $table->string('corp_id');
+            $table->string('puid'); // <-- Add this line
             $table->integer('workflow_recruitment_yn');
             $table->integer('workflow_workforce_yn');
             $table->integer('workflow_officetime_yn');
