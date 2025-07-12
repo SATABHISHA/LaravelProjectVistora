@@ -12,6 +12,7 @@ class WorkflowAutomationApiController extends Controller
     public function store(Request $request)
     {
         $request->validate([
+            'puid' => 'required|string', // <-- Add this line
             'corp_id' => 'required|string',
             'workflow_name' => 'required|string',
             'request_type' => 'required|string',
@@ -42,8 +43,6 @@ class WorkflowAutomationApiController extends Controller
             ], 409);
         }
 
-        // No duplicate check for request_type anymore
-
         $workflow = WorkflowAutomation::create($request->all());
 
         return response()->json([
@@ -69,8 +68,9 @@ class WorkflowAutomationApiController extends Controller
         // Remove null filters
         $filters = array_filter($filters, function($v) { return $v !== null; });
 
-        // Fetch workflow_automation data
+        // Fetch workflow_automation data (add puid to select)
         $automationQuery = DB::table('workflow_automation')->select(
+            'puid',
             'workflow_name',
             'description',
             'request_type',
@@ -96,14 +96,11 @@ class WorkflowAutomationApiController extends Controller
 
             $automationArr = [];
             foreach ($automations as $item) {
-                // Prepare row-specific filters
-                $rowFilters = array_merge($filters, [
-                    'workflow_name' => $item->workflow_name,
-                    'request_type' => $item->request_type,
-                ]);
+                $puid = $item->puid;
 
-                // Approvers for this automation row
-                $approversQuery = DB::table('approvers')
+                // Fetch approvers by puid
+                $approversArr = DB::table('approvers')
+                    ->where('puid', $puid)
                     ->select(
                         'workflow_name',
                         'request_type',
@@ -112,17 +109,15 @@ class WorkflowAutomationApiController extends Controller
                         'due_day',
                         'turnaround_time',
                         'active_yn'
-                    );
-                foreach ($rowFilters as $key => $val) {
-                    $approversQuery->where($key, $val);
-                }
-                $approversArr = $approversQuery->get();
+                    )
+                    ->get();
 
                 // Get all approver names as comma-separated string
                 $approverNames = $approversArr->pluck('approver')->unique()->implode(',');
 
-                // Conditional workflows for this automation row
-                $condWorkflowsQuery = DB::table('conditional_workflows')
+                // Fetch conditional workflows by puid
+                $condWorkflowsArr = DB::table('conditional_workflows')
+                    ->where('puid', $puid)
                     ->select(
                         'workflow_name',
                         'request_type',
@@ -133,13 +128,11 @@ class WorkflowAutomationApiController extends Controller
                         'intimationYn',
                         'due_day',
                         'turaround_time'
-                    );
-                foreach ($rowFilters as $key => $val) {
-                    $condWorkflowsQuery->where($key, $val);
-                }
-                $condWorkflowsArr = $condWorkflowsQuery->get();
+                    )
+                    ->get();
 
                 $automationArr[] = [
+                    'puid' => $item->puid,
                     'workflow_name' => $item->workflow_name,
                     'description' => $item->description,
                     'flow_type' => $item->flow_type,
@@ -149,7 +142,7 @@ class WorkflowAutomationApiController extends Controller
                     'to_days' => $item->to_days,
                     'conditional_workflowYN' => $item->conditional_workflowYN,
                     'activeYN' => $item->activeYN,
-                    'approver' => $approverNames, // <-- comma-separated names
+                    'approver' => $approverNames,
                     'approvers' => $approversArr,
                     'conditional_workflow' => $condWorkflowsArr,
                 ];
@@ -177,5 +170,31 @@ class WorkflowAutomationApiController extends Controller
             'status' => true,
             'public_uid' => $publicUid
         ]);
+    }
+
+    public function deleteByPuid($puid)
+    {
+        // Delete from workflow_automation
+        $workflowDeleted = DB::table('workflow_automation')->where('puid', $puid)->delete();
+
+        // Delete from approvers
+        $approversDeleted = DB::table('approvers')->where('puid', $puid)->delete();
+
+        // Delete from conditional_workflows
+        $conditionalDeleted = DB::table('conditional_workflows')->where('puid', $puid)->delete();
+
+        $anyDeleted = $workflowDeleted || $approversDeleted || $conditionalDeleted;
+
+        if ($anyDeleted) {
+            return response()->json([
+                'status' => true,
+                'message' => 'Records deleted successfully for puid: ' . $puid
+            ]);
+        } else {
+            return response()->json([
+                'status' => false,
+                'message' => 'No records found for puid: ' . $puid
+            ], 404);
+        }
     }
 }

@@ -409,6 +409,7 @@ Route::delete('/condition-type/delete/{corp_id}/{id}', [ConditionTypeApiControll
 Route::post('/workflow-automation/add', [WorkflowAutomationApiController::class, 'store']);
 Route::post('/workflow-automation/fetch', [WorkflowAutomationApiController::class, 'fetchAutomationData']);
 Route::get('/workflow-automation/generate-public-uid', [WorkflowAutomationApiController::class, 'generatePublicUid']);
+Route::delete('/workflow-automation/delete/{puid}', [WorkflowAutomationApiController::class, 'deleteByPuid']);
 
 // Custom Country Routes
 Route::post('/custom-country/add', [CustomCountryApiController::class, 'store']);
