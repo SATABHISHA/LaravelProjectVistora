@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use Illuminate\Http\Request;
 use App\Models\WorkflowAutomation;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
 
 class WorkflowAutomationApiController extends Controller
 {
@@ -165,6 +166,16 @@ class WorkflowAutomationApiController extends Controller
             'status' => true,
             'message' => 'Data fetched successfully.',
             'data' => $result
+        ]);
+    }
+
+    public function generatePublicUid()
+    {
+        $publicUid = (string) Str::uuid(); // Generates a unique UUID v4 string
+
+        return response()->json([
+            'status' => true,
+            'public_uid' => $publicUid
         ]);
     }
 }
