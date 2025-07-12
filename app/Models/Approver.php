@@ -10,6 +10,7 @@ class Approver extends Model
     use HasFactory;
 
     protected $fillable = [
+        'puid',
         'corp_id', 'workflow_name', 'request_type',
         'workflow_recruitment_yn', 'workflow_workforce_yn', 'workflow_officetime_yn',
         'workflow_payroll_yn', 'workflow_expense_yn', 'workflow_performance_yn',

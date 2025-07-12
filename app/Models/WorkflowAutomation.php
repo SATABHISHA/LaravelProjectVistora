@@ -9,9 +9,10 @@ class WorkflowAutomation extends Model
 {
     use HasFactory;
 
-    protected $table = 'workflow_automation'; // <-- Add this line
+    protected $table = 'workflow_automation';
 
     protected $fillable = [
+        'puid', // <-- Add this line
         'corp_id',
         'workflow_recruitment_yn',
         'workflow_workforce_yn',

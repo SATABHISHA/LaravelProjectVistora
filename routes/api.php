@@ -390,8 +390,9 @@ Route::get('/requesttype/{corp_id}', [RequestTypeApiController::class, 'getByCor
 
 // Approver Routes
 Route::post('/approver/add', [ApproverApiController::class, 'store']);
-Route::delete('/approver/delete/{corp_id}/{id}', [ApproverApiController::class, 'destroy']);
-Route::post('/approver/fetch', [ApproverApiController::class, 'fetch']); // Use POST for flexible filtering
+Route::delete('/approver/delete/{puid}', [ApproverApiController::class, 'destroy']);
+Route::post('/approver/fetch', [ApproverApiController::class, 'fetch']); // pass puid in body to fetch by puid
+Route::put('/approver/update/{corp_id}/{puid}', [ApproverApiController::class, 'update']);
 
 // Conditional Workflow Routes
 Route::post('/conditional-workflow/add', [ConditionalWorkflowApiController::class, 'store']);
