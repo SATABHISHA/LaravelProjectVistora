@@ -396,8 +396,8 @@ Route::put('/approver/update/{corp_id}/{puid}', [ApproverApiController::class, '
 
 // Conditional Workflow Routes
 Route::post('/conditional-workflow/add', [ConditionalWorkflowApiController::class, 'store']);
-Route::delete('/conditional-workflow/delete/{corp_id}/{id}', [ConditionalWorkflowApiController::class, 'destroy']);
-Route::put('/conditional-workflow/update/{corp_id}/{id}', [ConditionalWorkflowApiController::class, 'update']);
+Route::delete('/conditional-workflow/delete/{puid}', [ConditionalWorkflowApiController::class, 'destroy']);
+Route::put('/conditional-workflow/update/{puid}', [ConditionalWorkflowApiController::class, 'update']);
 Route::post('/conditional-workflow/fetch', [ConditionalWorkflowApiController::class, 'fetch']);
 
 // Condition Type Routes

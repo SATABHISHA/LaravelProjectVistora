@@ -11,6 +11,7 @@ class ConditionalWorkflowApiController extends Controller
     public function store(Request $request)
     {
         $request->validate([
+            'puid' => 'required|string', // <-- Add this line
             'corp_id' => 'required|string',
             'workflow_name' => 'required|string',
             'request_type' => 'required|string',
@@ -39,10 +40,10 @@ class ConditionalWorkflowApiController extends Controller
         ], 201);
     }
 
-    // Delete by corp_id and id
-    public function destroy($corp_id, $id)
+    // Delete by puid
+    public function destroy($puid)
     {
-        $workflow = ConditionalWorkflow::where('corp_id', $corp_id)->where('id', $id)->first();
+        $workflow = ConditionalWorkflow::where('puid', $puid)->first();
         if (!$workflow) {
             return response()->json([
                 'status' => false,
@@ -56,10 +57,10 @@ class ConditionalWorkflowApiController extends Controller
         ]);
     }
 
-    // Update by corp_id and id
-    public function update(Request $request, $corp_id, $id)
+    // Update by puid
+    public function update(Request $request, $puid)
     {
-        $workflow = ConditionalWorkflow::where('corp_id', $corp_id)->where('id', $id)->first();
+        $workflow = ConditionalWorkflow::where('puid', $puid)->first();
         if (!$workflow) {
             return response()->json([
                 'status' => false,
@@ -79,6 +80,27 @@ class ConditionalWorkflowApiController extends Controller
     // Fetch by filters, and parse role_name as array
     public function fetch(Request $request)
     {
+        // If puid is provided, fetch only by puid and return a single record
+        if ($request->puid) {
+            $workflow = ConditionalWorkflow::where('puid', $request->puid)->first();
+
+            if (!$workflow) {
+                return response()->json([
+                    'status' => false,
+                    'message' => 'Conditional workflow not found.'
+                ], 404);
+            }
+
+            // Parse role_name as array if comma separated
+            $workflow['role_names'] = array_map('trim', explode(',', $workflow->role_name));
+
+            return response()->json([
+                'status' => true,
+                'data' => $workflow
+            ]);
+        }
+
+        // Otherwise, use filters as before
         $query = ConditionalWorkflow::query();
 
         if ($request->corp_id) $query->where('corp_id', $request->corp_id);
@@ -99,6 +121,7 @@ class ConditionalWorkflowApiController extends Controller
             $item['role_names'] = array_map('trim', explode(',', $item->role_name));
             return $item;
         });
+
         return response()->json([
             'status' => true,
             'data' => $workflows
