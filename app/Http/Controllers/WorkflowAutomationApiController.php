@@ -197,4 +197,45 @@ class WorkflowAutomationApiController extends Controller
             ], 404);
         }
     }
+
+    public function updateByPuid(Request $request, $puid)
+    {
+        $workflow = WorkflowAutomation::where('puid', $puid)->first();
+
+        if (!$workflow) {
+            return response()->json([
+                'status' => false,
+                'message' => 'Workflow automation not found.'
+            ], 404);
+        }
+
+        $request->validate([
+            'corp_id' => 'sometimes|string',
+            'workflow_name' => 'sometimes|string',
+            'request_type' => 'sometimes|string',
+            'workflow_recruitment_yn' => 'sometimes|integer',
+            'workflow_workforce_yn' => 'sometimes|integer',
+            'workflow_officetime_yn' => 'sometimes|integer',
+            'workflow_payroll_yn' => 'sometimes|integer',
+            'workflow_expense_yn' => 'sometimes|integer',
+            'workflow_performance_yn' => 'sometimes|integer',
+            'workflow_asset_yn' => 'sometimes|integer',
+            'description' => 'nullable|string',
+            'flow_type' => 'sometimes|string',
+            'applicability' => 'sometimes|string',
+            'advance_applicability' => 'sometimes|string',
+            'from_days' => 'sometimes|string',
+            'to_days' => 'sometimes|string',
+            'conditional_workflowYN' => 'sometimes|integer',
+            'activeYN' => 'sometimes|integer',
+        ]);
+
+        $workflow->update($request->all());
+
+        return response()->json([
+            'status' => true,
+            'message' => 'Workflow automation updated successfully.',
+            'workflow' => $workflow
+        ]);
+    }
 }

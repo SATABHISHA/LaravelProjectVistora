@@ -410,6 +410,7 @@ Route::post('/workflow-automation/add', [WorkflowAutomationApiController::class,
 Route::post('/workflow-automation/fetch', [WorkflowAutomationApiController::class, 'fetchAutomationData']);
 Route::get('/workflow-automation/generate-public-uid', [WorkflowAutomationApiController::class, 'generatePublicUid']);
 Route::delete('/workflow-automation/delete/{puid}', [WorkflowAutomationApiController::class, 'deleteByPuid']);
+Route::put('/workflow-automation/update/{puid}', [WorkflowAutomationApiController::class, 'updateByPuid']);
 
 // Custom Country Routes
 Route::post('/custom-country/add', [CustomCountryApiController::class, 'store']);
