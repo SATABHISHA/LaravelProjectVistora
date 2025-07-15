@@ -58,6 +58,7 @@ use App\Http\Controllers\WorkflowAutomationApiController;
 use App\Http\Controllers\CustomCountryApiController;
 use App\Http\Controllers\CustomStateApiController;
 use App\Http\Controllers\CustomCityApiController;
+use App\Http\Controllers\ShiftPolicyApiController;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 
@@ -426,3 +427,9 @@ Route::delete('/custom-state/delete/{corp_id}/{state_name}', [CustomStateApiCont
 Route::post('/custom-city/add', [CustomCityApiController::class, 'store']);
 Route::get('/custom-city/{corp_id}', [CustomCityApiController::class, 'getByCorpId']);
 Route::delete('/custom-city/delete/{corp_id}/{city_name}', [CustomCityApiController::class, 'destroyByCorpIdAndCityName']);
+
+// Shift Policy Routes
+Route::post('/shiftpolicy/add', [ShiftPolicyApiController::class, 'store']);
+Route::put('/shiftpolicy/update/{corp_id}/{puid}', [ShiftPolicyApiController::class, 'update']);
+Route::get('/shiftpolicy/all/{corp_id}', [ShiftPolicyApiController::class, 'getAllByCorpId']);
+Route::delete('/shiftpolicy/delete/{puid}', [ShiftPolicyApiController::class, 'deleteByPuid']);
