@@ -22,6 +22,24 @@ class EmployeeStatutoryDetailApiController extends Controller
             ], 409);
         }
 
+        // List all nullable string fields from your migration
+        $nullableStringFields = [
+            'TaxRegime', 'PFNo', 'UAN', 'EmpPFContbtnLmt', 'EmployerPFContbtnLmt',
+            'EmpStateInsNo', 'EmpStateInsDispensaryName', 'ESISubUnitCode', 'DateOfJoin',
+            'VoluntaryPFAmount', 'VoluntaryPFPercent', 'VoluntaryPFEffectiveDate',
+            'EmployerAmount', 'EmployerPercentage', 'EmployerPanNumber', 'SalaryMode',
+            'SalaryBank', 'ReimbursementMode', 'ReimbursementBank'
+        ];
+
+        foreach ($nullableStringFields as $field) {
+            if (!isset($data[$field]) || $data[$field] === null || $data[$field] === '') {
+                $data[$field] = "N/A";
+            }
+        }
+
+        // Always set DraftYN to 0
+        $data['DraftYN'] = 0;
+
         $statutory = EmployeeStatutoryDetail::create($data);
         return response()->json(['data' => $statutory], 201);
     }
