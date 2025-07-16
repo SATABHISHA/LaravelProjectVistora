@@ -59,6 +59,7 @@ use App\Http\Controllers\CustomCountryApiController;
 use App\Http\Controllers\CustomStateApiController;
 use App\Http\Controllers\CustomCityApiController;
 use App\Http\Controllers\ShiftPolicyApiController;
+use App\Http\Controllers\ShiftPolicyWeeklyScheduleApiController;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 
@@ -433,3 +434,9 @@ Route::post('/shiftpolicy/add', [ShiftPolicyApiController::class, 'store']);
 Route::put('/shiftpolicy/update/{corp_id}/{puid}', [ShiftPolicyApiController::class, 'update']);
 Route::get('/shiftpolicy/all/{corp_id}', [ShiftPolicyApiController::class, 'getAllByCorpId']);
 Route::delete('/shiftpolicy/delete/{puid}', [ShiftPolicyApiController::class, 'deleteByPuid']);
+
+// Shift Policy Weekly Schedule Routes
+Route::post('/shift-policy-weekly-schedule/add', [ShiftPolicyWeeklyScheduleApiController::class, 'store']);
+Route::put('/shift-policy-weekly-schedule/update/{puid}/{id}', [ShiftPolicyWeeklyScheduleApiController::class, 'update']);
+Route::delete('/shift-policy-weekly-schedule/delete/{puid}/{id}', [ShiftPolicyWeeklyScheduleApiController::class, 'destroy']);
+Route::get('/shift-policy-weekly-schedule/{puid}', [ShiftPolicyWeeklyScheduleApiController::class, 'fetchByPuid']);
