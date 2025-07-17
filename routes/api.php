@@ -438,5 +438,6 @@ Route::delete('/shiftpolicy/delete/{puid}', [ShiftPolicyApiController::class, 'd
 // Shift Policy Weekly Schedule Routes
 Route::post('/shift-policy-weekly-schedule/add', [ShiftPolicyWeeklyScheduleApiController::class, 'store']);
 Route::put('/shift-policy-weekly-schedule/update/{puid}/{id}', [ShiftPolicyWeeklyScheduleApiController::class, 'update']);
-Route::delete('/shift-policy-weekly-schedule/delete/{puid}/{id}', [ShiftPolicyWeeklyScheduleApiController::class, 'destroy']);
+Route::delete('/shift-policy-weekly-schedule/delete/{puid}/{id}', [ShiftPolicyWeeklyScheduleApiController::class, 'destroyByPuidAndId']);
+Route::delete('/shift-policy-weekly-schedule/delete/{puid}', [ShiftPolicyWeeklyScheduleApiController::class, 'destroyByPuid']);
 Route::get('/shift-policy-weekly-schedule/{puid}', [ShiftPolicyWeeklyScheduleApiController::class, 'fetchByPuid']);

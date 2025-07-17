@@ -74,21 +74,40 @@ class ShiftPolicyWeeklyScheduleApiController extends Controller
         ]);
     }
 
-    // Delete by puid and id
-    public function destroy($puid, $id)
+    // Delete all by puid
+    public function destroyByPuid($puid)
     {
-        $schedule = ShiftPolicyWeeklySchedule::where('puid', $puid)->where('id', $id)->first();
-        if (!$schedule) {
+        $deleted = ShiftPolicyWeeklySchedule::where('puid', $puid)->delete();
+
+        if ($deleted) {
+            return response()->json([
+                'status' => true,
+                'message' => 'All schedules deleted for this puid.'
+            ]);
+        } else {
             return response()->json([
                 'status' => false,
-                'message' => 'Schedule not found.'
+                'message' => 'No schedules found for this puid.'
             ], 404);
         }
-        $schedule->delete();
-        return response()->json([
-            'status' => true,
-            'message' => 'Schedule deleted successfully.'
-        ]);
+    }
+
+    // Delete by puid and id
+    public function destroyByPuidAndId($puid, $id)
+    {
+        $deleted = ShiftPolicyWeeklySchedule::where('puid', $puid)->where('id', $id)->delete();
+
+        if ($deleted) {
+            return response()->json([
+                'status' => true,
+                'message' => 'Schedule deleted for this puid and id.'
+            ]);
+        } else {
+            return response()->json([
+                'status' => false,
+                'message' => 'No schedule found for this puid and id.'
+            ], 404);
+        }
     }
 
     // Fetch by puid, group by week_no, add color
