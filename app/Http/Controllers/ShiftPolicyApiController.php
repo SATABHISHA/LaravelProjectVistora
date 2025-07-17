@@ -11,27 +11,40 @@ class ShiftPolicyApiController extends Controller
     {
         $data = $request->all();
 
-        // Fields that should default to "0" if empty
+        // Prevent duplicate shift_code for the same corp_id
+        $exists = ShiftPolicy::where('corp_id', $data['corp_id'] ?? null)
+            ->where('shift_code', $data['shift_code'] ?? null)
+            ->exists();
+
+        if ($exists) {
+            return response()->json([
+                'status' => false,
+                'message' => 'Shift code already exists for this corp_id.'
+            ], 409);
+        }
+
+        // Fields that should default to "00.00AM" if empty
+        $fieldsToDefaultTime = [
+            'shift_start_time',
+            'first_half',
+            'second_half',
+            'checkin',
+            'gracetime_late',
+            'absence_halfday',
+            'absence_fullday',
+            'absence_halfday_absent_aftr',
+            'absence_fullday_absent_aftr',
+            'absence_secondhalf_absent_chckout_before'
+        ];
+
+        foreach ($fieldsToDefaultTime as $field) {
+            if (!isset($data[$field]) || $data[$field] === null || $data[$field] === '') {
+                $data[$field] = '00.00AM';
+            }
+        }
+
+        // Integer fields that should default to "0" if empty
         $fieldsToDefaultZero = [
-            'shift_start_time_hrs',
-            'shift_start_time_mins',
-            'first_half_hrs',
-            'first_half_mins',
-            'second_half_hrs',
-            'second_half_mins',
-            'checkin_hrs',
-            'checkin_mins',
-            'gracetime_late_mins',
-            'gracetime_early_mins',
-            'absence_halfday_minhrs',
-            'absence_halfday_minmins',
-            'absence_fullday_minhrs',
-            'absence_fullday_minmins',
-            'absence_halfday_absent_aftr_hrs',
-            'absence_halfday_absent_aftr_mins',
-            'absence_fullday_absent_aftr_hrs',
-            'absence_fullday_absent_aftr_mins',
-            'absence_secondhalf_absent_chckout_before',
             'absence_shiftallowance_yn',
             'absence_restrict_manager_backdate_yn',
             'absence_restrict_hr_backdate_yn',
@@ -60,7 +73,7 @@ class ShiftPolicyApiController extends Controller
 
     public function update(Request $request, $corp_id, $puid)
     {
-        $shiftPolicy = \App\Models\ShiftPolicy::where('corp_id', $corp_id)
+        $shiftPolicy = ShiftPolicy::where('corp_id', $corp_id)
             ->where('puid', $puid)
             ->first();
 
@@ -71,27 +84,30 @@ class ShiftPolicyApiController extends Controller
             ], 404);
         }
 
-        // Fields that should default to "0" if empty
+        $data = $request->all();
+
+        // Fields that should default to "00.00AM" if empty
+        $fieldsToDefaultTime = [
+            'shift_start_time',
+            'first_half',
+            'second_half',
+            'checkin',
+            'gracetime_late',
+            'absence_halfday',
+            'absence_fullday',
+            'absence_halfday_absent_aftr',
+            'absence_fullday_absent_aftr',
+            'absence_secondhalf_absent_chckout_before'
+        ];
+
+        foreach ($fieldsToDefaultTime as $field) {
+            if (isset($data[$field]) && ($data[$field] === null || $data[$field] === '')) {
+                $data[$field] = '00.00AM';
+            }
+        }
+
+        // Integer fields that should default to "0" if empty
         $fieldsToDefaultZero = [
-            'shift_start_time_hrs',
-            'shift_start_time_mins',
-            'first_half_hrs',
-            'first_half_mins',
-            'second_half_hrs',
-            'second_half_mins',
-            'checkin_hrs',
-            'checkin_mins',
-            'gracetime_late_mins',
-            'gracetime_early_mins',
-            'absence_halfday_minhrs',
-            'absence_halfday_minmins',
-            'absence_fullday_minhrs',
-            'absence_fullday_minmins',
-            'absence_halfday_absent_aftr_hrs',
-            'absence_halfday_absent_aftr_mins',
-            'absence_fullday_absent_aftr_hrs',
-            'absence_fullday_absent_aftr_mins',
-            'absence_secondhalf_absent_chckout_before',
             'absence_shiftallowance_yn',
             'absence_restrict_manager_backdate_yn',
             'absence_restrict_hr_backdate_yn',
@@ -103,7 +119,6 @@ class ShiftPolicyApiController extends Controller
             'adv_settings_visible_in_wrkplan_rqst_yn'
         ];
 
-        $data = $request->all();
         foreach ($fieldsToDefaultZero as $field) {
             if (isset($data[$field]) && ($data[$field] === null || $data[$field] === '')) {
                 $data[$field] = 0;
@@ -121,7 +136,7 @@ class ShiftPolicyApiController extends Controller
 
     public function getAllByCorpId($corp_id)
     {
-        $shiftPolicies = \App\Models\ShiftPolicy::where('corp_id', $corp_id)->get();
+        $shiftPolicies = ShiftPolicy::where('corp_id', $corp_id)->get();
 
         if ($shiftPolicies->isEmpty()) {
             return response()->json([
@@ -139,7 +154,7 @@ class ShiftPolicyApiController extends Controller
 
     public function deleteByPuid($puid)
     {
-        $deleted = \App\Models\ShiftPolicy::where('puid', $puid)->delete();
+        $deleted = ShiftPolicy::where('puid', $puid)->delete();
 
         if ($deleted) {
             return response()->json([

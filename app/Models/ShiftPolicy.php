@@ -9,31 +9,22 @@ class ShiftPolicy extends Model
 {
     use HasFactory;
 
-    protected $table = 'shiftpolicy';
+    protected $table = 'shiftpolicy'; // Table name as per migration
 
     protected $fillable = [
         'puid',
         'corp_id',
         'shift_code',
         'shift_name',
-        'shift_start_time_hrs',
-        'shift_start_time_mins',
-        'first_half_hrs',
-        'first_half_mins',
-        'second_half_hrs',
-        'second_half_mins',
-        'checkin_hrs',
-        'checkin_mins',
-        'gracetime_late_mins',
-        'gracetime_early_mins',
-        'absence_halfday_minhrs',
-        'absence_halfday_minmins',
-        'absence_fullday_minhrs',
-        'absence_fullday_minmins',
-        'absence_halfday_absent_aftr_hrs',
-        'absence_halfday_absent_aftr_mins',
-        'absence_fullday_absent_aftr_hrs',
-        'absence_fullday_absent_aftr_mins',
+        'shift_start_time',
+        'first_half',
+        'second_half',
+        'checkin',
+        'gracetime_late',
+        'absence_halfday',
+        'absence_fullday',
+        'absence_halfday_absent_aftr',
+        'absence_fullday_absent_aftr',
         'absence_secondhalf_absent_chckout_before',
         'absence_shiftallowance_yn',
         'absence_restrict_manager_backdate_yn',
