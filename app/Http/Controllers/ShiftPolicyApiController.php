@@ -37,13 +37,11 @@ class ShiftPolicyApiController extends Controller
             'absence_fullday_absent_aftr',
             'absence_secondhalf_absent_chckout_before'
         ];
-
         foreach ($fieldsToDefaultTime as $field) {
             if (!isset($data[$field]) || $data[$field] === null || $data[$field] === '') {
                 $data[$field] = '00.00AM';
             }
         }
-
         // Integer fields that should default to "0" if empty
         $fieldsToDefaultZero = [
             'absence_shiftallowance_yn',
