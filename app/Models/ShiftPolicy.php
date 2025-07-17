@@ -20,7 +20,7 @@ class ShiftPolicy extends Model
         'first_half',
         'second_half',
         'checkin',
-        'gracetime_early', // <-- Added this field
+        'gracetime_early',
         'gracetime_late',
         'absence_halfday',
         'absence_fullday',
@@ -35,6 +35,7 @@ class ShiftPolicy extends Model
         'adv_settings_sihft_break_deduction_yn',
         'adv_settings_deduct_time_before_shift_yn',
         'adv_settings_restrict_work_aftr_cutoff_yn',
-        'adv_settings_visible_in_wrkplan_rqst_yn'
+        'adv_settings_visible_in_wrkplan_rqst_yn',
+        'define_weekly_off_yn' // <-- Add this line
     ];
 }

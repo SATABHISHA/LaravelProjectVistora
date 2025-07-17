@@ -37,6 +37,7 @@ return new class extends Migration
             $table->integer('adv_settings_deduct_time_before_shift_yn');
             $table->integer('adv_settings_restrict_work_aftr_cutoff_yn');
             $table->integer('adv_settings_visible_in_wrkplan_rqst_yn');
+            $table->integer('define_weekly_off_yn');
             $table->timestamps();
         });
     }
