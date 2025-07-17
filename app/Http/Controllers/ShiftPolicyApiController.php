@@ -29,6 +29,7 @@ class ShiftPolicyApiController extends Controller
             'first_half',
             'second_half',
             'checkin',
+            'gracetime_early', // <-- Added this field
             'gracetime_late',
             'absence_halfday',
             'absence_fullday',
@@ -92,6 +93,7 @@ class ShiftPolicyApiController extends Controller
             'first_half',
             'second_half',
             'checkin',
+            'gracetime_early', // <-- Added this field
             'gracetime_late',
             'absence_halfday',
             'absence_fullday',

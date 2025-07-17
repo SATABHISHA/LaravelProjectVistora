@@ -21,6 +21,7 @@ return new class extends Migration
             $table->string('first_half');
             $table->string('second_half');
             $table->string('checkin');
+            $table->string('gracetime_early');
             $table->string('gracetime_late');
             $table->string('absence_halfday');
             $table->string('absence_fullday');
