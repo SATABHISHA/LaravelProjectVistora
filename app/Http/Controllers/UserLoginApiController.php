@@ -42,9 +42,9 @@ class UserLoginApiController extends Controller
                 'username' => $request->username,
                 'password' => Hash::make($request->password),
                 'empcode' => $request->empcode,
-                'active_yn' => $request->active_yn ?? true,
-                'admin_yn' => $request->admin_yn ?? false,
-                'supervisor_yn' => $request->supervisor_yn ?? false,
+                'active_yn' => isset($request->active_yn) ? (int)$request->active_yn : 1,
+                'admin_yn' => isset($request->admin_yn) ? (int)$request->admin_yn : 0,
+                'supervisor_yn' => isset($request->supervisor_yn) ? (int)$request->supervisor_yn : 0,
             ]);
         } catch (\Exception $e) {
             return response()->json([
@@ -92,7 +92,7 @@ class UserLoginApiController extends Controller
             ], 401);
         }
 
-        if (!$user->active_yn) {
+        if ((int)$user->active_yn !== 1) {
             return response()->json([
                 'status' => false,
                 'message' => 'User not active or Inactive user, please contact admin'
