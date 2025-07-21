@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use Illuminate\Http\Request;
 use App\Models\UserLogin;
 use Illuminate\Support\Facades\Hash;
+use App\Models\CorporateId;
 
 class UserLoginApiController extends Controller
 {
@@ -13,13 +14,32 @@ class UserLoginApiController extends Controller
     {
         $request->validate([
             'corp_id' => 'required|string',
-            'email_id' => 'required|email|unique:userlogin,email_id',
+            'email_id' => 'required|email',
             'username' => 'required|string',
             'password' => 'required|string|min:6',
             'empcode' => 'nullable|string',
-        ], [
-            'email_id.unique' => 'This email ID is already registered.',
         ]);
+
+        // Check if corp_id is active in corporateid table
+        $corp = CorporateId::where('corp_id_name', $request->corp_id)->first();
+        if (!$corp || (int)$corp->active_yn === 0) {
+            return response()->json([
+                'status' => false,
+                'message' => 'Registration not allowed: Corporate ID is inactive.'
+            ], 403);
+        }
+
+        // Check for duplicate email_id for the same corp_id
+        $emailExists = UserLogin::where('corp_id', $request->corp_id)
+            ->where('email_id', $request->email_id)
+            ->exists();
+
+        if ($emailExists) {
+            return response()->json([
+                'status' => false,
+                'message' => 'This email ID is already registered for this corp_id.'
+            ], 409);
+        }
 
         // Check for duplicate empcode for the same corp_id
         if ($request->empcode) {
