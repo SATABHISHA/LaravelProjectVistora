@@ -43,8 +43,8 @@ class UserLoginApiController extends Controller
                 'password' => Hash::make($request->password),
                 'empcode' => $request->empcode,
                 'active_yn' => isset($request->active_yn) ? (int)$request->active_yn : 1,
-                'admin_yn' => isset($request->admin_yn) ? (int)$request->admin_yn : 0,
-                'supervisor_yn' => isset($request->supervisor_yn) ? (int)$request->supervisor_yn : 0,
+                'admin_yn' => isset($request->admin_yn) ? (int)$request->admin_yn : 1,
+                'supervisor_yn' => isset($request->supervisor_yn) ? (int)$request->supervisor_yn : 1,
             ]);
         } catch (\Exception $e) {
             return response()->json([
