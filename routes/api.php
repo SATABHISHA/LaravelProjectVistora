@@ -60,6 +60,7 @@ use App\Http\Controllers\CustomStateApiController;
 use App\Http\Controllers\CustomCityApiController;
 use App\Http\Controllers\ShiftPolicyApiController;
 use App\Http\Controllers\ShiftPolicyWeeklyScheduleApiController;
+use App\Http\Controllers\CheckinPolicyApiController;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 
@@ -441,3 +442,9 @@ Route::put('/shift-policy-weekly-schedule/update/{puid}/{id}', [ShiftPolicyWeekl
 Route::delete('/shift-policy-weekly-schedule/delete/{puid}/{id}', [ShiftPolicyWeeklyScheduleApiController::class, 'destroyByPuidAndId']);
 Route::delete('/shift-policy-weekly-schedule/delete/{puid}', [ShiftPolicyWeeklyScheduleApiController::class, 'destroyByPuid']);
 Route::get('/shift-policy-weekly-schedule/{puid}', [ShiftPolicyWeeklyScheduleApiController::class, 'fetchByPuid']);
+
+// Check-in Policy Routes
+Route::post('/checkin-policy/add', [CheckinPolicyApiController::class, 'store']);
+Route::delete('/checkin-policy/delete/{puid}', [CheckinPolicyApiController::class, 'destroy']);
+Route::put('/checkin-policy/update/{puid}', [CheckinPolicyApiController::class, 'update']);
+Route::get('/checkin-policy/all/{corp_id}', [CheckinPolicyApiController::class, 'getByCorpId']);
