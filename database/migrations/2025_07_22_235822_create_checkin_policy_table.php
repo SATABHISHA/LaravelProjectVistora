@@ -66,6 +66,7 @@ return new class extends Migration
             $table->integer('raise_onduty_aftr_attdnc_process_yn');
             $table->integer('future_dtd_onduty_yn');
             $table->integer('restrict_manager_onduty_beyond_limit_yn');
+            $table->integer('restrict_hr_onduty_beyond_limit_yn');
             $table->integer('attchmnt_for_od_yn');
             $table->integer('whatsapp_od_rqst_yn');
             $table->integer('teams_od_rqst_yn');

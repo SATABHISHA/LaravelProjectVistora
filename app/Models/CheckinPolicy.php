@@ -26,7 +26,7 @@ class CheckinPolicy extends Model
         'emp_bck_dtd_onduty_rqst_days', 'mngr_bck_dtd_onduty_rqst_yn', 'mngr_bck_dtd_onduty_rqst_days',
         'hr_bck_dtd_onduty_rqst_yn', 'hr_bck_dtd_onduty_rqst_days', 'configure_overall_onduty_limit_yn',
         'project_log_time_yn', 'raise_onduty_aftr_attdnc_process_yn', 'future_dtd_onduty_yn',
-        'restrict_manager_onduty_beyond_limit_yn', 'attchmnt_for_od_yn', 'whatsapp_od_rqst_yn', 'teams_od_rqst_yn',
+        'restrict_manager_onduty_beyond_limit_yn', 'restrict_hr_onduty_beyond_limit_yn','attchmnt_for_od_yn', 'whatsapp_od_rqst_yn', 'teams_od_rqst_yn',
         'onduty_week_off_emp_restricted_yn', 'onduty_holidays_emp_restricted_yn', 'applicability_type',
         'applicability_for', 'advnc_applicability_type', 'advnc_applicability_for', 'from_days', 'to_days'
     ];
