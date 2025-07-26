@@ -62,6 +62,7 @@ use App\Http\Controllers\ShiftPolicyApiController;
 use App\Http\Controllers\ShiftPolicyWeeklyScheduleApiController;
 use App\Http\Controllers\CheckinPolicyApiController;
 use App\Http\Controllers\CheckinPolicyOnDutyTypeApiController;
+use App\Http\Controllers\LeaveTypeBasicConfigurationApiController;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 
@@ -454,3 +455,9 @@ Route::get('/checkin-policy/all/{corp_id}', [CheckinPolicyApiController::class, 
 Route::post('/checkin-policy-on-duty-type/add', [CheckinPolicyOnDutyTypeApiController::class, 'store']);
 Route::delete('/checkin-policy-on-duty-type/delete/{puid}', [CheckinPolicyOnDutyTypeApiController::class, 'destroy']);
 Route::get('/checkin-policy-on-duty-type/{puid}', [CheckinPolicyOnDutyTypeApiController::class, 'fetchByPuid']);
+
+// Leave Type Basic Configuration Routes
+Route::post('/leave-type-basic-configuration/add', [LeaveTypeBasicConfigurationApiController::class, 'store']);
+Route::put('/leave-type-basic-configuration/update/{puid}', [LeaveTypeBasicConfigurationApiController::class, 'update']);
+Route::delete('/leave-type-basic-configuration/delete/{puid}', [LeaveTypeBasicConfigurationApiController::class, 'destroy']);
+Route::get('/leave-type-basic-configuration/all/{corpid}', [LeaveTypeBasicConfigurationApiController::class, 'fetchByCorpid']);
