@@ -63,6 +63,7 @@ use App\Http\Controllers\ShiftPolicyWeeklyScheduleApiController;
 use App\Http\Controllers\CheckinPolicyApiController;
 use App\Http\Controllers\CheckinPolicyOnDutyTypeApiController;
 use App\Http\Controllers\LeaveTypeBasicConfigurationApiController;
+use App\Http\Controllers\LeaveTypeFullConfigurationApiController;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 
@@ -461,3 +462,9 @@ Route::post('/leave-type-basic-configuration/add', [LeaveTypeBasicConfigurationA
 Route::put('/leave-type-basic-configuration/update/{puid}', [LeaveTypeBasicConfigurationApiController::class, 'update']);
 Route::delete('/leave-type-basic-configuration/delete/{puid}', [LeaveTypeBasicConfigurationApiController::class, 'destroy']);
 Route::get('/leave-type-basic-configuration/all/{corpid}', [LeaveTypeBasicConfigurationApiController::class, 'fetchByCorpid']);
+
+// Leave Type Full Configuration Routes
+Route::post('/leave-type-full-configuration/add', [LeaveTypeFullConfigurationApiController::class, 'store']);
+Route::put('/leave-type-full-configuration/update/{puid}', [LeaveTypeFullConfigurationApiController::class, 'update']);
+Route::delete('/leave-type-full-configuration/delete/{puid}', [LeaveTypeFullConfigurationApiController::class, 'destroy']);
+Route::get('/leave-type-full-configuration/all/{corpid}', [LeaveTypeFullConfigurationApiController::class, 'fetchByCorpid']);
