@@ -106,26 +106,28 @@ class EmploymentDetailApiController extends Controller
         return response()->json(['nextEmpCode' => $nextEmpCode]);
     }
 
-    public function fetchEmploymentAndEmployeeDetails($corp_id)
+    public function fetchEmploymentAndEmployeeDetails($corp_id, $company_name = null)
     {
-        // Get all employment details for the corp_id
-        $employmentDetails = EmploymentDetail::where('corp_id', $corp_id)->get();
+        // Filter by corp_id and optionally by company_name
+        $query = EmploymentDetail::where('corp_id', $corp_id);
+        if ($company_name !== null) {
+            $query->where('company_name', $company_name);
+        }
+        $employmentDetails = $query->get();
+
         $employeeDetailsCount = EmployeeDetail::where('corp_id', $corp_id)->count();
 
         $result = [];
 
         foreach ($employmentDetails as $employment) {
-            // Try to find the corresponding employee detail by corp_id and EmpCode
             $employee = EmployeeDetail::where('corp_id', $corp_id)
                 ->where('EmpCode', $employment->EmpCode)
                 ->first();
 
-            // Prepare name parts
             $firstName = $employee && $employee->FirstName ? $employee->FirstName : '';
             $middleName = $employee && $employee->MiddleName ? $employee->MiddleName : '';
             $lastName = $employee && $employee->LastName ? $employee->LastName : '';
 
-            // Merge name logic
             if ($firstName === '' && $lastName === '') {
                 $fullName = 'N/A';
             } else {
