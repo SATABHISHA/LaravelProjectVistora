@@ -250,7 +250,9 @@ Route::delete('/employment/delete/{corp_id}/{EmpCode}', [EmploymentDetailApiCont
 Route::get('/employment/next-empcode/{corp_id}', [EmploymentDetailApiController::class, 'getNextEmpCode']);
 Route::get('/employment/summary/{corp_id}', [EmploymentDetailApiController::class, 'fetchEmploymentAndEmployeeDetails']);
 Route::post('/employment/check-empcode', [EmploymentDetailApiController::class, 'checkEmpCodeExists']);
+Route::get('/employment/summary-by-corp/{corpid}', [EmploymentDetailApiController::class, 'summaryByCorpId']);
 Route::get('/employment/{corp_id}/{EmpCode}', [EmploymentDetailApiController::class, 'show']);
+
 
 
 

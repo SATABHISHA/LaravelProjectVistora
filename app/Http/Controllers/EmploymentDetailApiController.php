@@ -1,10 +1,10 @@
 <?php
-
 namespace App\Http\Controllers;
 
 use Illuminate\Http\Request;
 use App\Models\EmploymentDetail;
 use App\Models\EmployeeDetail;
+use App\Models\CompanyDetails;
 
 class EmploymentDetailApiController extends Controller
 {
@@ -188,6 +188,52 @@ class EmploymentDetailApiController extends Controller
 
         return response()->json([
             'status' => $exists
+        ]);
+    }
+
+    public function summaryByCorpId($corpid)
+    {
+        // Main summary
+        $totalEmployees = EmploymentDetail::where('corp_id', $corpid)->count();
+        $totalActiveEmployees = EmploymentDetail::where('corp_id', $corpid)->where('ActiveYn', 1)->count();
+        $totalInactiveEmployees = EmploymentDetail::where('corp_id', $corpid)->where('ActiveYn', 0)->count();
+
+        // Get all unique company names for this corp_id
+        $companyNames = \App\Models\CompanyDetails::where('corp_id', $corpid)->pluck('company_name')->unique();
+
+        $companies = [];
+        foreach ($companyNames as $companyName) {
+            $total = \App\Models\EmploymentDetail::where('corp_id', $corpid)
+                ->where('company_name', $companyName)
+                ->count();
+            $active = \App\Models\EmploymentDetail::where('corp_id', $corpid)
+                ->where('company_name', $companyName)
+                ->where('ActiveYn', 1)
+                ->count();
+            $inactive = \App\Models\EmploymentDetail::where('corp_id', $corpid)
+                ->where('company_name', $companyName)
+                ->where('ActiveYn', 0)
+                ->count();
+            $firstEmployment = \App\Models\EmploymentDetail::where('corp_id', $corpid)
+                ->where('company_name', $companyName)
+                ->first();
+
+            $companies[] = [
+                'company_name' => $companyName,
+                'total_employees' => $total,
+                'total_active_employees' => $active,
+                'total_inactive_employees' => $inactive,
+                'corp_id' => $firstEmployment ? $firstEmployment->corp_id : $corpid,
+                'id' => $firstEmployment ? $firstEmployment->id : null,
+            ];
+        }
+
+        return response()->json([
+            'company_group' => $corpid,
+            'total_employees' => $totalEmployees,
+            'total_active_employees' => $totalActiveEmployees,
+            'total_inactive_employees' => $totalInactiveEmployees,
+            'companies' => $companies
         ]);
     }
 }
