@@ -219,10 +219,12 @@ class EmploymentDetailApiController extends Controller
                 ->where('company_name', $companyName)
                 ->first();
 
-            // Generate a random light color hex code
-            $colorcode = sprintf("#%02X%02X%02X", rand(180,255), rand(180,255), rand(180,255));
-            // Generate a random medium color hex code
-            $colorcode2 = sprintf("#%02X%02X%02X", rand(90,170), rand(90,170), rand(90,170));
+            // Generate a random base hue for the company
+            $hue = rand(180, 300); // blue to purple range (soothing)
+            // First color: lighter, more pastel
+            $colorcode = "hsl($hue, 60%, 85%)";
+            // Second color: a bit deeper, still soft
+            $colorcode2 = "hsl($hue, 60%, 65%)";
 
             $companies[] = [
                 'company_name' => $companyName,
@@ -231,8 +233,8 @@ class EmploymentDetailApiController extends Controller
                 'total_inactive_employees' => $inactive,
                 'corp_id' => $firstEmployment ? $firstEmployment->corp_id : $corpid,
                 'id' => $firstEmployment ? $firstEmployment->id : null,
-                'colorcode' => $colorcode,     // light color
-                'colorcode2' => $colorcode2,   // dark color
+                'colorcode' => $colorcode,     // pastel
+                'colorcode2' => $colorcode2,   // deeper pastel
             ];
         }
 
