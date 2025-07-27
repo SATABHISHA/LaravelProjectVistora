@@ -195,7 +195,6 @@ class EmploymentDetailApiController extends Controller
 
     public function summaryByCorpId($corpid)
     {
-        // Main summary
         $totalEmployees = EmploymentDetail::where('corp_id', $corpid)->count();
         $totalActiveEmployees = EmploymentDetail::where('corp_id', $corpid)->where('ActiveYn', 1)->count();
         $totalInactiveEmployees = EmploymentDetail::where('corp_id', $corpid)->where('ActiveYn', 0)->count();
@@ -220,6 +219,9 @@ class EmploymentDetailApiController extends Controller
                 ->where('company_name', $companyName)
                 ->first();
 
+            // Generate a random light color hex code
+            $colorcode = sprintf("#%02X%02X%02X", rand(180,255), rand(180,255), rand(180,255));
+
             $companies[] = [
                 'company_name' => $companyName,
                 'total_employees' => $total,
@@ -227,6 +229,7 @@ class EmploymentDetailApiController extends Controller
                 'total_inactive_employees' => $inactive,
                 'corp_id' => $firstEmployment ? $firstEmployment->corp_id : $corpid,
                 'id' => $firstEmployment ? $firstEmployment->id : null,
+                'colorcode' => $colorcode,
             ];
         }
 
