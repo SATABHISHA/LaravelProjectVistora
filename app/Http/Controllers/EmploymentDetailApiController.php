@@ -221,6 +221,8 @@ class EmploymentDetailApiController extends Controller
 
             // Generate a random light color hex code
             $colorcode = sprintf("#%02X%02X%02X", rand(180,255), rand(180,255), rand(180,255));
+            // Generate a random dark color hex code
+            $colorcode2 = sprintf("#%02X%02X%02X", rand(0,80), rand(0,80), rand(0,80));
 
             $companies[] = [
                 'company_name' => $companyName,
@@ -229,7 +231,8 @@ class EmploymentDetailApiController extends Controller
                 'total_inactive_employees' => $inactive,
                 'corp_id' => $firstEmployment ? $firstEmployment->corp_id : $corpid,
                 'id' => $firstEmployment ? $firstEmployment->id : null,
-                'colorcode' => $colorcode,
+                'colorcode' => $colorcode,     // light color
+                'colorcode2' => $colorcode2,   // dark color
             ];
         }
 
