@@ -221,8 +221,8 @@ class EmploymentDetailApiController extends Controller
 
             // Generate a random light color hex code
             $colorcode = sprintf("#%02X%02X%02X", rand(180,255), rand(180,255), rand(180,255));
-            // Generate a random dark color hex code
-            $colorcode2 = sprintf("#%02X%02X%02X", rand(0,80), rand(0,80), rand(0,80));
+            // Generate a random medium color hex code
+            $colorcode2 = sprintf("#%02X%02X%02X", rand(90,170), rand(90,170), rand(90,170));
 
             $companies[] = [
                 'company_name' => $companyName,
