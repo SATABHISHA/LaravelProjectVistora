@@ -13,6 +13,11 @@ class EmploymentDetailApiController extends Controller
     {
         $data = $request->all();
 
+        // Set ActiveYn to 1 if not provided
+        if (!isset($data['ActiveYn'])) {
+            $data['ActiveYn'] = 1;
+        }
+
         // Check for duplicate EmpCode within the same corp_id
         $exists = EmploymentDetail::where('corp_id', $data['corp_id'])
             ->where('EmpCode', $data['EmpCode'])

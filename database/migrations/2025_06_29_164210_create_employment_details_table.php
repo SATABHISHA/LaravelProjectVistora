@@ -38,6 +38,7 @@ return new class extends Migration
             $table->integer('PF')->nullable();
             $table->integer('Gratuity')->nullable();
             $table->integer('DraftYN')->nullable();
+            $table->integer('ActiveYn')->default(1); // <-- Added field
             $table->timestamps();
         });
     }
