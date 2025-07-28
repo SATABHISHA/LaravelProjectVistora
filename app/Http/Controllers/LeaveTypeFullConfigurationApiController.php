@@ -76,4 +76,23 @@ class LeaveTypeFullConfigurationApiController extends Controller
             'data' => $records
         ]);
     }
+
+    // Fetch by puid
+    public function fetchByPuid($puid)
+    {
+        $record = LeaveTypeFullConfiguration::where('puid', $puid)->first();
+
+        if (!$record) {
+            return response()->json([
+                'status' => false,
+                'message' => 'Leave type full configuration not found.',
+                'data' => (object)[]
+            ], 404);
+        }
+
+        return response()->json([
+            'status' => true,
+            'data' => $record
+        ]);
+    }
 }

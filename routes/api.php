@@ -470,3 +470,4 @@ Route::post('/leave-type-full-configuration/add', [LeaveTypeFullConfigurationApi
 Route::put('/leave-type-full-configuration/update/{puid}', [LeaveTypeFullConfigurationApiController::class, 'update']);
 Route::delete('/leave-type-full-configuration/delete/{puid}', [LeaveTypeFullConfigurationApiController::class, 'destroy']);
 Route::get('/leave-type-full-configuration/all/{corpid}', [LeaveTypeFullConfigurationApiController::class, 'fetchByCorpid']);
+Route::get('/leave-type-full-configuration/{puid}', [LeaveTypeFullConfigurationApiController::class, 'fetchByPuid']);
