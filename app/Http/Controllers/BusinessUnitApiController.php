@@ -102,11 +102,17 @@ class BusinessUnitApiController extends Controller
     public function getAllByCorpId($corp_id)
     {
         // Get unique business units by business_unit_name for the given corp_id
-        $businessUnits = BusinessUnit::where('corp_id', $corp_id)
+       /* $businessUnits = BusinessUnit::where('corp_id', $corp_id)
             ->select('business_unit_id', 'corp_id', 'company_name', 'business_unit_name', 'active_yn')
             ->groupBy('business_unit_name', 'business_unit_id', 'corp_id', 'company_name', 'active_yn')
-            ->get();
+            ->get();*/
 
+     $businessUnits = BusinessUnit::where('corp_id', $corp_id)
+    ->select('business_unit_id', 'corp_id', 'company_name', 'business_unit_name', 'active_yn')
+    ->orderByDesc('business_unit_id')
+    ->get()
+    ->unique('business_unit_name')
+    ->values();
         return response()->json([
             'status' => true,
             'data' => $businessUnits
