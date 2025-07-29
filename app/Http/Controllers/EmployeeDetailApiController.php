@@ -115,7 +115,7 @@ class EmployeeDetailApiController extends Controller
         $data = $employees->map(function ($emp) {
             $full_name = trim("{$emp->FirstName} {$emp->MiddleName} {$emp->LastName}");
             return [
-                'empcode_fullname' => "{$emp->EmpCode}|{$full_name}"
+                'empcode_fullname' => "{$emp->EmpCode}-{$full_name}"
             ];
         });
 
