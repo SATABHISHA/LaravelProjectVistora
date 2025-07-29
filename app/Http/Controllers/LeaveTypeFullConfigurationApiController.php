@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use App\Models\LeaveTypeFullConfiguration;
 
 class LeaveTypeFullConfigurationApiController extends Controller
@@ -13,7 +14,7 @@ class LeaveTypeFullConfigurationApiController extends Controller
         $leaveType = LeaveTypeFullConfiguration::create($request->all());
 
         // Update isConfigurationCompletedYN in leave_type_basic_configurations where puid matches
-        \DB::table('leave_type_basic_configurations')
+        DB::table('leave_type_basic_configurations')
             ->where('puid', $leaveType->puid)
             ->update(['isConfigurationCompletedYN' => 1]);
 
