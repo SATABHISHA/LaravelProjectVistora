@@ -64,6 +64,7 @@ use App\Http\Controllers\CheckinPolicyApiController;
 use App\Http\Controllers\CheckinPolicyOnDutyTypeApiController;
 use App\Http\Controllers\LeaveTypeBasicConfigurationApiController;
 use App\Http\Controllers\LeaveTypeFullConfigurationApiController;
+use App\Http\Controllers\LeavePolicyApiController;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 
@@ -473,3 +474,9 @@ Route::put('/leave-type-full-configuration/update/{puid}', [LeaveTypeFullConfigu
 Route::delete('/leave-type-full-configuration/delete/{puid}', [LeaveTypeFullConfigurationApiController::class, 'destroy']);
 Route::get('/leave-type-full-configuration/all/{corpid}', [LeaveTypeFullConfigurationApiController::class, 'fetchByCorpid']);
 Route::get('/leave-type-full-configuration/{puid}', [LeaveTypeFullConfigurationApiController::class, 'fetchByPuid']);
+
+// Leave Policy Routes
+Route::post('/leave-policy/add', [LeavePolicyApiController::class, 'store']);
+Route::put('/leave-policy/update/{puid}', [LeavePolicyApiController::class, 'update']);
+Route::delete('/leave-policy/delete/{puid}', [LeavePolicyApiController::class, 'destroy']);
+Route::get('/leave-policy/by-corpid/{corpid}', [LeavePolicyApiController::class, 'getByCorpid']);
