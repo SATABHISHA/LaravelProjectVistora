@@ -65,6 +65,7 @@ use App\Http\Controllers\CheckinPolicyOnDutyTypeApiController;
 use App\Http\Controllers\LeaveTypeBasicConfigurationApiController;
 use App\Http\Controllers\LeaveTypeFullConfigurationApiController;
 use App\Http\Controllers\LeavePolicyApiController;
+use App\Http\Controllers\EmployeeProfilePhotoApiController;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 
@@ -480,3 +481,9 @@ Route::post('/leave-policy/add', [LeavePolicyApiController::class, 'store']);
 Route::put('/leave-policy/update/{puid}', [LeavePolicyApiController::class, 'update']);
 Route::delete('/leave-policy/delete/{puid}', [LeavePolicyApiController::class, 'destroy']);
 Route::get('/leave-policy/by-corpid/{corpid}', [LeavePolicyApiController::class, 'getByCorpid']);
+
+// Employee Profile Photo Routes
+Route::post('/employee-profile-photo/add', [EmployeeProfilePhotoApiController::class, 'store']);
+Route::post('/employee-profile-photo/update/{corp_id}/{emp_code}', [EmployeeProfilePhotoApiController::class, 'update']);
+Route::get('/employee-profile-photo/{corp_id}/{emp_code}', [EmployeeProfilePhotoApiController::class, 'fetch']);
+Route::delete('/employee-profile-photo/delete/{corp_id}/{emp_code}', [EmployeeProfilePhotoApiController::class, 'destroy']);
