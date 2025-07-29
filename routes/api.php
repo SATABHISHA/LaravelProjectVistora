@@ -264,6 +264,8 @@ Route::delete('/employee/delete/{corp_id}/{EmpCode}/{id}', [EmployeeDetailApiCon
 Route::post('/employee/check-empcode', [EmployeeDetailApiController::class, 'checkEmpCodeExists']);
 Route::get('/employee/{corp_id}/{EmpCode}', [EmployeeDetailApiController::class, 'show']);
 Route::get('/employee-details/by-corp/{corp_id}', [EmployeeDetailApiController::class, 'getByCorpId']);
+Route::get('/employee/empcode-fullname/{corp_id}', [EmployeeDetailApiController::class, 'getEmpCodeWithFullNameByCorpId']);
+
 
 // Employee Statutory Details APIs
 Route::post('/statutory/add', [EmployeeStatutoryDetailApiController::class, 'store']);

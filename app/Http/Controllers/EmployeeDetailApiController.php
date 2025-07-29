@@ -105,4 +105,20 @@ class EmployeeDetailApiController extends Controller
 
         return response()->json(['data' => $data]);
     }
+
+    // Get EmpCode with full name by corp_id
+    public function getEmpCodeWithFullNameByCorpId($corp_id)
+    {
+        $employees = EmployeeDetail::where('corp_id', $corp_id)
+            ->get(['EmpCode', 'FirstName', 'MiddleName', 'LastName']);
+
+        $data = $employees->map(function ($emp) {
+            $full_name = trim("{$emp->FirstName} {$emp->MiddleName} {$emp->LastName}");
+            return [
+                'empcode_fullname' => "{$emp->EmpCode}|{$full_name}"
+            ];
+        });
+
+        return response()->json(['data' => $data]);
+    }
 }
