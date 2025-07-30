@@ -28,22 +28,41 @@ class EmployeeProfilePhotoApiController extends Controller
             ], 400);
         }
 
-        // Save file to public/profile_photos
+        $photo = EmployeeProfilePhoto::where('corp_id', $request->corp_id)
+            ->where('emp_code', $request->emp_code)
+            ->first();
+
+        // Save new file
         $file = $request->file('photo');
         $filename = uniqid() . '.' . $file->getClientOriginalExtension();
         $file->move(public_path('profile_photos'), $filename);
 
-        $photo = EmployeeProfilePhoto::create([
-            'emp_code' => $request->emp_code,
-            'corp_id' => $request->corp_id,
-            'photo_url' => $filename
-        ]);
+        if ($photo) {
+            // Delete old file
+            @unlink(public_path('profile_photos/' . $photo->photo_url));
+            // Update existing record
+            $photo->photo_url = $filename;
+            $photo->save();
 
-        return response()->json([
-            'status' => true,
-            'message' => 'Profile photo uploaded successfully.',
-            'data' => $photo
-        ]);
+            return response()->json([
+                'status' => true,
+                'message' => 'Profile photo updated successfully.',
+                'data' => $photo
+            ]);
+        } else {
+            // Create new record
+            $photo = EmployeeProfilePhoto::create([
+                'emp_code' => $request->emp_code,
+                'corp_id' => $request->corp_id,
+                'photo_url' => $filename
+            ]);
+
+            return response()->json([
+                'status' => true,
+                'message' => 'Profile photo uploaded successfully.',
+                'data' => $photo
+            ]);
+        }
     }
 
     // Update profile photo by corp_id and emp_code
