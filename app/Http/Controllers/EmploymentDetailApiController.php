@@ -108,7 +108,6 @@ class EmploymentDetailApiController extends Controller
 
     public function fetchEmploymentAndEmployeeDetails($corp_id, $company_name = null)
     {
-        // Filter by corp_id and optionally by company_name
         $query = EmploymentDetail::where('corp_id', $corp_id);
         if ($company_name !== null) {
             $query->where('company_name', $company_name);
@@ -134,6 +133,19 @@ class EmploymentDetailApiController extends Controller
                 $fullName = trim($firstName . ' ' . ($middleName !== '' ? $middleName . ' ' : '') . $lastName);
             }
 
+            // Fetch profile photo
+            $profilePhoto = \App\Models\EmployeeProfilePhoto::where('corp_id', $corp_id)
+                ->where('emp_code', $employment->EmpCode)
+                ->first();
+
+            if ($profilePhoto) {
+                $photo_url = url('profile_photos/' . $profilePhoto->photo_url);
+                $photo_yn = 1;
+            } else {
+                $photo_url = '';
+                $photo_yn = 0;
+            }
+
             $row = [
                 'EmpCode'            => $employment->EmpCode ?? 'N/A',
                 'company_name'       => $employment->company_name ?? 'N/A',
@@ -146,6 +158,8 @@ class EmploymentDetailApiController extends Controller
                 'WorkEmail'          => $employee && $employee->WorkEmail ? $employee->WorkEmail : 'N/A',
                 'Mobile'             => $employee && $employee->Mobile ? $employee->Mobile : 'N/A',
                 'FullName'           => $fullName,
+                'photo_url'          => $photo_url,
+                'photo_yn'           => $photo_yn,
             ];
 
             $result[] = $row;
@@ -173,6 +187,8 @@ class EmploymentDetailApiController extends Controller
                 'WorkEmail'          => 'N/A',
                 'Mobile'             => 'N/A',
                 'FullName'           => 'N/A',
+                'photo_url'          => '',
+                'photo_yn'           => 0,
             ];
         }
 
