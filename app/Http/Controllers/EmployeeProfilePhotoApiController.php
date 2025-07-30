@@ -97,7 +97,7 @@ class EmployeeProfilePhotoApiController extends Controller
             ], 404);
         }
 
-        $downloadUrl = url('public/profile_photos/' . $photo->photo_url);
+        $downloadUrl = url('profile_photos/' . $photo->photo_url);
 
         return response()->json([
             'status' => true,
