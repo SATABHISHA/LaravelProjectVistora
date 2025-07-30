@@ -14,10 +14,9 @@ class EmployeeProfilePhotoApiController extends Controller
         $request->validate([
             'emp_code' => 'required|string',
             'corp_id' => 'required|string',
-            'photo' => 'required|file|max:5120' // 5MB = 5120KB
+            'photo' => 'required|file|max:5120'
         ]);
 
-        // Check if EmpCode exists in employment_details
         $exists = EmploymentDetail::where('EmpCode', $request->emp_code)
             ->where('corp_id', $request->corp_id)
             ->exists();
@@ -29,13 +28,15 @@ class EmployeeProfilePhotoApiController extends Controller
             ], 400);
         }
 
-        // Store file
-        $path = $request->file('photo')->store('profile_photos', 'public');
+        // Save file to public/profile_photos
+        $file = $request->file('photo');
+        $filename = uniqid() . '.' . $file->getClientOriginalExtension();
+        $file->move(public_path('profile_photos'), $filename);
 
         $photo = EmployeeProfilePhoto::create([
             'emp_code' => $request->emp_code,
             'corp_id' => $request->corp_id,
-            'photo_url' => $path
+            'photo_url' => $filename
         ]);
 
         return response()->json([
@@ -49,7 +50,7 @@ class EmployeeProfilePhotoApiController extends Controller
     public function update(Request $request, $corp_id, $emp_code)
     {
         $request->validate([
-            'photo' => 'required|file|max:5120' // 5MB
+            'photo' => 'required|file|max:5120'
         ]);
 
         $photo = EmployeeProfilePhoto::where('corp_id', $corp_id)
@@ -63,12 +64,15 @@ class EmployeeProfilePhotoApiController extends Controller
             ], 404);
         }
 
-        // Delete old file from storage
-        \Storage::disk('public')->delete($photo->photo_url);
+        // Delete old file
+        @unlink(public_path('profile_photos/' . $photo->photo_url));
 
-        // Store new file
-        $path = $request->file('photo')->store('profile_photos', 'public');
-        $photo->photo_url = $path;
+        // Save new file
+        $file = $request->file('photo');
+        $filename = uniqid() . '.' . $file->getClientOriginalExtension();
+        $file->move(public_path('profile_photos'), $filename);
+
+        $photo->photo_url = $filename;
         $photo->save();
 
         return response()->json([
@@ -93,8 +97,7 @@ class EmployeeProfilePhotoApiController extends Controller
             ], 404);
         }
 
-        // Generate download link
-        $downloadUrl = url('storage/' . $photo->photo_url);
+        $downloadUrl = url('public/profile_photos/' . $photo->photo_url);
 
         return response()->json([
             'status' => true,
@@ -120,9 +123,7 @@ class EmployeeProfilePhotoApiController extends Controller
             ], 404);
         }
 
-        // Delete file from storage
-        \Storage::disk('public')->delete($photo->photo_url);
-
+        @unlink(public_path('profile_photos/' . $photo->photo_url));
         $photo->delete();
 
         return response()->json([
