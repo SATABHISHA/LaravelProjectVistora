@@ -66,6 +66,7 @@ use App\Http\Controllers\LeaveTypeBasicConfigurationApiController;
 use App\Http\Controllers\LeaveTypeFullConfigurationApiController;
 use App\Http\Controllers\LeavePolicyApiController;
 use App\Http\Controllers\EmployeeProfilePhotoApiController;
+use App\Http\Controllers\PayComponentApiController;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 
@@ -487,3 +488,9 @@ Route::post('/employee-profile-photo/add', [EmployeeProfilePhotoApiController::c
 Route::post('/employee-profile-photo/update/{corp_id}/{emp_code}', [EmployeeProfilePhotoApiController::class, 'update']);
 Route::get('/employee-profile-photo/{corp_id}/{emp_code}', [EmployeeProfilePhotoApiController::class, 'fetch']);
 Route::delete('/employee-profile-photo/delete/{corp_id}/{emp_code}', [EmployeeProfilePhotoApiController::class, 'destroy']);
+
+// Pay Component Routes
+Route::post('/paycomponent/add-or-update', [PayComponentApiController::class, 'storeOrUpdate']);
+Route::get('/paycomponent/all/{corpId}', [PayComponentApiController::class, 'getByCorpId']);
+Route::get('/paycomponent/{puid}', [PayComponentApiController::class, 'getByPuid']);
+Route::delete('/paycomponent/delete/{puid}', [PayComponentApiController::class, 'destroy']);
