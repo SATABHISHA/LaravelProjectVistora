@@ -67,6 +67,7 @@ use App\Http\Controllers\LeaveTypeFullConfigurationApiController;
 use App\Http\Controllers\LeavePolicyApiController;
 use App\Http\Controllers\EmployeeProfilePhotoApiController;
 use App\Http\Controllers\PayComponentApiController;
+use App\Http\Controllers\ComponentTypeApiController;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 
@@ -494,3 +495,8 @@ Route::post('/paycomponent/add-or-update', [PayComponentApiController::class, 's
 Route::get('/paycomponent/all/{corpId}', [PayComponentApiController::class, 'getByCorpId']);
 Route::get('/paycomponent/{puid}', [PayComponentApiController::class, 'getByPuid']);
 Route::delete('/paycomponent/delete/{puid}', [PayComponentApiController::class, 'destroy']);
+
+// Component Type Routes
+Route::post('/component-type/add-or-update', [ComponentTypeApiController::class, 'storeOrUpdate']);
+Route::get('/component-type/all/{corpId}', [ComponentTypeApiController::class, 'getByCorpId']);
+Route::delete('/component-type/delete/{corpId}/{id}', [ComponentTypeApiController::class, 'destroy']);
