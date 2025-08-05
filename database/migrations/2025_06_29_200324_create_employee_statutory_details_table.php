@@ -21,7 +21,7 @@ return new class extends Migration
             $table->string('PFNo')->nullable();
             $table->string('UAN')->nullable();
             $table->integer('PensionYN')->nullable();
-            $table->string('PensionNo')->nullable(); // new field
+            $table->string('PensionNo',200)->nullable(); // new field
             $table->integer('EmpStateInsuranceYN')->nullable();
             $table->string('EmpStateInsNo')->nullable();
             $table->string('EmpStateInsDispensaryName')->nullable();
