@@ -24,7 +24,7 @@ class EmployeeStatutoryDetailApiController extends Controller
 
         // List all nullable string fields from your migration
         $nullableStringFields = [
-            'TaxRegime', 'PFNo', 'UAN', 'EmpPFContbtnLmt', 'EmployerPFContbtnLmt',
+            'TaxRegime', 'PFNo', 'UAN', 'PensionNo', // PensionNo added, EmpPFContbtnLmt & EmployerPFContbtnLmt removed
             'EmpStateInsNo', 'EmpStateInsDispensaryName', 'ESISubUnitCode', 'DateOfJoin',
             'VoluntaryPFAmount', 'VoluntaryPFPercent', 'VoluntaryPFEffectiveDate',
             'EmployerAmount', 'EmployerPercentage', 'EmployerPanNumber', 'SalaryMode',
@@ -52,7 +52,10 @@ class EmployeeStatutoryDetailApiController extends Controller
             ->where('id', $id)
             ->firstOrFail();
 
-        $statutory->update($request->all());
+        // Remove EmpPFContbtnLmt & EmployerPFContbtnLmt if present in request
+        $updateData = $request->except(['EmpPFContbtnLmt', 'EmployerPFContbtnLmt']);
+
+        $statutory->update($updateData);
         return response()->json(['data' => $statutory]);
     }
 

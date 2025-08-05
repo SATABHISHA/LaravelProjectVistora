@@ -11,11 +11,10 @@ class EmployeeStatutoryDetail extends Model
 
     protected $fillable = [
         'corp_id', 'EmpCode', 'TaxRegime', 'AdhaarPanLinkedYN', 'ProvidentFundYN', 'PFNo', 'UAN',
-        'EmpPFContbtnLmt', 'EmployerPFContbtnLmt', 'PensionYN', 'EmpStateInsuranceYN', 'EmpStateInsNo',
-        'EmpStateInsDispensaryName', 'ESISubUnitCode', 'LabourWelfareFundYN', 'PTYN', 'BonusYN',
-        'GratuityYN', 'GratuityInCtcYN', 'DateOfJoin', 'VoluntaryPfYN', 'VoluntaryPFAmount',
-        'VoluntaryPFPercent', 'VoluntaryPFEffectiveDate', 'EmployerCtbnToNPSYN', 'EmployerAmount',
-        'EmployerPercentage', 'EmployerPanNumber', 'SalaryMode', 'SalaryBank', 'ReimbursementMode',
-        'ReimbursementBank'
+        'PensionYN', 'PensionNo', 'EmpStateInsuranceYN', 'EmpStateInsNo', 'EmpStateInsDispensaryName',
+        'ESISubUnitCode', 'LabourWelfareFundYN', 'PTYN', 'BonusYN', 'GratuityYN', 'GratuityInCtcYN',
+        'DateOfJoin', 'VoluntaryPfYN', 'VoluntaryPFAmount', 'VoluntaryPFPercent', 'VoluntaryPFEffectiveDate',
+        'EmployerCtbnToNPSYN', 'EmployerAmount', 'EmployerPercentage', 'EmployerPanNumber', 'SalaryMode',
+        'SalaryBank', 'ReimbursementMode', 'ReimbursementBank', 'DraftYN'
     ];
 }

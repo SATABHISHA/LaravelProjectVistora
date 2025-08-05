@@ -20,9 +20,8 @@ return new class extends Migration
             $table->integer('ProvidentFundYN')->nullable();
             $table->string('PFNo')->nullable();
             $table->string('UAN')->nullable();
-            $table->string('EmpPFContbtnLmt')->nullable();
-            $table->string('EmployerPFContbtnLmt')->nullable();
             $table->integer('PensionYN')->nullable();
+            $table->string('PensionNo')->nullable(); // new field
             $table->integer('EmpStateInsuranceYN')->nullable();
             $table->string('EmpStateInsNo')->nullable();
             $table->string('EmpStateInsDispensaryName')->nullable();
