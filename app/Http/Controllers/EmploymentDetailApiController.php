@@ -36,12 +36,27 @@ class EmploymentDetailApiController extends Controller
     // Update by corp_id and EmpCode
     public function update(Request $request, $corp_id, $EmpCode)
     {
-        $employment = EmploymentDetail::where('corp_id', $corp_id)
-            ->where('EmpCode', $EmpCode)
-            ->firstOrFail();
+        try {
+            $employment = EmploymentDetail::where('corp_id', $corp_id)
+                ->where('EmpCode', $EmpCode)
+                ->firstOrFail();
 
-        $employment->update($request->all());
-        return response()->json(['data' => $employment]);
+            $updated = $employment->update($request->all());
+
+            if ($updated) {
+                return response()->json(['data' => $employment]);
+            } else {
+                return response()->json([
+                    'status' => false,
+                    'message' => 'Update failed: No changes were made.'
+                ], 400);
+            }
+        } catch (\Exception $e) {
+            return response()->json([
+                'status' => false,
+                'message' => 'Update failed: ' . $e->getMessage()
+            ], 500);
+        }
     }
 
     // Delete by corp_id and EmpCode
