@@ -27,6 +27,7 @@ class EmploymentDetail extends Model
         'ConfirmationStatus',
         'ReportingManager',
         'FunctionalManager',
+        'ReportingManager3', // <-- Add this line
         'PFNumber',
         'UAN',
         'EmployeeContributionLimit',

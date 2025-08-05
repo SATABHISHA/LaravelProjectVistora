@@ -30,6 +30,7 @@ return new class extends Migration
             $table->string('ConfirmationStatus')->nullable();
             $table->string('ReportingManager')->nullable();
             $table->string('FunctionalManager')->nullable();
+            $table->string('ReportingManager3')->nullable(); // <-- Add this line
             $table->string('PFNumber')->nullable();
             $table->string('UAN')->nullable();
             $table->string('EmployeeContributionLimit')->nullable();
