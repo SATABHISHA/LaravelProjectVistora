@@ -68,6 +68,7 @@ use App\Http\Controllers\LeavePolicyApiController;
 use App\Http\Controllers\EmployeeProfilePhotoApiController;
 use App\Http\Controllers\PayComponentApiController;
 use App\Http\Controllers\ComponentTypeApiController;
+use App\Http\Controllers\PaygroupConfigurationApiController;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 
@@ -500,3 +501,9 @@ Route::delete('/paycomponent/delete/{puid}', [PayComponentApiController::class, 
 Route::post('/component-type/add-or-update', [ComponentTypeApiController::class, 'storeOrUpdate']);
 Route::get('/component-type/all/{corpId}', [ComponentTypeApiController::class, 'getByCorpId']);
 Route::delete('/component-type/delete/{corpId}/{id}', [ComponentTypeApiController::class, 'destroy']);
+
+// Paygroup Configuration Routes
+Route::post('/paygroup-configuration/add-or-update', [PaygroupConfigurationApiController::class, 'storeOrUpdate']);
+Route::get('/paygroup-configuration/by-corpid/{corpId}', [PaygroupConfigurationApiController::class, 'fetchByCorpId']);
+Route::get('/paygroup-configuration/{puid}', [PaygroupConfigurationApiController::class, 'fetchByPuid']);
+Route::delete('/paygroup-configuration/delete/{puid}', [PaygroupConfigurationApiController::class, 'destroy']);
