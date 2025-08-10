@@ -53,7 +53,17 @@ class PaygroupConfigurationApiController extends Controller
     public function fetchByPuid($puid)
     {
         $data = PaygroupConfiguration::where('puid', $puid)->first();
-        return response()->json(['data' => $data]);
+        if (!$data) {
+            return response()->json([
+                'status' => false,
+                'message' => 'Paygroup configuration not found.',
+                'data' => (object)[]
+            ], 404);
+        }
+        return response()->json([
+            'status' => true,
+            'data' => $data
+        ]);
     }
 
     // Delete by puid
