@@ -45,7 +45,12 @@ class PayComponentApiController extends Controller
     {
         $component = PayComponent::where('puid', $puid)->first();
         if (!$component) {
-            return response()->json(['status' => 'false', 'message' => 'PayComponent not found'], 404);
+            return response()->json([
+                'status' => 'false',
+                'message' => 'PayComponent not found',
+                'data' => (object)[]
+            ],
+            404);
         }
         return response()->json(['status' => 'true', 'data' => $component]);
     }
