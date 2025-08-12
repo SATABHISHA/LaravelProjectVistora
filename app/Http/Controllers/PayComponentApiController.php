@@ -10,27 +10,44 @@ class PayComponentApiController extends Controller
     // Add or update PayComponent by corpId and puid
     public function storeOrUpdate(Request $request)
     {
-        $request->validate([
-            'corpId' => 'required|string',
-            'puid' => 'required|string',
-            'componentName' => 'required|string',
-            // Add other validation rules as needed
-        ]);
+        try {
+            $request->validate([
+                'corpId' => 'required|string',
+                'puid' => 'required|string',
+                'componentName' => 'required|string',
+            ]);
 
-        $data = $request->all();
+            $data = $request->all();
 
-        $payComponent = PayComponent::updateOrCreate(
-            ['corpId' => $data['corpId'], 'puid' => $data['puid']],
-            $data
-        );
+            // Check if record exists first
+            $existingComponent = PayComponent::where('corpId', $data['corpId'])
+                ->where('puid', $data['puid'])
+                ->first();
 
-        $status = $payComponent->wasRecentlyCreated ? 'created' : 'updated';
+            if ($existingComponent) {
+                // Update existing record
+                $existingComponent->update($data);
+                return response()->json([
+                    'status' => true,
+                    'message' => "PayComponent updated successfully",
+                    'data' => $existingComponent
+                ]);
+            } else {
+                // Create new record
+                $payComponent = PayComponent::create($data);
+                return response()->json([
+                    'status' => true,
+                    'message' => "PayComponent created successfully",
+                    'data' => $payComponent
+                ]);
+            }
 
-        return response()->json([
-            'message' => "PayComponent {$status} successfully",
-            'status' => $status,
-            'pay_component' => $payComponent
-        ]);
+        } catch (\Exception $e) {
+            return response()->json([
+                'status' => false,
+                'message' => 'Error: ' . $e->getMessage()
+            ], 500);
+        }
     }
 
     // Fetch all PayComponents by corpId
@@ -46,13 +63,12 @@ class PayComponentApiController extends Controller
         $component = PayComponent::where('puid', $puid)->first();
         if (!$component) {
             return response()->json([
-                'status' => 'false',
+                'status' => false,
                 'message' => 'PayComponent not found',
                 'data' => (object)[]
-            ],
-            404);
+            ], 404);
         }
-        return response()->json(['status' => 'true', 'data' => $component]);
+        return response()->json(['status' => true, 'data' => $component]);
     }
 
     // Delete PayComponent by puid
