@@ -19,6 +19,19 @@ class PayComponentApiController extends Controller
 
             $data = $request->all();
 
+            // Check for duplicate componentName for the same corpId (excluding current puid if updating)
+            $duplicateCheck = PayComponent::where('corpId', $data['corpId'])
+                ->where('componentName', $data['componentName'])
+                ->where('puid', '!=', $data['puid']) // Exclude current record when updating
+                ->exists();
+
+            if ($duplicateCheck) {
+                return response()->json([
+                    'status' => false,
+                    'message' => 'Component with this name already exists for this corpId.'
+                ], 409);
+            }
+
             $payComponent = PayComponent::updateOrCreate(
                 ['corpId' => $data['corpId'], 'puid' => $data['puid']],
                 $data
