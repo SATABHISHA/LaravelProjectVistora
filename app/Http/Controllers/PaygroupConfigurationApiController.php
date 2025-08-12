@@ -76,4 +76,26 @@ class PaygroupConfigurationApiController extends Controller
             return response()->json(['status' => false, 'message' => 'Not found'], 404);
         }
     }
+
+    // Fetch IncludedComponents as trimmed list by puid
+    public function fetchIncludedComponents($puid)
+    {
+        $paygroup = PaygroupConfiguration::where('puid', $puid)->first();
+
+        if (!$paygroup || empty($paygroup->IncludedComponents)) {
+            return response()->json([
+                'status' => false,
+                'message' => 'No IncludedComponents found.',
+                'data' => []
+            ], 404);
+        }
+
+        // Split by comma, trim each value, and filter out empty strings
+        $components = array_filter(array_map('trim', explode(',', $paygroup->IncludedComponents)));
+
+        return response()->json([
+            'status' => true,
+            'data' => array_values($components)
+        ]);
+    }
 }

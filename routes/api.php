@@ -507,3 +507,4 @@ Route::post('/paygroup-configuration/add-or-update', [PaygroupConfigurationApiCo
 Route::get('/paygroup-configuration/by-corpid/{corpId}', [PaygroupConfigurationApiController::class, 'fetchByCorpId']);
 Route::get('/paygroup-configuration/{puid}', [PaygroupConfigurationApiController::class, 'fetchByPuid']);
 Route::delete('/paygroup-configuration/delete/{puid}', [PaygroupConfigurationApiController::class, 'destroy']);
+Route::get('/paygroup/included-components/{puid}', [PaygroupConfigurationApiController::class, 'fetchIncludedComponents']);
