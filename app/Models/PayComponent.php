@@ -46,6 +46,6 @@ class PayComponent extends Model
         'nonTaxableLimit',
         'taxComputationMethodType',
         'mapIncomeToSectionType',
-        'isIncludeInFBPBasket',
+        'isIncludeInFBPBasket'
     ];
 }
