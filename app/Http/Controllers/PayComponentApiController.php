@@ -19,32 +19,21 @@ class PayComponentApiController extends Controller
 
             $data = $request->all();
 
-            // Check if record exists first
-            $existingComponent = PayComponent::where('corpId', $data['corpId'])
-                ->where('puid', $data['puid'])
-                ->first();
+            $payComponent = PayComponent::updateOrCreate(
+                ['corpId' => $data['corpId'], 'puid' => $data['puid']],
+                $data
+            );
 
-            if ($existingComponent) {
-                // Update existing record
-                $existingComponent->update($data);
-                return response()->json([
-                    'status' => true,
-                    'message' => "PayComponent updated successfully",
-                    'data' => $existingComponent
-                ]);
-            } else {
-                // Create new record
-                $payComponent = PayComponent::create($data);
-                return response()->json([
-                    'status' => true,
-                    'message' => "PayComponent created successfully",
-                    'data' => $payComponent
-                ]);
-            }
+            $status = $payComponent->wasRecentlyCreated ? 'created' : 'updated';
 
+            return response()->json([
+                'message' => "PayComponent {$status} successfully",
+                'status' => $status,
+                'pay_component' => $payComponent
+            ]);
         } catch (\Exception $e) {
             return response()->json([
-                'status' => false,
+                'status' => 'error',
                 'message' => 'Error: ' . $e->getMessage()
             ], 500);
         }
@@ -63,12 +52,13 @@ class PayComponentApiController extends Controller
         $component = PayComponent::where('puid', $puid)->first();
         if (!$component) {
             return response()->json([
-                'status' => false,
+                'status' => 'false',
                 'message' => 'PayComponent not found',
                 'data' => (object)[]
-            ], 404);
+            ],
+            404);
         }
-        return response()->json(['status' => true, 'data' => $component]);
+        return response()->json(['status' => 'true', 'data' => $component]);
     }
 
     // Delete PayComponent by puid
