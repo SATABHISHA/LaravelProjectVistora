@@ -69,6 +69,7 @@ use App\Http\Controllers\EmployeeProfilePhotoApiController;
 use App\Http\Controllers\PayComponentApiController;
 use App\Http\Controllers\ComponentTypeApiController;
 use App\Http\Controllers\PaygroupConfigurationApiController;
+use App\Http\Controllers\FormulaBuilderApiController;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 
@@ -508,3 +509,8 @@ Route::get('/paygroup-configuration/by-corpid/{corpId}', [PaygroupConfigurationA
 Route::get('/paygroup-configuration/{puid}', [PaygroupConfigurationApiController::class, 'fetchByPuid']);
 Route::delete('/paygroup-configuration/delete/{puid}', [PaygroupConfigurationApiController::class, 'destroy']);
 Route::get('/paygroup/included-components/{puid}', [PaygroupConfigurationApiController::class, 'fetchIncludedComponents']);
+
+// Formula Builder Routes
+Route::post('/formula-builder/add-or-update', [FormulaBuilderApiController::class, 'storeOrUpdate']);
+Route::get('/formula-builder/{corpId}/{componentGroupName}', [FormulaBuilderApiController::class, 'fetchByCorpIdAndGroup']);
+Route::delete('/formula-builder/delete/{puid}', [FormulaBuilderApiController::class, 'destroy']);
