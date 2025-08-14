@@ -14,6 +14,6 @@ class PaygroupConfiguration extends Model
         'AppointmentLetter', 'SalaryRevisionLetter', 'ContractLetter', 'IncludedComponents',
         'IsFBPEnabled', 'PfWageComponentsUnderThreshold', 'CtcYearlyYn', 'MonthlyBasicYn',
         'LeaveEncashedOnGrosYn', 'CostToCompanyYn', 'PBYn', 'CTCAllowances', 'ApplicabilityType',
-        'ApplicableOn', 'AdvanceApplicabilityType', 'AdvanceApplicableOn', 'FromDays', 'ToDays', 'ActiveYn'
+        'ApplicableOn', 'AdvanceApplicabilityType', 'AdvanceApplicableOn', 'FromDays', 'ToDays', 'ActiveYn', 'FormulaConfiguredYn'
     ];
 }

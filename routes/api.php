@@ -513,4 +513,4 @@ Route::get('/paygroup/included-components/{puid}', [PaygroupConfigurationApiCont
 // Formula Builder Routes
 Route::post('/formula-builder/add-or-update', [FormulaBuilderApiController::class, 'storeOrUpdate']);
 Route::get('/formula-builder/{corpId}/{componentGroupName}', [FormulaBuilderApiController::class, 'fetchByCorpIdAndGroup']);
-Route::delete('/formula-builder/delete/{puid}', [FormulaBuilderApiController::class, 'destroy']);
+Route::delete('/formula-builder/delete/{puid}/{paygroupPuid}', [FormulaBuilderApiController::class, 'destroy']);

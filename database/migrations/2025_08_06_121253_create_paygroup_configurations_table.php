@@ -39,6 +39,7 @@ return new class extends Migration
             $table->string('FromDays')->nullable();
             $table->string('ToDays')->nullable();
             $table->integer('ActiveYn')->default(1);
+            $table->integer('FormulaConfiguredYn')->default(0);
             $table->timestamps();
         });
     }
