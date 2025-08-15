@@ -113,51 +113,96 @@ class PaygroupConfigurationApiController extends Controller
         $employmentDetails = DB::table('employment_details')
             ->where('corp_id', $corp_id)
             ->where('EmpCode', $EmpCode)
-            ->first(); // Single record expected
+            ->first();
+
+        if (!$employmentDetails) {
+            return response()->json([
+                'status' => false,
+                'message' => 'Employment details not found.',
+                'data' => []
+            ], 404);
+        }
 
         $result = [];
 
         foreach ($paygroups as $paygroup) {
-            // Step 1: Prepare ApplicabiltyType columns (remove spaces, map 'Company' to 'company_name')
-            $applicabilityTypesRaw = array_map('trim', explode(',', $paygroup->ApplicabiltyType ?? ''));
-            $applicabilityTypes = [];
-            foreach ($applicabilityTypesRaw as $type) {
-                $type = str_replace(' ', '', $type);
-                if (strtolower($type) === 'company') {
-                    $type = 'company_name';
-                }
-                if ($type && in_array($type, $employmentColumns)) {
-                    $applicabilityTypes[] = $type;
-                }
-            }
+            // Check if properties exist before accessing them
+            $applicabilityTypeField = property_exists($paygroup, 'ApplicabiltyType') ? 'ApplicabiltyType' : 
+                                     (property_exists($paygroup, 'ApplicabilityType') ? 'ApplicabilityType' : null);
+            
+            $advanceApplicabilityTypeField = property_exists($paygroup, 'AdvanceApplicabilityType') ? 'AdvanceApplicabilityType' : null;
+            
+            $applicableOnField = property_exists($paygroup, 'ApplicableOn') ? 'ApplicableOn' : null;
+            
+            $advanceApplicableOnField = property_exists($paygroup, 'AdvanceApplicableOn') ? 'AdvanceApplicableOn' : null;
 
-            // Step 2: Prepare ApplicableOn values (comma separated)
-            $applicableOnValues = array_map('trim', explode(',', $paygroup->ApplicableOn ?? ''));
+            // Process ApplicabilityType
+            $applicabilityTypes = $applicabilityTypeField ? 
+                $this->prepareTypes($paygroup->$applicabilityTypeField, $employmentColumns) : [];
 
-            // Step 3: Matching Logic
-            $matched = false;
+            // Process AdvanceApplicabilityType
+            $advanceApplicabilityTypes = $advanceApplicabilityTypeField ? 
+                $this->prepareTypes($paygroup->$advanceApplicabilityTypeField, $employmentColumns) : [];
 
-            foreach ($applicableOnValues as $val) {
-                if ($val === '') continue;
-                foreach ($applicabilityTypes as $col) {
-                    if (isset($employmentDetails->$col)) {
-                        $empValue = strtolower(trim($employmentDetails->$col));
-                        if ($empValue === strtolower(trim($val))) {
-                            $matched = true;
-                            break 2; // Found a match, add GroupName
-                        }
-                    }
-                }
-            }
+            // Prepare ApplicableOn values
+            $applicableOnValues = $applicableOnField ? 
+                $this->prepareValues($paygroup->$applicableOnField) : [];
+                
+            $advanceApplicableOnValues = $advanceApplicableOnField ? 
+                $this->prepareValues($paygroup->$advanceApplicableOnField) : [];
 
-            if ($matched) {
+            // Matching
+            $applicableMatches = $this->checkMatch($applicabilityTypes, $applicableOnValues, $employmentDetails);
+            $advanceApplicableMatches = $this->checkMatch($advanceApplicabilityTypes, $advanceApplicableOnValues, $employmentDetails);
+
+            // Add GroupName if any criteria matches
+            if ($applicableMatches || $advanceApplicableMatches) {
                 $result[] = $paygroup->GroupName;
             }
         }
 
         return response()->json([
             'status' => true,
-            'data' => array_values(array_unique($result)),
+            'data' => array_values(array_unique($result))
         ]);
     }
+
+    private function prepareTypes($typeString, $employmentColumns)
+    {
+        $types = [];
+        foreach (explode(',', $typeString ?? '') as $type) {
+            $type = strtolower(str_replace(' ', '', trim($type)));
+            if ($type === 'company') {
+                $type = 'company_name';
+            }
+            if ($type && in_array($type, $employmentColumns)) {
+                $types[] = $type;
+            }
+        }
+        return $types;
+    }
+
+    private function prepareValues($valueString)
+    {
+        return array_filter(array_map(fn($v) => strtolower(trim($v)), explode(',', $valueString ?? '')));
+    }
+
+    private function checkMatch($columns, $values, $employmentDetails)
+    {
+        if (empty($columns) || empty($values)) {
+            return false;
+        }
+        foreach ($columns as $col) {
+            if (isset($employmentDetails->$col)) {
+                $empValue = strtolower(trim($employmentDetails->$col));
+                if (in_array($empValue, $values, true)) {
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+
+
+
 }
