@@ -104,85 +104,60 @@ class PaygroupConfigurationApiController extends Controller
     // Fetch GroupNames by Employment Details
     public function fetchGroupNamesByEmploymentDetails($corp_id, $EmpCode)
     {
-        // Get all column names from employment_details
         $employmentColumns = Schema::getColumnListing('employment_details');
 
-        // Get all paygroup_configurations for this corp_id
         $paygroups = DB::table('paygroup_configurations')
             ->where('corpId', $corp_id)
             ->get();
 
-        // Get employment_details filtered by corp_id and EmpCode
         $employmentDetails = DB::table('employment_details')
             ->where('corp_id', $corp_id)
             ->where('EmpCode', $EmpCode)
-            ->get();
+            ->first(); // Single record expected
 
         $result = [];
 
         foreach ($paygroups as $paygroup) {
-            // Prepare ApplicabiltyType and AdvanceApplicabilityType columns
-            $applicabilityTypes = array_map('trim', explode(',', $paygroup->ApplicabiltyType ?? ''));
-            $advanceApplicabilityTypes = array_map('trim', explode(',', $paygroup->AdvanceApplicabilityType ?? ''));
+            // Step 1: Prepare ApplicabiltyType columns (remove spaces, map 'Company' to 'company_name')
+            $applicabilityTypesRaw = array_map('trim', explode(',', $paygroup->ApplicabiltyType ?? ''));
+            $applicabilityTypes = [];
+            foreach ($applicabilityTypesRaw as $type) {
+                $type = str_replace(' ', '', $type);
+                if (strtolower($type) === 'company') {
+                    $type = 'company_name';
+                }
+                if ($type && in_array($type, $employmentColumns)) {
+                    $applicabilityTypes[] = $type;
+                }
+            }
 
-            // Map 'Company' to 'company_name'
-            $applicabilityTypes = array_map(function($type) {
-                return strtolower($type) === 'company' ? 'company_name' : $type;
-            }, $applicabilityTypes);
-
-            $advanceApplicabilityTypes = array_map(function($type) {
-                return strtolower($type) === 'company' ? 'company_name' : $type;
-            }, $advanceApplicabilityTypes);
-
-            // Filter only columns that exist in employment_details
-            $applicabilityTypes = array_filter($applicabilityTypes, function($type) use ($employmentColumns) {
-                return in_array($type, $employmentColumns);
-            });
-
-            $advanceApplicabilityTypes = array_filter($advanceApplicabilityTypes, function($type) use ($employmentColumns) {
-                return in_array($type, $employmentColumns);
-            });
-
-            // Prepare ApplicableOn and AdvanceApplicableOn values (comma separated)
+            // Step 2: Prepare ApplicableOn values (comma separated)
             $applicableOnValues = array_map('trim', explode(',', $paygroup->ApplicableOn ?? ''));
-            $advanceApplicableOnValues = array_map('trim', explode(',', $paygroup->AdvanceApplicableOn ?? ''));
 
-            // For each employment_details row, check if all applicable columns match the values
-            foreach ($employmentDetails as $emp) {
-                $match = true;
+            // Step 3: Matching Logic
+            $matched = false;
 
-                // Check ApplicabiltyType columns and ApplicableOn values
-                foreach ($applicabilityTypes as $idx => $col) {
-                    if (isset($applicableOnValues[$idx]) && isset($emp->$col)) {
-                        if ($emp->$col != $applicableOnValues[$idx]) {
-                            $match = false;
-                            break;
+            foreach ($applicableOnValues as $val) {
+                if ($val === '') continue;
+                foreach ($applicabilityTypes as $col) {
+                    if (isset($employmentDetails->$col)) {
+                        $empValue = strtolower(trim($employmentDetails->$col));
+                        if ($empValue === strtolower(trim($val))) {
+                            $matched = true;
+                            break 2; // Found a match, add GroupName
                         }
                     }
                 }
+            }
 
-                // Check AdvanceApplicabilityType columns and AdvanceApplicableOn values
-                if ($match) {
-                    foreach ($advanceApplicabilityTypes as $idx => $col) {
-                        if (isset($advanceApplicableOnValues[$idx]) && isset($emp->$col)) {
-                            if ($emp->$col != $advanceApplicableOnValues[$idx]) {
-                                $match = false;
-                                break;
-                            }
-                        }
-                    }
-                }
-
-                if ($match) {
-                    $result[] = $paygroup->GroupName;
-                    break; // Only need to add once per paygroup
-                }
+            if ($matched) {
+                $result[] = $paygroup->GroupName;
             }
         }
 
         return response()->json([
             'status' => true,
-            'data' => array_values(array_unique($result))
+            'data' => array_values(array_unique($result)),
         ]);
     }
 }
