@@ -516,3 +516,6 @@ Route::get('/paygroup-configuration/gross/{groupName}/{basicSalary}', [PaygroupC
 Route::post('/formula-builder/add-or-update', [FormulaBuilderApiController::class, 'storeOrUpdate']);
 Route::get('/formula-builder/{corpId}/{componentGroupName}', [FormulaBuilderApiController::class, 'fetchByCorpIdAndGroup']);
 Route::delete('/formula-builder/delete/{puid}/{paygroupPuid}', [FormulaBuilderApiController::class, 'destroy']);
+
+// Other Benefits Allowances Route
+Route::get('/paygroup-configuration/other-benefits-allowances/{groupName}/{corpId}', [PaygroupConfigurationApiController::class, 'fetchOtherBenefitsAllowances']);

@@ -354,4 +354,58 @@ class PaygroupConfigurationApiController extends Controller
         return $formula;
     }
 
+    // Fetch OtherBenefitsAllowances by GroupName and corpId
+    public function fetchOtherBenefitsAllowances($groupName, $corpId)
+    {
+        // Get CTCAllowances from paygroup_configurations
+        $paygroup = DB::table('paygroup_configurations')
+            ->where('GroupName', $groupName)
+            ->where('corpId', $corpId)
+            ->first();
+
+        if (!$paygroup || empty($paygroup->CTCAllowances)) {
+            return response()->json([
+                'status' => false,
+                'message' => 'GroupName not found for this corpId or no CTCAllowances available.',
+                'data' => []
+            ], 404);
+        }
+
+        // Split CTCAllowances by comma and trim each value
+        $ctcAllowances = array_filter(array_map('trim', explode(',', $paygroup->CTCAllowances)));
+
+        $result = [];
+
+        foreach ($ctcAllowances as $allowanceName) {
+            // Fetch from pay_components for each allowance
+            $payComponent = DB::table('pay_components')
+                ->where('componentName', $allowanceName)
+                ->first();
+
+            if ($payComponent) {
+                $allowanceResult = [
+                    'allowanceName' => $allowanceName,
+                    'componentName' => $payComponent->componentName,
+                    'payType' => $payComponent->payType ?? null,
+                    'paymentNature' => $payComponent->paymentNature ?? null,
+                    'isPartOfCtcYn' => $payComponent->isPartOfCtcYn ?? null,
+                    'componentDescription' => $payComponent->componentDescription ?? null
+                ];
+
+                $result[] = $allowanceResult;
+            }
+        }
+
+        return response()->json([
+            'status' => true,
+            'data' => [
+                'groupName' => $groupName,
+                'corpId' => $corpId,
+                'ctcAllowances' => $ctcAllowances,
+                'otherBenefitsAllowances' => $result,
+                'totalCount' => count($result)
+            ]
+        ]);
+    }
+
 }
