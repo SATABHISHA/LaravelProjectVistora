@@ -408,4 +408,99 @@ class PaygroupConfigurationApiController extends Controller
         ]);
     }
 
+    // Fetch Deductions with calculated values
+    public function fetchDeductionsByGroupName($groupName, $basicSalary)
+    {
+        // Validate basic salary
+        if (!is_numeric($basicSalary) || $basicSalary <= 0) {
+            return response()->json([
+                'status' => false,
+                'message' => 'Valid basic salary is required.',
+                'data' => []
+            ], 400);
+        }
+
+        // Get IncludedComponents from paygroup_configurations
+        $paygroup = DB::table('paygroup_configurations')
+            ->where('GroupName', $groupName)
+            ->first();
+
+        if (!$paygroup || empty($paygroup->IncludedComponents)) {
+            return response()->json([
+                'status' => false,
+                'message' => 'GroupName not found or no IncludedComponents available.',
+                'data' => []
+            ], 404);
+        }
+
+        // Split IncludedComponents by comma and trim each value
+        $includedComponents = array_filter(array_map('trim', explode(',', $paygroup->IncludedComponents)));
+
+        $result = [];
+        $totalDeductions = 0;
+
+        foreach ($includedComponents as $componentName) {
+            // Fetch from pay_components with conditions for Deductions
+            $payComponent = DB::table('pay_components')
+                ->where('componentName', $componentName)
+                ->where('isPartOfCtcYn', 1)
+                ->where('payType', 'Deduction')
+                ->first();
+
+            if ($payComponent) {
+                // Try different approaches to fetch formula
+                $formulaBuilder = null;
+                $formula = null;
+                
+                // Approach 1: Match both componentGroupName and componentName with componentName
+                $formulaBuilder = DB::table('formula_builders')
+                    ->where('componentGroupName', $componentName)
+                    ->where('componentName', $componentName)
+                    ->first();
+                
+                // Approach 2: If not found, try matching only componentName
+                if (!$formulaBuilder) {
+                    $formulaBuilder = DB::table('formula_builders')
+                        ->where('componentName', $componentName)
+                        ->first();
+                }
+                
+                // Approach 3: If still not found, try matching componentGroupName only
+                if (!$formulaBuilder) {
+                    $formulaBuilder = DB::table('formula_builders')
+                        ->where('componentGroupName', $componentName)
+                        ->first();
+                }
+
+                $calculatedValue = 0;
+
+                if ($formulaBuilder && !empty($formulaBuilder->formula)) {
+                    $formula = $formulaBuilder->formula;
+                    // Calculate the formula dynamically with basic salary
+                    $calculatedValue = $this->calculateFormula($formula, $basicSalary);
+                }
+
+                $componentResult = [
+                    'componentName' => $componentName,
+                    'paymentNature' => $payComponent->paymentNature,
+                    'formula' => $formula,
+                    'calculatedValue' => $calculatedValue
+                ];
+
+                $result[] = $componentResult;
+                $totalDeductions += $calculatedValue;
+            }
+        }
+
+        return response()->json([
+            'status' => true,
+            'data' => [
+                'groupName' => $groupName,
+                'basicSalary' => (float)$basicSalary,
+                'deductions' => $result,
+                'totalDeductions' => $totalDeductions
+            ]
+        ]);
+    }
+
 }

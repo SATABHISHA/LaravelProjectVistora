@@ -519,3 +519,6 @@ Route::delete('/formula-builder/delete/{puid}/{paygroupPuid}', [FormulaBuilderAp
 
 // Other Benefits Allowances Route
 Route::get('/paygroup-configuration/other-benefits-allowances/{groupName}/{corpId}', [PaygroupConfigurationApiController::class, 'fetchOtherBenefitsAllowances']);
+
+// Deductions Route
+Route::get('/paygroup-configuration/deductions/{groupName}/{basicSalary}', [PaygroupConfigurationApiController::class, 'fetchDeductionsByGroupName']);
