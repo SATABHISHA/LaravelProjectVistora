@@ -205,6 +205,82 @@ class PaygroupConfigurationApiController extends Controller
         return false; // No matches found
     }
 
+    // Fetch Gross with calculated values (with basic salary as URL parameter)
+    public function fetchGrossByGroupName($groupName, $basicSalary)
+    {
+        // Validate basic salary
+        if (!is_numeric($basicSalary) || $basicSalary <= 0) {
+            return response()->json([
+                'status' => false,
+                'message' => 'Valid basic salary is required.',
+                'data' => []
+            ], 400);
+        }
 
+        // Get IncludedComponents from paygroup_configurations
+        $paygroup = DB::table('paygroup_configurations')
+            ->where('GroupName', $groupName)
+            ->first();
+
+        if (!$paygroup || empty($paygroup->IncludedComponents)) {
+            return response()->json([
+                'status' => false,
+                'message' => 'GroupName not found or no IncludedComponents available.',
+                'data' => []
+            ], 404);
+        }
+
+        // Split IncludedComponents by comma and trim each value
+        $includedComponents = array_filter(array_map('trim', explode(',', $paygroup->IncludedComponents)));
+
+        $result = [];
+        $totalGross = 0;
+
+        foreach ($includedComponents as $componentName) {
+            // Fetch from pay_components with conditions
+            $payComponent = DB::table('pay_components')
+                ->where('componentName', $componentName)
+                ->where('isPartOfCtcYn', 1)
+                ->where('payType', 'Addition')
+                ->first();
+
+            if ($payComponent) {
+                // Fetch formula from formula_builders
+                $formulaBuilder = DB::table('formula_builders')
+                    ->where('componentGroupName', $payComponent->componentName)
+                    ->where('componentName', $payComponent->componentName)
+                    ->first();
+
+                $calculatedValue = 0;
+                $formula = null;
+
+                if ($formulaBuilder && !empty($formulaBuilder->formula)) {
+                    $formula = $formulaBuilder->formula;
+                    // Calculate the formula dynamically with basic salary
+                    $calculatedValue = $this->calculateFormula($formula, $basicSalary);
+                }
+
+                $componentResult = [
+                    'componentName' => $componentName,
+                    'paymentNature' => $payComponent->paymentNature,
+                    'formula' => $formula,
+                    'calculatedValue' => $calculatedValue
+                ];
+
+                $result[] = $componentResult;
+                $totalGross += $calculatedValue;
+            }
+        }
+
+        return response()->json([
+            'status' => true,
+            'data' => [
+                'groupName' => $groupName,
+                'basicSalary' => (float)$basicSalary,
+                'components' => $result,
+                'totalGross' => $totalGross
+            ]
+        ]);
+    }
 
 }

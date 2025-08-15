@@ -510,6 +510,7 @@ Route::get('/paygroup-configuration/{puid}', [PaygroupConfigurationApiController
 Route::delete('/paygroup-configuration/delete/{puid}', [PaygroupConfigurationApiController::class, 'destroy']);
 Route::get('/paygroup/included-components/{puid}', [PaygroupConfigurationApiController::class, 'fetchIncludedComponents']);
 Route::get('/paygroup-configuration/groupnames/by-employment-details/{corp_id}/{EmpCode}', [PaygroupConfigurationApiController::class, 'fetchGroupNamesByEmploymentDetails']);
+Route::get('/paygroup-configuration/gross/{groupName}/{basicSalary}', [PaygroupConfigurationApiController::class, 'fetchGrossByGroupName']);
 
 // Formula Builder Routes
 Route::post('/formula-builder/add-or-update', [FormulaBuilderApiController::class, 'storeOrUpdate']);
