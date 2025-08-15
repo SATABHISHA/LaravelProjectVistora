@@ -509,7 +509,7 @@ Route::get('/paygroup-configuration/by-corpid/{corpId}', [PaygroupConfigurationA
 Route::get('/paygroup-configuration/{puid}', [PaygroupConfigurationApiController::class, 'fetchByPuid']);
 Route::delete('/paygroup-configuration/delete/{puid}', [PaygroupConfigurationApiController::class, 'destroy']);
 Route::get('/paygroup/included-components/{puid}', [PaygroupConfigurationApiController::class, 'fetchIncludedComponents']);
-Route::get('/paygroup-configuration/groupnames/by-employment-details/{EmpCode}', [PaygroupConfigurationApiController::class, 'fetchGroupNamesByEmploymentDetails']);
+Route::get('/paygroup-configuration/groupnames/by-employment-details/{corp_id}/{EmpCode}', [PaygroupConfigurationApiController::class, 'fetchGroupNamesByEmploymentDetails']);
 
 // Formula Builder Routes
 Route::post('/formula-builder/add-or-update', [FormulaBuilderApiController::class, 'storeOrUpdate']);

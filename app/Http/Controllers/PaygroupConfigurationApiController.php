@@ -102,16 +102,19 @@ class PaygroupConfigurationApiController extends Controller
     }
 
     // Fetch GroupNames by Employment Details
-    public function fetchGroupNamesByEmploymentDetails($EmpCode)
+    public function fetchGroupNamesByEmploymentDetails($corp_id, $EmpCode)
     {
         // Get all column names from employment_details
         $employmentColumns = Schema::getColumnListing('employment_details');
 
-        // Get all paygroup_configurations
-        $paygroups = DB::table('paygroup_configurations')->get();
+        // Get all paygroup_configurations for this corp_id
+        $paygroups = DB::table('paygroup_configurations')
+            ->where('corpId', $corp_id)
+            ->get();
 
-        // Get employment_details filtered by EmpCode
-        $employmentDetails = \DB::table('employment_details')
+        // Get employment_details filtered by corp_id and EmpCode
+        $employmentDetails = DB::table('employment_details')
+            ->where('corp_id', $corp_id)
             ->where('EmpCode', $EmpCode)
             ->get();
 
