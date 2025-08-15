@@ -245,14 +245,31 @@ class PaygroupConfigurationApiController extends Controller
                 ->first();
 
             if ($payComponent) {
-                // Fetch formula from formula_builders
+                // Try different approaches to fetch formula
+                $formulaBuilder = null;
+                $formula = null;
+                
+                // Approach 1: Match both componentGroupName and componentName with componentName
                 $formulaBuilder = DB::table('formula_builders')
-                    ->where('componentGroupName', $payComponent->componentName)
-                    ->where('componentName', $payComponent->componentName)
+                    ->where('componentGroupName', $componentName)
+                    ->where('componentName', $componentName)
                     ->first();
+                
+                // Approach 2: If not found, try matching only componentName
+                if (!$formulaBuilder) {
+                    $formulaBuilder = DB::table('formula_builders')
+                        ->where('componentName', $componentName)
+                        ->first();
+                }
+                
+                // Approach 3: If still not found, try matching componentGroupName only
+                if (!$formulaBuilder) {
+                    $formulaBuilder = DB::table('formula_builders')
+                        ->where('componentGroupName', $componentName)
+                        ->first();
+                }
 
                 $calculatedValue = 0;
-                $formula = null;
 
                 if ($formulaBuilder && !empty($formulaBuilder->formula)) {
                     $formula = $formulaBuilder->formula;
@@ -264,7 +281,13 @@ class PaygroupConfigurationApiController extends Controller
                     'componentName' => $componentName,
                     'paymentNature' => $payComponent->paymentNature,
                     'formula' => $formula,
-                    'calculatedValue' => $calculatedValue
+                    'calculatedValue' => $calculatedValue,
+                    // Add debug info temporarily
+                    'debug' => [
+                        'formula_found' => $formulaBuilder ? true : false,
+                        'formula_raw' => $formulaBuilder->formula ?? null,
+                        'payComponent_found' => $payComponent ? true : false
+                    ]
                 ];
 
                 $result[] = $componentResult;
@@ -281,6 +304,54 @@ class PaygroupConfigurationApiController extends Controller
                 'totalGross' => $totalGross
             ]
         ]);
+    }
+
+    // Calculate dynamic formula with basic salary
+    private function calculateFormula($formula, $basicSalary)
+    {
+        try {
+            // Basic security check - only allow numbers, operators, and common functions
+            if (!preg_match('/^[0-9+\-*\/().\s_A-Za-z]+$/', $formula)) {
+                throw new \Exception('Invalid formula format');
+            }
+
+            // Replace formula variables with actual values
+            $processedFormula = $this->processFormulaVariables($formula, $basicSalary);
+
+            // Evaluate the formula safely
+            $result = eval("return $processedFormula;");
+            
+            return is_numeric($result) ? (float)$result : 0;
+        } catch (\Exception $e) {
+            // Log error and return 0 for safety
+            \Log::warning("Formula calculation error: " . $e->getMessage() . " for formula: " . $formula);
+            return 0;
+        }
+    }
+
+    // Process formula variables with basic salary
+    private function processFormulaVariables($formula, $basicSalary)
+    {
+        // Replace common variables with actual values
+        $variables = [
+            'BASIC_SALARY' => $basicSalary,
+            'BasicSalary' => $basicSalary,
+            'Basic_Salary' => $basicSalary,
+            'basic_salary' => $basicSalary,
+            'BASIC' => $basicSalary,
+            'Basic' => $basicSalary,
+            'basic' => $basicSalary,
+            // Add more variable patterns as needed based on your formulas
+            'DA' => $basicSalary * 0.1,  // Example: DA = 10% of basic
+            'HRA' => $basicSalary * 0.4, // Example: HRA = 40% of basic
+        ];
+
+        foreach ($variables as $key => $value) {
+            // Safely replace variables in the formula
+            $formula = preg_replace('/\b' . preg_quote($key, '/') . '\b/', $value, $formula);
+        }
+
+        return $formula;
     }
 
 }
