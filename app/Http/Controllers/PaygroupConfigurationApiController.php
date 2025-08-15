@@ -126,38 +126,35 @@ class PaygroupConfigurationApiController extends Controller
         $result = [];
 
         foreach ($paygroups as $paygroup) {
-            // Check if properties exist before accessing them
-            $applicabilityTypeField = property_exists($paygroup, 'ApplicabiltyType') ? 'ApplicabiltyType' : 
-                                     (property_exists($paygroup, 'ApplicabilityType') ? 'ApplicabilityType' : null);
-            
-            $advanceApplicabilityTypeField = property_exists($paygroup, 'AdvanceApplicabilityType') ? 'AdvanceApplicabilityType' : null;
-            
-            $applicableOnField = property_exists($paygroup, 'ApplicableOn') ? 'ApplicableOn' : null;
-            
-            $advanceApplicableOnField = property_exists($paygroup, 'AdvanceApplicableOn') ? 'AdvanceApplicableOn' : null;
+            // Get field values directly
+            $applicabilityTypeValue = $paygroup->ApplicabiltyType ?? $paygroup->ApplicabilityType ?? '';
+            $advanceApplicabilityTypeValue = $paygroup->AdvanceApplicabilityType ?? '';
+            $applicableOnValue = $paygroup->ApplicableOn ?? '';
+            $advanceApplicableOnValue = $paygroup->AdvanceApplicableOn ?? '';
 
-            // Process ApplicabilityType
-            $applicabilityTypes = $applicabilityTypeField ? 
-                $this->prepareTypes($paygroup->$applicabilityTypeField, $employmentColumns) : [];
+            // Process types and values
+            $applicabilityTypes = $this->prepareTypes($applicabilityTypeValue, $employmentColumns);
+            $advanceApplicabilityTypes = $this->prepareTypes($advanceApplicabilityTypeValue, $employmentColumns);
+            $applicableOnValues = $this->prepareValues($applicableOnValue);
+            $advanceApplicableOnValues = $this->prepareValues($advanceApplicableOnValue);
 
-            // Process AdvanceApplicabilityType
-            $advanceApplicabilityTypes = $advanceApplicabilityTypeField ? 
-                $this->prepareTypes($paygroup->$advanceApplicabilityTypeField, $employmentColumns) : [];
-
-            // Prepare ApplicableOn values
-            $applicableOnValues = $applicableOnField ? 
-                $this->prepareValues($paygroup->$applicableOnField) : [];
-                
-            $advanceApplicableOnValues = $advanceApplicableOnField ? 
-                $this->prepareValues($paygroup->$advanceApplicableOnField) : [];
-
-            // Matching
+            // Check matches
             $applicableMatches = $this->checkMatch($applicabilityTypes, $applicableOnValues, $employmentDetails);
             $advanceApplicableMatches = $this->checkMatch($advanceApplicabilityTypes, $advanceApplicableOnValues, $employmentDetails);
 
-            // Add GroupName if any criteria matches
-            if ($applicableMatches || $advanceApplicableMatches) {
-                $result[] = $paygroup->GroupName;
+            // Logic: if advance exists, both must match; if not, only applicable needs to match
+            $hasAdvanceData = !empty(trim($advanceApplicableOnValue));
+            
+            if ($hasAdvanceData) {
+                // Both ApplicableOn and AdvanceApplicableOn must match
+                if ($applicableMatches && $advanceApplicableMatches) {
+                    $result[] = $paygroup->GroupName;
+                }
+            } else {
+                // Only ApplicableOn needs to match if AdvanceApplicableOn is null/empty
+                if ($applicableMatches) {
+                    $result[] = $paygroup->GroupName;
+                }
             }
         }
 
@@ -171,10 +168,13 @@ class PaygroupConfigurationApiController extends Controller
     {
         $types = [];
         foreach (explode(',', $typeString ?? '') as $type) {
-            $type = strtolower(str_replace(' ', '', trim($type)));
-            if ($type === 'company') {
+            $type = str_replace(' ', '', trim($type)); // Remove spaces but don't convert to lowercase
+            
+            // Handle specific mappings
+            if (strtolower($type) === 'company') {
                 $type = 'company_name';
             }
+            
             if ($type && in_array($type, $employmentColumns)) {
                 $types[] = $type;
             }
@@ -184,7 +184,7 @@ class PaygroupConfigurationApiController extends Controller
 
     private function prepareValues($valueString)
     {
-        return array_filter(array_map(fn($v) => strtolower(trim($v)), explode(',', $valueString ?? '')));
+        return array_filter(array_map(fn($v) => trim($v), explode(',', $valueString ?? ''))); // Keep original case and spaces
     }
 
     private function checkMatch($columns, $values, $employmentDetails)
@@ -192,15 +192,17 @@ class PaygroupConfigurationApiController extends Controller
         if (empty($columns) || empty($values)) {
             return false;
         }
+        
+        // Check if at least one column-value pair matches
         foreach ($columns as $col) {
             if (isset($employmentDetails->$col)) {
-                $empValue = strtolower(trim($employmentDetails->$col));
+                $empValue = trim($employmentDetails->$col); // Keep original case
                 if (in_array($empValue, $values, true)) {
-                    return true;
+                    return true; // Found a match
                 }
             }
         }
-        return false;
+        return false; // No matches found
     }
 
 
