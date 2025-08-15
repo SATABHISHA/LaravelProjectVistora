@@ -283,11 +283,11 @@ class PaygroupConfigurationApiController extends Controller
                     'formula' => $formula,
                     'calculatedValue' => $calculatedValue,
                     // Add debug info temporarily
-                    'debug' => [
+                   /* 'debug' => [
                         'formula_found' => $formulaBuilder ? true : false,
                         'formula_raw' => $formulaBuilder->formula ?? null,
                         'payComponent_found' => $payComponent ? true : false
-                    ]
+                    ]*/
                 ];
 
                 $result[] = $componentResult;
