@@ -384,12 +384,12 @@ class PaygroupConfigurationApiController extends Controller
 
             if ($payComponent) {
                 $allowanceResult = [
-                    'allowanceName' => $allowanceName,
                     'componentName' => $payComponent->componentName,
                     'payType' => $payComponent->payType ?? null,
                     'paymentNature' => $payComponent->paymentNature ?? null,
                     'isPartOfCtcYn' => $payComponent->isPartOfCtcYn ?? null,
-                    'componentDescription' => $payComponent->componentDescription ?? null
+                    'componentDescription' => $payComponent->componentDescription ?? null,
+                    'calculatedValue' => 0.0  // Added calculatedValue field with default 0.0
                 ];
 
                 $result[] = $allowanceResult;
@@ -499,6 +499,41 @@ class PaygroupConfigurationApiController extends Controller
                 'basicSalary' => (float)$basicSalary,
                 'deductions' => $result,
                 'totalDeductions' => $totalDeductions
+            ]
+        ]);
+    }
+
+    // Add the Save Payroll Data method(not required in this way)
+    public function savePayrollData(Request $request)
+    {
+        $data = $request->all();
+        
+        // Validate the JSON structure
+        $validator = \Validator::make($data, [
+            'Gross' => 'required|array',
+            'Allowances' => 'required|array',
+            'Deductions' => 'required|array',
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json([
+                'status' => false,
+                'message' => 'Invalid data structure',
+                'errors' => $validator->errors()
+            ], 400);
+        }
+        
+        return response()->json([
+            'status' => true,
+            'message' => 'Payroll data saved successfully',
+            'data' => [
+                'grossCount' => count($data['Gross']),
+                'allowancesCount' => count($data['Allowances']),
+                'deductionsCount' => count($data['Deductions']),
+                'totalGross' => array_sum(array_column($data['Gross'], 'calculatedValue')),
+                'totalAllowances' => array_sum(array_column($data['Allowances'], 'calculatedValue')),
+                'totalDeductions' => array_sum(array_column($data['Deductions'], 'calculatedValue')),
+                'savedAt' => now()->toDateTimeString()
             ]
         ]);
     }

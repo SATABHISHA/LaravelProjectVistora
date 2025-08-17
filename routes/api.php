@@ -522,3 +522,6 @@ Route::get('/paygroup-configuration/other-benefits-allowances/{groupName}/{corpI
 
 // Deductions Route
 Route::get('/paygroup-configuration/deductions/{groupName}/{basicSalary}', [PaygroupConfigurationApiController::class, 'fetchDeductionsByGroupName']);
+
+// Save Payroll Data Route
+Route::post('/payroll-data/save', [PaygroupConfigurationApiController::class, 'savePayrollData']); //--not required
