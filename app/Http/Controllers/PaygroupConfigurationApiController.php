@@ -389,7 +389,19 @@ class PaygroupConfigurationApiController extends Controller
                     'paymentNature' => $payComponent->paymentNature ?? null,
                     'isPartOfCtcYn' => $payComponent->isPartOfCtcYn ?? null,
                     'componentDescription' => $payComponent->componentDescription ?? null,
-                    'calculatedValue' => 0.0  // Added calculatedValue field with default 0.0
+                    'calculatedValue' => 0.0
+                ];
+
+                $result[] = $allowanceResult;
+            } else {
+                // Even if pay component not found, add the allowance with default values
+                $allowanceResult = [
+                    'componentName' => $allowanceName,
+                    'payType' => null,
+                    'paymentNature' => null,
+                    'isPartOfCtcYn' => null,
+                    'componentDescription' => null,
+                    'calculatedValue' => 0.0
                 ];
 
                 $result[] = $allowanceResult;
@@ -401,8 +413,7 @@ class PaygroupConfigurationApiController extends Controller
             'data' => [
                 'groupName' => $groupName,
                 'corpId' => $corpId,
-                'ctcAllowances' => $ctcAllowances,
-                'otherBenefitsAllowances' => $result,
+                'otherBenefitsAllowances' => $result,  // Remove ctcAllowances, only return processed result
                 'totalCount' => count($result)
             ]
         ]);
