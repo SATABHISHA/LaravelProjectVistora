@@ -6,6 +6,8 @@ use Illuminate\Http\Request;
 use App\Models\PaygroupConfiguration;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
+use Illuminate\Support\Facades\Validator;
+use Illuminate\Support\Facades\Log;
 
 class PaygroupConfigurationApiController extends Controller
 {
@@ -324,7 +326,7 @@ class PaygroupConfigurationApiController extends Controller
             return is_numeric($result) ? (float)$result : 0;
         } catch (\Exception $e) {
             // Log error and return 0 for safety
-            \Log::warning("Formula calculation error: " . $e->getMessage() . " for formula: " . $formula);
+            Log::warning("Formula calculation error: " . $e->getMessage() . " for formula: " . $formula);
             return 0;
         }
     }
@@ -520,7 +522,7 @@ class PaygroupConfigurationApiController extends Controller
         $data = $request->all();
         
         // Validate the JSON structure
-        $validator = \Validator::make($data, [
+        $validator = Validator::make($data, [
             'Gross' => 'required|array',
             'Allowances' => 'required|array',
             'Deductions' => 'required|array',
