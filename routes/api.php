@@ -70,6 +70,7 @@ use App\Http\Controllers\PayComponentApiController;
 use App\Http\Controllers\ComponentTypeApiController;
 use App\Http\Controllers\PaygroupConfigurationApiController;
 use App\Http\Controllers\FormulaBuilderApiController;
+use App\Http\Controllers\EmployeeSalaryStructureApiController;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 
@@ -525,3 +526,9 @@ Route::get('/paygroup-configuration/deductions/{groupName}/{basicSalary}', [Payg
 
 // Save Payroll Data Route
 Route::post('/payroll-data/save', [PaygroupConfigurationApiController::class, 'savePayrollData']); //--not required
+
+// Employee Salary Structure Routes
+Route::post('/employee-salary-structure/add-or-update', [EmployeeSalaryStructureApiController::class, 'storeOrUpdate']);
+Route::get('/employee-salary-structure/{empCode}/{companyName}/{corpId}', [EmployeeSalaryStructureApiController::class, 'fetchByEmpDetails']);
+Route::delete('/employee-salary-structure/delete/{puid}', [EmployeeSalaryStructureApiController::class, 'destroy']);
+
