@@ -247,49 +247,49 @@ class PaygroupConfigurationApiController extends Controller
                 ->first();
 
             if ($payComponent) {
-                // Try different approaches to fetch formula
-                $formulaBuilder = null;
+                $calculatedValue = 0;
                 $formula = null;
-                
-                // Approach 1: Match both componentGroupName and componentName with componentName
-                $formulaBuilder = DB::table('formula_builders')
-                    ->where('componentGroupName', $componentName)
-                    ->where('componentName', $componentName)
-                    ->first();
-                
-                // Approach 2: If not found, try matching only componentName
-                if (!$formulaBuilder) {
-                    $formulaBuilder = DB::table('formula_builders')
-                        ->where('componentName', $componentName)
-                        ->first();
-                }
-                
-                // Approach 3: If still not found, try matching componentGroupName only
-                if (!$formulaBuilder) {
+
+                // Check if component name is "Basic" (case-insensitive)
+                if (strtolower(trim($componentName)) === 'basic') {
+                    $calculatedValue = (float)$basicSalary;
+                    $formula = 'basicSalary'; // Set a descriptive formula
+                } else {
+                    // Try different approaches to fetch formula for non-basic components
+                    $formulaBuilder = null;
+                    
+                    // Approach 1: Match both componentGroupName and componentName with componentName
                     $formulaBuilder = DB::table('formula_builders')
                         ->where('componentGroupName', $componentName)
+                        ->where('componentName', $componentName)
                         ->first();
-                }
+                    
+                    // Approach 2: If not found, try matching only componentName
+                    if (!$formulaBuilder) {
+                        $formulaBuilder = DB::table('formula_builders')
+                            ->where('componentName', $componentName)
+                            ->first();
+                    }
+                    
+                    // Approach 3: If still not found, try matching componentGroupName only
+                    if (!$formulaBuilder) {
+                        $formulaBuilder = DB::table('formula_builders')
+                            ->where('componentGroupName', $componentName)
+                            ->first();
+                    }
 
-                $calculatedValue = 0;
-
-                if ($formulaBuilder && !empty($formulaBuilder->formula)) {
-                    $formula = $formulaBuilder->formula;
-                    // Calculate the formula dynamically with basic salary
-                    $calculatedValue = $this->calculateFormula($formula, $basicSalary);
+                    if ($formulaBuilder && !empty($formulaBuilder->formula)) {
+                        $formula = $formulaBuilder->formula;
+                        // Calculate the formula dynamically with basic salary
+                        $calculatedValue = $this->calculateFormula($formula, $basicSalary);
+                    }
                 }
 
                 $componentResult = [
                     'componentName' => $componentName,
                     'paymentNature' => $payComponent->paymentNature,
                     'formula' => $formula,
-                    'calculatedValue' => $calculatedValue,
-                    // Add debug info temporarily
-                   /* 'debug' => [
-                        'formula_found' => $formulaBuilder ? true : false,
-                        'formula_raw' => $formulaBuilder->formula ?? null,
-                        'payComponent_found' => $payComponent ? true : false
-                    ]*/
+                    'calculatedValue' => $calculatedValue
                 ];
 
                 $result[] = $componentResult;
