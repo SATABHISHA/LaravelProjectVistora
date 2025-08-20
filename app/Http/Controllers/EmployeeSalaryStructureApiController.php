@@ -70,15 +70,9 @@ class EmployeeSalaryStructureApiController extends Controller
             $responseData = $salaryStructure->toArray();
             
             // Parse JSON strings to arrays with JSON objects inside using square brackets
-            $responseData['grossList'] = [
-                $this->parseJsonField($salaryStructure->grossList)
-            ];
-            $responseData['otherBenifits'] = [
-                $this->parseJsonField($salaryStructure->otherBenifits)
-            ];
-            $responseData['recurringDeductions'] = [
-                $this->parseJsonField($salaryStructure->recurringDeductions)
-            ];
+            $responseData['grossList'] = $this->parseJsonField($salaryStructure->grossList);
+            $responseData['otherBenifits'] = $this->parseJsonField($salaryStructure->otherBenifits);
+            $responseData['recurringDeductions'] = $this->parseJsonField($salaryStructure->recurringDeductions);
 
             return response()->json([
                 'status' => true,
