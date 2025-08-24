@@ -99,6 +99,7 @@ Route::post('/company/register_company_details', [CompanyDetailsApiController::c
 Route::get('/company/details/{corp_id}', [CompanyDetailsApiController::class, 'show']);
 Route::put('/company/update/{company_id}/{corp_id}', [CompanyDetailsApiController::class, 'update']);
 Route::delete('/company/delete/{company_id}/{corp_id}', [CompanyDetailsApiController::class, 'destroy']);
+Route::get('/company/name/{corp_id}', [CompanyDetailsApiController::class, 'getCompanyNameByCorpId']); // New route added
 
 // Business Unit Routes
 Route::post('/business_unit/add', [BusinessUnitApiController::class, 'store']);

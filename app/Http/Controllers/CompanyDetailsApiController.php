@@ -120,4 +120,36 @@ class CompanyDetailsApiController extends Controller
 
         return response()->json(['message' => 'Company deleted successfully']);
     }
+
+    /**
+     * Fetch a list of all active company names by corporate ID.
+     *
+     * @param string $corp_id
+     * @return \Illuminate\Http\JsonResponse
+     */
+    public function getCompanyNameByCorpId(string $corp_id)
+    {
+        // Use get() to fetch all matching records, not just the first()
+        $companies = \App\Models\CompanyDetails::where('corp_id', $corp_id)
+                                        ->where('active_yn', true)
+                                        ->get();
+
+        // Check if the collection of companies is empty
+        if ($companies->isEmpty()) {
+            return response()->json([
+                'status' => false,
+                'message' => 'No active companies found for this corporate ID.',
+            ], 404);
+        }
+
+        // Use pluck() to create an array of just the company names
+        $companyNames = $companies->pluck('company_name');
+
+        // Return the list inside the 'data' array
+        return response()->json([
+            'status' => true,
+            'corp_id' => $corp_id,
+            'data' => $companyNames,
+        ]);
+    }
 }
