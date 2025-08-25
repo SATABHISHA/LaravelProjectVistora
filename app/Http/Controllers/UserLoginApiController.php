@@ -18,7 +18,11 @@ class UserLoginApiController extends Controller
             'username' => 'required|string',
             'password' => 'required|string|min:6',
             'empcode' => 'nullable|string',
-            'company_name' => 'nullable|string', // Added validation for company_name
+            'company_name' => 'nullable|string',
+            // Added validation for role fields
+            'active_yn' => 'nullable|integer|in:0,1',
+            'admin_yn' => 'nullable|integer|in:0,1',
+            'supervisor_yn' => 'nullable|integer|in:0,1',
         ]);
 
         // Check if corp_id is active in corporateid table
@@ -63,10 +67,10 @@ class UserLoginApiController extends Controller
                 'username' => $request->username,
                 'password' => Hash::make($request->password),
                 'empcode' => $request->empcode,
-                'company_name' => $request->company_name, // Added company_name field
-                'active_yn' => isset($request->active_yn) ? (int)$request->active_yn : 1, // Changed default to 1
-                'admin_yn' => isset($request->admin_yn) ? (int)$request->admin_yn : 0,
-                'supervisor_yn' => isset($request->supervisor_yn) ? (int)$request->supervisor_yn : 0,
+                'company_name' => $request->company_name,
+                'active_yn' => $request->has('active_yn') ? (int)$request->active_yn : 1,
+                'admin_yn' => $request->has('admin_yn') ? (int)$request->admin_yn : 0,
+                'supervisor_yn' => $request->has('supervisor_yn') ? (int)$request->supervisor_yn : 0,
             ]);
         } catch (\Exception $e) {
             return response()->json([
@@ -132,6 +136,9 @@ class UserLoginApiController extends Controller
     public function index()
     {
         $users = UserLogin::all();
-        return response()->json($users);
+        return response()->json([
+            'status' => true,
+            'data' => $users
+        ]);
     }
 }
