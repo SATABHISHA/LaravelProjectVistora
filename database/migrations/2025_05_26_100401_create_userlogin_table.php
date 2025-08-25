@@ -17,10 +17,11 @@ return new class extends Migration
             $table->string('email_id')->unique();
             $table->string('username');
             $table->string('password');
-            $table->string('empcode')->nullable(); // <-- Add this line
-            $table->boolean('active_yn')->default(true);
-            $table->boolean('admin_yn')->default(false);
-            $table->boolean('supervisor_yn')->default(false);
+            $table->string('empcode')->nullable();
+            $table->string('company_name')->nullable(); // Added company_name field
+            $table->integer('active_yn')->default(1);   // Changed to integer with default 1
+            $table->integer('admin_yn')->default(0);    // Changed to integer with default 0
+            $table->integer('supervisor_yn')->default(0); // Changed to integer with default 0
             $table->timestamps();
         });
     }

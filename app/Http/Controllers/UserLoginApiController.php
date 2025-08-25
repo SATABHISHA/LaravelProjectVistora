@@ -18,6 +18,7 @@ class UserLoginApiController extends Controller
             'username' => 'required|string',
             'password' => 'required|string|min:6',
             'empcode' => 'nullable|string',
+            'company_name' => 'nullable|string', // Added validation for company_name
         ]);
 
         // Check if corp_id is active in corporateid table
@@ -62,7 +63,8 @@ class UserLoginApiController extends Controller
                 'username' => $request->username,
                 'password' => Hash::make($request->password),
                 'empcode' => $request->empcode,
-                'active_yn' => isset($request->active_yn) ? (int)$request->active_yn : 0,
+                'company_name' => $request->company_name, // Added company_name field
+                'active_yn' => isset($request->active_yn) ? (int)$request->active_yn : 1, // Changed default to 1
                 'admin_yn' => isset($request->admin_yn) ? (int)$request->admin_yn : 0,
                 'supervisor_yn' => isset($request->supervisor_yn) ? (int)$request->supervisor_yn : 0,
             ]);
