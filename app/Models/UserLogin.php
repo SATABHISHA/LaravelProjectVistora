@@ -15,7 +15,7 @@ class UserLogin extends Model
     protected $fillable = [
         'corp_id', 'email_id', 'username', 'password',
         'empcode', // <-- Added this line
-        'active_yn', 'admin_yn', 'supervisor_yn'
+        'company_name','active_yn', 'admin_yn', 'supervisor_yn'
     ];
 
     protected $hidden = ['password'];
