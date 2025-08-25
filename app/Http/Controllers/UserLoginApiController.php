@@ -132,6 +132,75 @@ class UserLoginApiController extends Controller
         ]);
     }
 
+    /**
+     * Update user details by corp_id and email_id.
+     */
+    public function update(Request $request, $corp_id, $email_id)
+    {
+        // Find the user to update
+        $user = UserLogin::where('corp_id', $corp_id)
+            ->where('email_id', $email_id)
+            ->first();
+
+        if (!$user) {
+            return response()->json([
+                'status' => false,
+                'message' => 'User not found.'
+            ], 404);
+        }
+
+        // Validate the incoming data
+        $request->validate([
+            'username' => 'sometimes|string',
+            'password' => 'sometimes|string|min:6',
+            'empcode' => 'sometimes|nullable|string',
+            'company_name' => 'sometimes|nullable|string',
+            'active_yn' => 'sometimes|integer|in:0,1',
+            'admin_yn' => 'sometimes|integer|in:0,1',
+            'supervisor_yn' => 'sometimes|integer|in:0,1',
+        ]);
+
+        // Check for empcode uniqueness if it's being changed
+        if ($request->has('empcode') && $request->empcode !== $user->empcode) {
+            $empcodeExists = UserLogin::where('corp_id', $corp_id)
+                ->where('empcode', $request->empcode)
+                ->exists();
+
+            if ($empcodeExists) {
+                return response()->json([
+                    'status' => false,
+                    'message' => 'This empcode is already taken by another user in this corporation.'
+                ], 409);
+            }
+        }
+
+        // Prepare the data for update
+        $updateData = $request->only([
+            'username', 'empcode', 'company_name', 'active_yn', 'admin_yn', 'supervisor_yn'
+        ]);
+
+        // Hash the password only if a new one is provided
+        if ($request->has('password')) {
+            $updateData['password'] = Hash::make($request->password);
+        }
+
+        try {
+            // Update the user with the prepared data
+            $user->update($updateData);
+        } catch (\Exception $e) {
+            return response()->json([
+                'status' => false,
+                'message' => 'Update failed: ' . $e->getMessage()
+            ], 500);
+        }
+
+        return response()->json([
+            'status' => true,
+            'message' => 'User updated successfully',
+            'user' => $user
+        ]);
+    }
+
     // Get all users
     public function index()
     {
