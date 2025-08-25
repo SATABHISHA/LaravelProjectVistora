@@ -16,13 +16,13 @@ return new class extends Migration
             $table->string('corp_id');
             $table->string('empcode');
             $table->string('Degree');
-            $table->string('Specialization');
+            $table->string('Specialization')->nullable();
             $table->string('Type');
             $table->string('FromYear');
             $table->string('ToYear');
-            $table->string('University');
-            $table->string('Institute');
-            $table->string('Grade');
+            $table->string('University')->nullable();
+            $table->string('Institute')->nullable();
+            $table->string('Grade')->nullable();
             $table->timestamps();
         });
     }

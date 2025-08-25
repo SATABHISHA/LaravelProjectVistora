@@ -14,15 +14,26 @@ class EmployeeEducationApiController extends Controller
             'corp_id' => 'required|string',
             'empcode' => 'required|string',
             'Degree' => 'required|string',
-            'Specialization' => 'required|string',
             'Type' => 'required|string',
             'FromYear' => 'required|string',
             'ToYear' => 'required|string',
-            'University' => 'required|string',
-            'Institute' => 'required|string',
-            'Grade' => 'required|string',
+            // Nullable fields
+            'Specialization' => 'nullable|string',
+            'University' => 'nullable|string',
+            'Institute' => 'nullable|string',
+            'Grade' => 'nullable|string',
         ]);
-        $education = EmployeeEducation::create($request->all());
+
+        // Process the request data
+        $data = $request->all();
+        
+        // Replace empty nullable fields with "N/A"
+        $data['Specialization'] = $data['Specialization'] ?: 'N/A';
+        $data['University'] = $data['University'] ?: 'N/A';
+        $data['Institute'] = $data['Institute'] ?: 'N/A';
+        $data['Grade'] = $data['Grade'] ?: 'N/A';
+        
+        $education = EmployeeEducation::create($data);
         return response()->json(['message' => 'Education added', 'data' => $education], 201);
     }
 
@@ -33,10 +44,47 @@ class EmployeeEducationApiController extends Controller
             ->where('empcode', $empcode)
             ->where('id', $id)
             ->first();
+            
         if (!$education) {
             return response()->json(['message' => 'Education not found'], 404);
         }
-        $education->update($request->all());
+        
+        // Validate input
+        $request->validate([
+            'corp_id' => 'string',
+            'empcode' => 'string',
+            'Degree' => 'string',
+            'Type' => 'string',
+            'FromYear' => 'string',
+            'ToYear' => 'string',
+            // Nullable fields
+            'Specialization' => 'nullable|string',
+            'University' => 'nullable|string',
+            'Institute' => 'nullable|string',
+            'Grade' => 'nullable|string',
+        ]);
+        
+        // Process the request data
+        $data = $request->all();
+        
+        // Replace empty nullable fields with "N/A" if they exist in the request
+        if (array_key_exists('Specialization', $data) && empty($data['Specialization'])) {
+            $data['Specialization'] = 'N/A';
+        }
+        
+        if (array_key_exists('University', $data) && empty($data['University'])) {
+            $data['University'] = 'N/A';
+        }
+        
+        if (array_key_exists('Institute', $data) && empty($data['Institute'])) {
+            $data['Institute'] = 'N/A';
+        }
+        
+        if (array_key_exists('Grade', $data) && empty($data['Grade'])) {
+            $data['Grade'] = 'N/A';
+        }
+        
+        $education->update($data);
         return response()->json(['message' => 'Education updated', 'data' => $education]);
     }
 
