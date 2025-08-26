@@ -12,8 +12,11 @@ class FormulaBuilder extends Model
     protected $fillable = [
         'corpId',
         'puid',
+        'paygroupPuid',
         'componentGroupName',
         'componentName',
+        'componentNameRefersTo',
+        'referenceValue', // Added the new field
         'formula'
     ];
 }

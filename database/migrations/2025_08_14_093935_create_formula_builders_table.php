@@ -15,8 +15,11 @@ return new class extends Migration
             $table->id();
             $table->string('corpId');
             $table->string('puid');
+            $table->string('paygroupPuid');
             $table->string('componentGroupName');
             $table->string('componentName');
+            $table->string('componentNameRefersTo')->default('None'); // Added default value 'None'
+            $table->string('referenceValue')->nullable(); // Added new referenceValue column as string
             $table->text('formula');
             $table->timestamps();
         });

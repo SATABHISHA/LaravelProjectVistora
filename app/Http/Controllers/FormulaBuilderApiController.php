@@ -15,9 +15,11 @@ class FormulaBuilderApiController extends Controller
             $request->validate([
                 'corpId' => 'required|string',
                 'puid' => 'required|string',
-                'paygroupPuid' => 'required|string', // New field for paygroup_configurations
+                'paygroupPuid' => 'required|string',
                 'componentGroupName' => 'required|string',
                 'componentName' => 'required|string',
+                'componentNameRefersTo' => 'required|string',
+                'referenceValue' => 'nullable|string', // Added validation for referenceValue
                 'formula' => 'required|string',
             ]);
 
@@ -37,10 +39,14 @@ class FormulaBuilderApiController extends Controller
 
             $status = $formulaBuilder->wasRecentlyCreated ? 'created' : 'updated';
 
+            // Calculate value for percent formulas and add to response
+            $responseData = $formulaBuilder->toArray();
+            $responseData['calculatedValue'] = $this->calculateFormulaValue($formulaBuilder);
+
             return response()->json([
                 'status' => true,
                 'message' => "Formula builder {$status} successfully",
-                'data' => $formulaBuilder
+                'data' => $responseData
             ]);
 
         } catch (\Exception $e) {
@@ -58,6 +64,13 @@ class FormulaBuilderApiController extends Controller
             $formulas = FormulaBuilder::where('corpId', $corpId)
                 ->where('componentGroupName', $componentGroupName)
                 ->get();
+
+            // Add calculated values to each formula
+            $formulas = $formulas->map(function($formula) {
+                $formulaArray = $formula->toArray();
+                $formulaArray['calculatedValue'] = $this->calculateFormulaValue($formula);
+                return $formulaArray;
+            });
 
             return response()->json([
                 'status' => true,
@@ -113,5 +126,34 @@ class FormulaBuilderApiController extends Controller
                 'message' => 'Error: ' . $e->getMessage()
             ], 500);
         }
+    }
+
+    /**
+     * Calculate value based on formula
+     * For percent formulas, calculate percentage of referenceValue
+     * For other formulas, return 0
+     */
+    private function calculateFormulaValue($formula)
+    {
+        // Default return value if not a percent formula
+        $calculatedValue = 0;
+
+        // Check if formula contains 'percent'
+        if (strpos($formula->formula, 'percent') !== false) {
+            // Extract percentage value (e.g., from "30percent" get 30)
+            preg_match('/(\d+(?:\.\d+)?)percent/', $formula->formula, $matches);
+            
+            if (isset($matches[1])) {
+                $percentValue = (float)$matches[1];
+                
+                // If reference value exists, calculate the percentage
+                if (!empty($formula->referenceValue) && is_numeric($formula->referenceValue)) {
+                    $referenceValue = (float)$formula->referenceValue;
+                    $calculatedValue = ($percentValue / 100) * $referenceValue;
+                }
+            }
+        }
+
+        return $calculatedValue;
     }
 }
