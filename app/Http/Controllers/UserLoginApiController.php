@@ -201,6 +201,31 @@ class UserLoginApiController extends Controller
         ]);
     }
 
+    /**
+     * Fetch a single user's details by corp_id and email_id.
+     */
+    public function show($corp_id, $email_id)
+    {
+        // Find the user by the composite key
+        $user = UserLogin::where('corp_id', $corp_id)
+            ->where('email_id', $email_id)
+            ->first();
+
+        // Check if the user was found
+        if (!$user) {
+            return response()->json([
+                'status' => false,
+                'message' => 'User not found.'
+            ], 404);
+        }
+
+        // Return the user details
+        return response()->json([
+            'status' => true,
+            'user' => $user
+        ]);
+    }
+
     // Get all users
     public function index()
     {
