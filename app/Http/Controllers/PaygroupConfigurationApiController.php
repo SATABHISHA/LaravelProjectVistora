@@ -211,7 +211,7 @@ class PaygroupConfigurationApiController extends Controller
     public function fetchGrossByGroupName($groupName, $basicSalary)
     {
         // Validate basic salary
-        if (!is_numeric($basicSalary) || $basicSalary <= 0) {
+        if (!is_numeric($basicSalary) || $basicSalary < 0) { // Allow 0 basic salary
             return response()->json([
                 'status' => false,
                 'message' => 'Valid basic salary is required.',
@@ -247,42 +247,19 @@ class PaygroupConfigurationApiController extends Controller
                 ->first();
 
             if ($payComponent) {
-                $calculatedValue = 0;
+                $calculatedValue = 0.0;
                 $formula = null;
 
                 // Check if component name is "Basic" (case-insensitive)
                 if (strtolower(trim($componentName)) === 'basic') {
                     $calculatedValue = (float)$basicSalary;
-                    $formula = 'basicSalary'; // Set a descriptive formula
+                    $formula = 'Basic'; // A fixed identifier for Basic salary
                 } else {
-                    // Try different approaches to fetch formula for non-basic components
-                    $formulaBuilder = null;
-                    
-                    // Approach 1: Match both componentGroupName and componentName with componentName
-                    $formulaBuilder = DB::table('formula_builders')
-                        ->where('componentGroupName', $componentName)
-                        ->where('componentName', $componentName)
-                        ->first();
-                    
-                    // Approach 2: If not found, try matching only componentName
-                    if (!$formulaBuilder) {
-                        $formulaBuilder = DB::table('formula_builders')
-                            ->where('componentName', $componentName)
-                            ->first();
-                    }
-                    
-                    // Approach 3: If still not found, try matching componentGroupName only
-                    if (!$formulaBuilder) {
-                        $formulaBuilder = DB::table('formula_builders')
-                            ->where('componentGroupName', $componentName)
-                            ->first();
-                    }
-
-                    if ($formulaBuilder && !empty($formulaBuilder->formula)) {
-                        $formula = $formulaBuilder->formula;
-                        // Calculate the formula dynamically with basic salary
-                        $calculatedValue = $this->calculateFormula($formula, $basicSalary);
-                    }
+                    // ** NEW LOGIC **
+                    // Use the new helper method for all other components
+                    $calculationResult = $this->calculateComponentValue($componentName, $basicSalary);
+                    $calculatedValue = $calculationResult['calculatedValue'];
+                    $formula = $calculationResult['formula'];
                 }
 
                 $componentResult = [
@@ -308,53 +285,39 @@ class PaygroupConfigurationApiController extends Controller
         ]);
     }
 
-    // Calculate dynamic formula with basic salary
-    private function calculateFormula($formula, $basicSalary)
+    /**
+     * NEW HELPER METHOD for calculating component value based on the new formula_builders logic.
+     */
+    private function calculateComponentValue($componentName, $basicSalary)
     {
-        try {
-            // Basic security check - only allow numbers, operators, and common functions
-            if (!preg_match('/^[0-9+\-*\/().\s_A-Za-z]+$/', $formula)) {
-                throw new \Exception('Invalid formula format');
+        $formulaBuilder = DB::table('formula_builders')
+            ->where('componentName', $componentName)
+            ->first();
+
+        // If no formula is defined for the component, return defaults.
+        if (!$formulaBuilder) {
+            return ['calculatedValue' => 0.0, 'formula' => null];
+        }
+
+        $formulaType = $formulaBuilder->formula ?? null;
+        $calculatedValue = 0.0;
+
+        // Only calculate if the formula type is 'Percent'.
+        if ($formulaType === 'Percent') {
+            $refersTo = $formulaBuilder->componentNameRefersTo ?? null;
+            $percentage = (float)($formulaBuilder->referenceValue ?? 0);
+
+            // For now, we only handle calculations based on 'Basic' salary.
+            // This can be expanded later if formulas can refer to other components.
+            if (strtolower($refersTo) === 'basic' && $percentage > 0) {
+                $calculatedValue = ($percentage / 100) * (float)$basicSalary;
             }
-
-            // Replace formula variables with actual values
-            $processedFormula = $this->processFormulaVariables($formula, $basicSalary);
-
-            // Evaluate the formula safely
-            $result = eval("return $processedFormula;");
-            
-            return is_numeric($result) ? (float)$result : 0;
-        } catch (\Exception $e) {
-            // Log error and return 0 for safety
-            Log::warning("Formula calculation error: " . $e->getMessage() . " for formula: " . $formula);
-            return 0;
         }
+        // For 'Fixed' or 'Variable', the calculated value is 0.0 as per requirements.
+
+        return ['calculatedValue' => round($calculatedValue, 2), 'formula' => $formulaType];
     }
 
-    // Process formula variables with basic salary
-    private function processFormulaVariables($formula, $basicSalary)
-    {
-        // Replace common variables with actual values
-        $variables = [
-            'BASIC_SALARY' => $basicSalary,
-            'BasicSalary' => $basicSalary,
-            'Basic_Salary' => $basicSalary,
-            'basic_salary' => $basicSalary,
-            'BASIC' => $basicSalary,
-            'Basic' => $basicSalary,
-            'basic' => $basicSalary,
-            // Add more variable patterns as needed based on your formulas
-            'DA' => $basicSalary * 0.1,  // Example: DA = 10% of basic
-            'HRA' => $basicSalary * 0.4, // Example: HRA = 40% of basic
-        ];
-
-        foreach ($variables as $key => $value) {
-            // Safely replace variables in the formula
-            $formula = preg_replace('/\b' . preg_quote($key, '/') . '\b/', $value, $formula);
-        }
-
-        return $formula;
-    }
 
     // Fetch OtherBenefitsAllowances by GroupName and corpId
     public function fetchOtherBenefitsAllowances($groupName, $corpId)
@@ -425,7 +388,7 @@ class PaygroupConfigurationApiController extends Controller
     public function fetchDeductionsByGroupName($groupName, $basicSalary)
     {
         // Validate basic salary
-        if (!is_numeric($basicSalary) || $basicSalary <= 0) {
+        if (!is_numeric($basicSalary) || $basicSalary < 0) { // Allow 0 basic salary
             return response()->json([
                 'status' => false,
                 'message' => 'Valid basic salary is required.',
@@ -461,37 +424,11 @@ class PaygroupConfigurationApiController extends Controller
                 ->first();
 
             if ($payComponent) {
-                // Try different approaches to fetch formula
-                $formulaBuilder = null;
-                $formula = null;
-                
-                // Approach 1: Match both componentGroupName and componentName with componentName
-                $formulaBuilder = DB::table('formula_builders')
-                    ->where('componentGroupName', $componentName)
-                    ->where('componentName', $componentName)
-                    ->first();
-                
-                // Approach 2: If not found, try matching only componentName
-                if (!$formulaBuilder) {
-                    $formulaBuilder = DB::table('formula_builders')
-                        ->where('componentName', $componentName)
-                        ->first();
-                }
-                
-                // Approach 3: If still not found, try matching componentGroupName only
-                if (!$formulaBuilder) {
-                    $formulaBuilder = DB::table('formula_builders')
-                        ->where('componentGroupName', $componentName)
-                        ->first();
-                }
-
-                $calculatedValue = 0;
-
-                if ($formulaBuilder && !empty($formulaBuilder->formula)) {
-                    $formula = $formulaBuilder->formula;
-                    // Calculate the formula dynamically with basic salary
-                    $calculatedValue = $this->calculateFormula($formula, $basicSalary);
-                }
+                // ** NEW LOGIC **
+                // Use the new helper method for all deduction components
+                $calculationResult = $this->calculateComponentValue($componentName, $basicSalary);
+                $calculatedValue = $calculationResult['calculatedValue'];
+                $formula = $calculationResult['formula'];
 
                 $componentResult = [
                     'componentName' => $componentName,
