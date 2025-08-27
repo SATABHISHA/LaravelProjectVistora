@@ -302,8 +302,8 @@ class PaygroupConfigurationApiController extends Controller
         $formulaType = $formulaBuilder->formula ?? null;
         $calculatedValue = 0.0;
 
-        // Only calculate if the formula type is 'Percent'.
-        if ($formulaType === 'Percent') {
+        // ✅ **MODIFIED LINE:** Convert formula type to lowercase for case-insensitive comparison.
+        if (strtolower($formulaType) === 'percent') {
             $refersTo = $formulaBuilder->componentNameRefersTo ?? null;
             $percentage = (float)($formulaBuilder->referenceValue ?? 0);
 
