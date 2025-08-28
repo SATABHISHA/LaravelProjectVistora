@@ -24,6 +24,7 @@ return new class extends Migration
             $table->string('Address')->nullable();
             $table->string('totalHrsForTheDay')->nullable();
             $table->string('status')->nullable(); // Added status field
+            $table->string('date');
             $table->timestamps();
         });
     }
