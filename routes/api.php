@@ -71,6 +71,7 @@ use App\Http\Controllers\ComponentTypeApiController;
 use App\Http\Controllers\PaygroupConfigurationApiController;
 use App\Http\Controllers\FormulaBuilderApiController;
 use App\Http\Controllers\EmployeeSalaryStructureApiController;
+use App\Http\Controllers\AttendanceApiController;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 
