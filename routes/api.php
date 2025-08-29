@@ -535,3 +535,7 @@ Route::post('/employee-salary-structure/add-or-update', [EmployeeSalaryStructure
 Route::get('/employee-salary-structure/{empCode}/{companyName}/{corpId}', [EmployeeSalaryStructureApiController::class, 'fetchByEmpDetails']);
 Route::delete('/employee-salary-structure/delete/{puid}', [EmployeeSalaryStructureApiController::class, 'destroy']);
 
+// Attendance Routes
+Route::post('/attendance/check', [AttendanceApiController::class, 'checkInOrOut']);
+Route::get('/attendance/today/{puid}', [AttendanceApiController::class, 'fetchTodayAttendance']);
+

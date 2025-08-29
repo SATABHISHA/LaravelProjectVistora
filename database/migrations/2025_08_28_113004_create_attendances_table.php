@@ -13,6 +13,7 @@ return new class extends Migration
     {
         Schema::create('attendances', function (Blueprint $table) {
             $table->id();
+            $table->string('puid');
             $table->string('corpId');
             $table->string('userName');
             $table->string('empCode');
@@ -24,6 +25,7 @@ return new class extends Migration
             $table->string('Address')->nullable();
             $table->string('totalHrsForTheDay')->nullable();
             $table->string('status')->nullable(); // Added status field
+            $table->string('attendanceStatus')->nullable();
             $table->string('date');
             $table->timestamps();
         });
