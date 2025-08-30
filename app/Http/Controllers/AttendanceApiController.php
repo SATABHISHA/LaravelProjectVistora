@@ -146,4 +146,59 @@ class AttendanceApiController extends Controller
             ], 500);
         }
     }
+
+    /**
+     * Check if attendance exists for today by corpId, empCode, and companyName
+     * Returns status true/false with attendance data if exists
+     */
+    public function checkTodayAttendanceExists($corpId, $empCode, $companyName)
+    {
+        try {
+            $today = Carbon::today()->format('Y-m-d');
+            
+            $attendance = Attendance::where('corpId', $corpId)
+                ->where('empCode', $empCode)
+                ->where('companyName', $companyName)
+                ->where('date', $today)
+                ->first();
+            
+            if (!$attendance) {
+                return response()->json([
+                    'status' => false,
+                    'message' => 'No attendance record found for today',
+                    'data' => null
+                ]);
+            }
+            
+            return response()->json([
+                'status' => true,
+                'message' => 'Attendance record exists for today',
+                'data' => [
+                    'puid' => $attendance->puid,
+                    'corpId' => $attendance->corpId,
+                    'userName' => $attendance->userName,
+                    'empCode' => $attendance->empCode,
+                    'companyName' => $attendance->companyName,
+                    'checkIn' => $attendance->checkIn,
+                    'checkOut' => $attendance->checkOut,
+                    'Lat' => $attendance->Lat,
+                    'Long' => $attendance->Long,
+                    'Address' => $attendance->Address,
+                    'totalHrsForTheDay' => $attendance->totalHrsForTheDay,
+                    'status' => $attendance->status,
+                    'attendanceStatus' => $attendance->attendanceStatus,
+                    'date' => $attendance->date,
+                    'created_at' => $attendance->created_at,
+                    'updated_at' => $attendance->updated_at
+                ]
+            ]);
+            
+        } catch (\Exception $e) {
+            return response()->json([
+                'status' => false,
+                'message' => 'Error: ' . $e->getMessage(),
+                'data' => null
+            ], 500);
+        }
+    }
 }
