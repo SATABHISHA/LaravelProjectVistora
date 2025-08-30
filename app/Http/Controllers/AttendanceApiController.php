@@ -68,15 +68,8 @@ class AttendanceApiController extends Controller
             
             // Handle check-out (when status is "IN")
             if ($attendance->status === 'IN') {
-                // Calculate hours between check-in and check-out
-                $checkInTime = Carbon::parse($attendance->checkIn);
-                $checkOutTime = Carbon::parse($request->time);
-                
-                // Calculate difference in hours and minutes
-                $diffInMinutes = $checkInTime->diffInMinutes($checkOutTime);
-                $hours = floor($diffInMinutes / 60);
-                $minutes = $diffInMinutes % 60;
-                $totalHours = sprintf('%02d:%02d', $hours, $minutes);
+                // ✅ **UPDATED:** Calculate hours between check-in and check-out for AM/PM format
+                $totalHours = $this->calculateWorkingHours($attendance->checkIn, $request->time);
                 
                 // Update the attendance record with checkout time and total hours
                 $attendance->update([
@@ -107,6 +100,37 @@ class AttendanceApiController extends Controller
                 'status' => false,
                 'message' => 'Error: ' . $e->getMessage()
             ], 500);
+        }
+    }
+
+    /**
+     * ✅ **NEW METHOD:** Calculate working hours between check-in and check-out times in AM/PM format
+     */
+    private function calculateWorkingHours($checkInTime, $checkOutTime)
+    {
+        try {
+            // Parse AM/PM time format
+            $checkIn = Carbon::createFromFormat('g:i A', $checkInTime);
+            $checkOut = Carbon::createFromFormat('g:i A', $checkOutTime);
+            
+            // Handle case where checkout is next day (e.g., night shift)
+            // If checkout time is earlier than checkin time, assume it's next day
+            if ($checkOut->lt($checkIn)) {
+                $checkOut->addDay();
+            }
+            
+            // Calculate difference in minutes
+            $diffInMinutes = $checkIn->diffInMinutes($checkOut);
+            
+            // Convert to hours and minutes format
+            $hours = floor($diffInMinutes / 60);
+            $minutes = $diffInMinutes % 60;
+            
+            return sprintf('%02d:%02d', $hours, $minutes);
+            
+        } catch (\Exception $e) {
+            // If parsing fails, return 00:00
+            return '00:00';
         }
     }
 
