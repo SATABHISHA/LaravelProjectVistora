@@ -27,7 +27,7 @@ class AttendanceApiController extends Controller
             ]);
 
             // ✅ **FIXED:** Get today's date in the correct timezone
-            $today = Carbon::now()->format('Y-m-d');
+            $today = Carbon::now('Asia/Kolkata')->format('Y-m-d');
             
             // Check if user already has an attendance record for today
             $attendance = Attendance::where('puid', $request->puid)
@@ -117,7 +117,7 @@ class AttendanceApiController extends Controller
     {
         try {
             // ✅ **FIXED:** Get today's date in the correct timezone
-            $today = Carbon::now()->format('Y-m-d');
+            $today = Carbon::now('Asia/Kolkata')->format('Y-m-d');
             
             $attendance = Attendance::where('corpId', $corpId)
                 ->where('userName', $userName)
@@ -156,7 +156,7 @@ class AttendanceApiController extends Controller
     {
         try {
             // ✅ **FIXED:** Get today's date in the correct timezone
-            $today = Carbon::now()->format('Y-m-d');
+            $today = Carbon::now('Asia/Kolkata')->format('Y-m-d');
             
             $attendance = Attendance::where('corpId', $corpId)
                 ->where('empCode', $empCode)
