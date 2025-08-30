@@ -539,5 +539,5 @@ Route::delete('/employee-salary-structure/delete/{puid}', [EmployeeSalaryStructu
 
 // Attendance Routes
 Route::post('/attendance/check', [AttendanceApiController::class, 'checkInOrOut']);
-Route::get('/attendance/today/{puid}', [AttendanceApiController::class, 'fetchTodayAttendance']);
+Route::get('/attendance/today/{corpId}/{userName}/{empCode}/{companyName}', [AttendanceApiController::class, 'fetchTodayAttendance']);
 

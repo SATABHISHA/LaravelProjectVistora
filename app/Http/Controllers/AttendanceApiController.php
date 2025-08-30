@@ -111,21 +111,24 @@ class AttendanceApiController extends Controller
     }
 
     /**
-     * Fetch attendance details for the current day by puid
+     * Fetch attendance details for the current day by corpId, userName, empCode, and companyName
      */
-    public function fetchTodayAttendance($puid)
+    public function fetchTodayAttendance($corpId, $userName, $empCode, $companyName)
     {
         try {
             $today = Carbon::today()->format('Y-m-d');
             
-            $attendance = Attendance::where('puid', $puid)
+            $attendance = Attendance::where('corpId', $corpId)
+                ->where('userName', $userName)
+                ->where('empCode', $empCode)
+                ->where('companyName', $companyName)
                 ->where('date', $today)
                 ->first();
             
             if (!$attendance) {
                 return response()->json([
                     'status' => false,
-                    'message' => 'No attendance record found for today',
+                    'message' => 'No attendance record found for today with the provided details',
                     'data' => null
                 ]);
             }
