@@ -235,4 +235,49 @@ class UserLoginApiController extends Controller
             'data' => $users
         ]);
     }
+
+    /**
+     * Check if essential user details (empcode, company_name, username) exist.
+     */
+    public function checkUserDetails($corp_id, $email_id)
+    {
+        // Find the user by corp_id and email_id
+        $user = \App\Models\UserLogin::where('corp_id', $corp_id)
+            ->where('email_id', $email_id)
+            ->first();
+
+        // Handle case where the user does not exist at all
+        if (!$user) {
+            return response()->json([
+                'status' => false,
+                'message' => 'User not found for the given corp_id and email_id.'
+            ], 404);
+        }
+
+        // Check for empty or null fields
+        $missingFields = [];
+        if (empty($user->empcode)) {
+            $missingFields[] = 'empcode';
+        }
+        if (empty($user->company_name)) {
+            $missingFields[] = 'company_name';
+        }
+        if (empty($user->username)) {
+            $missingFields[] = 'username';
+        }
+
+        // If the missingFields array is not empty, it means some details are missing
+        if (!empty($missingFields)) {
+            return response()->json([
+                'status' => false,
+                'message' => 'User details are incomplete. Missing fields: ' . implode(', ', $missingFields)
+            ]);
+        }
+
+        // If all checks pass, return a success response
+        return response()->json([
+            'status' => true,
+            'message' => 'All required user details (empcode, company_name, username) are present.'
+        ]);
+    }
 }

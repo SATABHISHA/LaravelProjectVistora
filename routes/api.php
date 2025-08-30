@@ -94,8 +94,9 @@ Route::middleware('auth:sanctum')->get('/user', function (Request $request) {
 Route::post('/userlogin/register', [UserLoginApiController::class, 'register']);
 Route::post('/userlogin/login', [UserLoginApiController::class, 'login']);
 Route::get('/userlogin/userslist', [UserLoginApiController::class, 'index']);
-Route::put('/users/update/{corp_id}/{email_id}', [UserLoginApiController::class, 'update']); // New route added
-Route::get('/users/{corp_id}/{email_id}', [UserLoginApiController::class, 'show']); // New route added
+Route::put('/users/update/{corp_id}/{email_id}', [UserLoginApiController::class, 'update']);
+Route::get('/users/{corp_id}/{email_id}', [UserLoginApiController::class, 'show']);
+Route::get('/user/check-details/{corp_id}/{email_id}', [UserLoginApiController::class, 'checkUserDetails']); // New route added
 
 // Company Details Routes
 Route::post('/company/register_company_details', [CompanyDetailsApiController::class, 'register']);
