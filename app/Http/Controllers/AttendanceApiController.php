@@ -282,6 +282,11 @@ class AttendanceApiController extends Controller
                     ];
                 }
                 
+                // Parse date and get day name and formatted date
+                $attendanceDate = Carbon::parse($attendance->date);
+                $dayName = $attendanceDate->format('l'); // Monday, Tuesday, etc.
+                $dateName = $attendanceDate->format('jS M'); // 1st Aug, 2nd Sep, etc.
+                
                 // Create attendance record with only specific fields
                 $attendanceRecord = [
                     'checkIn' => $attendance->checkIn,
@@ -293,6 +298,8 @@ class AttendanceApiController extends Controller
                     'status' => $attendance->status,
                     'attendanceStatus' => $attendance->attendanceStatus,
                     'date' => $attendance->date,
+                    'dayName' => $dayName,
+                    'dateName' => $dateName,
                     'created_at' => $attendance->created_at,
                     'updated_at' => $attendance->updated_at
                 ];
