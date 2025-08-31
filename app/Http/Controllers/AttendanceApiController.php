@@ -323,4 +323,77 @@ class AttendanceApiController extends Controller
             ], 500);
         }
     }
+
+    /**
+     * Bulk insert attendance records for testing purposes
+     */
+    public function bulkInsertAttendance(Request $request)
+    {
+        try {
+            $request->validate([
+                'records' => 'required|array',
+                'records.*.corpId' => 'required|string',
+                'records.*.userName' => 'required|string',
+                'records.*.empCode' => 'required|string',
+                'records.*.companyName' => 'required|string',
+                'records.*.checkIn' => 'nullable|string',
+                'records.*.checkOut' => 'nullable|string',
+                'records.*.date' => 'required|string',
+                'records.*.Lat' => 'nullable|string',
+                'records.*.Long' => 'nullable|string',
+                'records.*.Address' => 'nullable|string',
+            ]);
+
+            $insertedRecords = [];
+
+            foreach ($request->records as $record) {
+                // Check if record already exists for this date
+                $existingRecord = Attendance::where('corpId', $record['corpId'])
+                    ->where('empCode', $record['empCode'])
+                    ->where('date', $record['date'])
+                    ->first();
+
+                if (!$existingRecord) {
+                    // Generate unique PUID for each record
+                    $uniquePuid = uniqid($record['empCode'] . '_' . str_replace('-', '', $record['date']) . '_', true);
+                    
+                    $attendance = Attendance::create([
+                        'puid' => $uniquePuid,
+                        'corpId' => $record['corpId'],
+                        'userName' => $record['userName'],
+                        'empCode' => $record['empCode'],
+                        'companyName' => $record['companyName'],
+                        'checkIn' => $record['checkIn'] ?? null,
+                        'checkOut' => $record['checkOut'] ?? null,
+                        'Lat' => $record['Lat'] ?? null,
+                        'Long' => $record['Long'] ?? null,
+                        'Address' => $record['Address'] ?? null,
+                        'totalHrsForTheDay' => isset($record['checkIn']) && isset($record['checkOut']) 
+                            ? $this->calculateWorkingHours($record['checkIn'], $record['checkOut']) 
+                            : null,
+                        'status' => isset($record['checkOut']) ? 'OUT' : 'IN',
+                        'attendanceStatus' => 'Present',
+                        'date' => $record['date']
+                    ]);
+
+                    $insertedRecords[] = $attendance;
+                }
+            }
+
+            return response()->json([
+                'status' => true,
+                'message' => 'Bulk attendance records inserted successfully',
+                'data' => [
+                    'insertedCount' => count($insertedRecords),
+                    'records' => $insertedRecords
+                ]
+            ]);
+
+        } catch (\Exception $e) {
+            return response()->json([
+                'status' => false,
+                'message' => 'Error: ' . $e->getMessage()
+            ], 500);
+        }
+    }
 }
