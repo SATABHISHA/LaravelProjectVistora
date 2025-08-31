@@ -229,7 +229,7 @@ class AttendanceApiController extends Controller
     }
 
     /**
-     * Fetch attendance details for current week and last 5 days by corpId
+     * Fetch attendance details grouped by employee for last 5 days, current week, and last 15 days by corpId
      * with optional filter by companyName
      */
     public function fetchAttendanceHistory($corpId, $filter = 'ALL')
@@ -239,12 +239,11 @@ class AttendanceApiController extends Controller
             Carbon::setLocale('en');
             $today = Carbon::now('Asia/Kolkata');
             
-            // Calculate current week (Monday to Sunday)
+            // Calculate date ranges
             $currentWeekStart = $today->copy()->startOfWeek(Carbon::MONDAY)->format('Y-m-d');
             $currentWeekEnd = $today->copy()->endOfWeek(Carbon::SUNDAY)->format('Y-m-d');
-            
-            // Calculate last 5 days from today
             $last5DaysStart = $today->copy()->subDays(4)->format('Y-m-d'); // Including today, so -4 days
+            $last15DaysStart = $today->copy()->subDays(14)->format('Y-m-d'); // Including today, so -14 days
             $todayFormatted = $today->format('Y-m-d');
             
             // Base query
@@ -255,23 +254,86 @@ class AttendanceApiController extends Controller
                 $query->where('companyName', $filter);
             }
             
-            // Get current week attendance
-            $currentWeekAttendance = $query->clone()
-                ->whereBetween('date', [$currentWeekStart, $currentWeekEnd])
+            // Get all attendance records for the last 15 days (covers all ranges)
+            $allAttendance = $query->clone()
+                ->whereBetween('date', [$last15DaysStart, $todayFormatted])
                 ->orderBy('date', 'desc')
                 ->orderBy('created_at', 'desc')
-                ->get()
-                ->toArray();
+                ->get();
             
-            // Get last 5 days attendance
-            $last5DaysAttendance = $query->clone()
-                ->whereBetween('date', [$last5DaysStart, $todayFormatted])
-                ->orderBy('date', 'desc')
-                ->orderBy('created_at', 'desc')
-                ->get()
-                ->toArray();
+            // Group by employee (empCode + userName combination)
+            $employeeData = [];
             
-            // Get unique company names for filter options (for current corp)
+            foreach ($allAttendance as $attendance) {
+                $employeeKey = $attendance->empCode . '_' . $attendance->userName;
+                
+                if (!isset($employeeData[$employeeKey])) {
+                    $employeeData[$employeeKey] = [
+                        'puid' => $attendance->puid,
+                        'corpId' => $attendance->corpId,
+                        'userName' => $attendance->userName,
+                        'empCode' => $attendance->empCode,
+                        'companyName' => $attendance->companyName,
+                        'attendance' => [
+                            'last5Days' => [],
+                            'currentWeek' => [],
+                            'last15Days' => []
+                        ]
+                    ];
+                }
+                
+                // Create attendance record with only specific fields
+                $attendanceRecord = [
+                    'checkIn' => $attendance->checkIn,
+                    'checkOut' => $attendance->checkOut,
+                    'Lat' => $attendance->Lat,
+                    'Long' => $attendance->Long,
+                    'Address' => $attendance->Address,
+                    'totalHrsForTheDay' => $attendance->totalHrsForTheDay,
+                    'status' => $attendance->status,
+                    'attendanceStatus' => $attendance->attendanceStatus,
+                    'date' => $attendance->date,
+                    'created_at' => $attendance->created_at,
+                    'updated_at' => $attendance->updated_at
+                ];
+                
+                // Add to last15Days (all records fall into this category)
+                $employeeData[$employeeKey]['attendance']['last15Days'][] = $attendanceRecord;
+                
+                // Add to last5Days if within range
+                if ($attendance->date >= $last5DaysStart) {
+                    $employeeData[$employeeKey]['attendance']['last5Days'][] = $attendanceRecord;
+                }
+                
+                // Add to currentWeek if within range
+                if ($attendance->date >= $currentWeekStart && $attendance->date <= $currentWeekEnd) {
+                    $employeeData[$employeeKey]['attendance']['currentWeek'][] = $attendanceRecord;
+                }
+            }
+            
+            // Convert to array and calculate statistics
+            $employees = array_values($employeeData);
+            $totalEmployees = count($employees);
+            $totalRecords = $allAttendance->count();
+            
+            // Calculate statistics per time range
+            $last5DaysTotal = 0;
+            $currentWeekTotal = 0;
+            $last15DaysTotal = $totalRecords;
+            
+            foreach ($employees as &$employee) {
+                $last5DaysTotal += count($employee['attendance']['last5Days']);
+                $currentWeekTotal += count($employee['attendance']['currentWeek']);
+                
+                // Add counts to each employee data
+                $employee['statistics'] = [
+                    'last5DaysCount' => count($employee['attendance']['last5Days']),
+                    'currentWeekCount' => count($employee['attendance']['currentWeek']),
+                    'last15DaysCount' => count($employee['attendance']['last15Days'])
+                ];
+            }
+            
+            // Get unique company names for filter options
             $availableCompanies = Attendance::where('corpId', $corpId)
                 ->distinct()
                 ->pluck('companyName')
@@ -279,13 +341,9 @@ class AttendanceApiController extends Controller
                 ->values()
                 ->toArray();
             
-            // Count statistics
-            $currentWeekCount = count($currentWeekAttendance);
-            $last5DaysCount = count($last5DaysAttendance);
-            
             return response()->json([
                 'status' => true,
-                'message' => 'Attendance history retrieved successfully',
+                'message' => 'Employee attendance history retrieved successfully',
                 'data' => [
                     'corpId' => $corpId,
                     'filter' => $filter,
@@ -297,16 +355,19 @@ class AttendanceApiController extends Controller
                         'last5Days' => [
                             'start' => $last5DaysStart,
                             'end' => $todayFormatted
+                        ],
+                        'last15Days' => [
+                            'start' => $last15DaysStart,
+                            'end' => $todayFormatted
                         ]
                     ],
-                    'attendance' => [
-                        'currentWeek' => $currentWeekAttendance,
-                        'last5Days' => $last5DaysAttendance
-                    ],
+                    'employees' => $employees,
                     'statistics' => [
-                        'currentWeekCount' => $currentWeekCount,
-                        'last5DaysCount' => $last5DaysCount,
-                        'totalRecords' => $currentWeekCount + $last5DaysCount
+                        'totalEmployees' => $totalEmployees,
+                        'totalRecords' => $totalRecords,
+                        'last5DaysTotal' => $last5DaysTotal,
+                        'currentWeekTotal' => $currentWeekTotal,
+                        'last15DaysTotal' => $last15DaysTotal
                     ],
                     'filterOptions' => [
                         'availableCompanies' => array_merge(['ALL'], $availableCompanies),
