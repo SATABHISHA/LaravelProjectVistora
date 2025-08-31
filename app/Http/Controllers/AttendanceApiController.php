@@ -227,4 +227,100 @@ class AttendanceApiController extends Controller
             ], 500);
         }
     }
+
+    /**
+     * Fetch attendance details for current week and last 5 days by corpId
+     * with optional filter by companyName
+     */
+    public function fetchAttendanceHistory($corpId, $filter = 'ALL')
+    {
+        try {
+            // Set timezone
+            Carbon::setLocale('en');
+            $today = Carbon::now('Asia/Kolkata');
+            
+            // Calculate current week (Monday to Sunday)
+            $currentWeekStart = $today->copy()->startOfWeek(Carbon::MONDAY)->format('Y-m-d');
+            $currentWeekEnd = $today->copy()->endOfWeek(Carbon::SUNDAY)->format('Y-m-d');
+            
+            // Calculate last 5 days from today
+            $last5DaysStart = $today->copy()->subDays(4)->format('Y-m-d'); // Including today, so -4 days
+            $todayFormatted = $today->format('Y-m-d');
+            
+            // Base query
+            $query = Attendance::where('corpId', $corpId);
+            
+            // Apply company filter if not 'ALL'
+            if ($filter !== 'ALL' && !empty($filter)) {
+                $query->where('companyName', $filter);
+            }
+            
+            // Get current week attendance
+            $currentWeekAttendance = $query->clone()
+                ->whereBetween('date', [$currentWeekStart, $currentWeekEnd])
+                ->orderBy('date', 'desc')
+                ->orderBy('created_at', 'desc')
+                ->get()
+                ->toArray();
+            
+            // Get last 5 days attendance
+            $last5DaysAttendance = $query->clone()
+                ->whereBetween('date', [$last5DaysStart, $todayFormatted])
+                ->orderBy('date', 'desc')
+                ->orderBy('created_at', 'desc')
+                ->get()
+                ->toArray();
+            
+            // Get unique company names for filter options (for current corp)
+            $availableCompanies = Attendance::where('corpId', $corpId)
+                ->distinct()
+                ->pluck('companyName')
+                ->filter()
+                ->values()
+                ->toArray();
+            
+            // Count statistics
+            $currentWeekCount = count($currentWeekAttendance);
+            $last5DaysCount = count($last5DaysAttendance);
+            
+            return response()->json([
+                'status' => true,
+                'message' => 'Attendance history retrieved successfully',
+                'data' => [
+                    'corpId' => $corpId,
+                    'filter' => $filter,
+                    'dateRanges' => [
+                        'currentWeek' => [
+                            'start' => $currentWeekStart,
+                            'end' => $currentWeekEnd
+                        ],
+                        'last5Days' => [
+                            'start' => $last5DaysStart,
+                            'end' => $todayFormatted
+                        ]
+                    ],
+                    'attendance' => [
+                        'currentWeek' => $currentWeekAttendance,
+                        'last5Days' => $last5DaysAttendance
+                    ],
+                    'statistics' => [
+                        'currentWeekCount' => $currentWeekCount,
+                        'last5DaysCount' => $last5DaysCount,
+                        'totalRecords' => $currentWeekCount + $last5DaysCount
+                    ],
+                    'filterOptions' => [
+                        'availableCompanies' => array_merge(['ALL'], $availableCompanies),
+                        'currentFilter' => $filter
+                    ]
+                ]
+            ]);
+            
+        } catch (\Exception $e) {
+            return response()->json([
+                'status' => false,
+                'message' => 'Error: ' . $e->getMessage(),
+                'data' => null
+            ], 500);
+        }
+    }
 }
