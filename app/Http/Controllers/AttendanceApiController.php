@@ -304,11 +304,12 @@ class AttendanceApiController extends Controller
                     'updated_at' => $attendance->updated_at
                 ];
                 
-                // Add to last15Days (all records fall into this category)
+                // ✅ **FIXED:** Add to last15Days first (all records from last 15 days)
+                // Since we're already filtering by last 15 days in the query, all records qualify
                 $employeeData[$employeeKey]['attendance']['last15Days'][] = $attendanceRecord;
                 
                 // Add to last5Days if within range
-                if ($attendance->date >= $last5DaysStart) {
+                if ($attendance->date >= $last5DaysStart && $attendance->date <= $todayFormatted) {
                     $employeeData[$employeeKey]['attendance']['last5Days'][] = $attendanceRecord;
                 }
                 
