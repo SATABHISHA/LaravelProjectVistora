@@ -549,3 +549,5 @@ Route::post('/attendance/bulk-insert', [AttendanceApiController::class, 'bulkIns
 Route::get('/attendance/monthly', [AttendanceApiController::class, 'fetchMonthlyAttendance']);
 Route::post('/attendance/monthly', [AttendanceApiController::class, 'fetchMonthlyAttendance']); // New POST route
 
+// Get current month and year
+Route::get('/attendance/current-month-year', [AttendanceApiController::class, 'getCurrentMonthYear']);

@@ -609,4 +609,31 @@ class AttendanceApiController extends Controller
             ], 500);
         }
     }
+
+    /**
+     * Get current month and year
+     * 
+     * @return \Illuminate\Http\JsonResponse
+     */
+    public function getCurrentMonthYear()
+    {
+        try {
+            $now = Carbon::now('Asia/Kolkata');
+            
+            return response()->json([
+                'status' => true,
+                'message' => 'Current month and year retrieved successfully',
+                'data' => [
+                    'month' => (int) $now->format('n'), // Month without leading zeros (1-12)
+                    'year' => (int) $now->format('Y'),  // 4-digit year
+                    'monthName' => $now->format('F Y')  // Full month name and year (e.g. "September 2025")
+                ]
+            ]);
+        } catch (\Exception $e) {
+            return response()->json([
+                'status' => false,
+                'message' => 'Error: ' . $e->getMessage()
+            ], 500);
+        }
+    }
 }
