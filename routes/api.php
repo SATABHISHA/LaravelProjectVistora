@@ -545,3 +545,6 @@ Route::get('/attendance/history/{corpId}/{filter?}', [AttendanceApiController::c
 // Add this route for bulk insert
 Route::post('/attendance/bulk-insert', [AttendanceApiController::class, 'bulkInsertAttendance']);
 
+// Monthly Attendance Route
+Route::get('/attendance/monthly', [AttendanceApiController::class, 'fetchMonthlyAttendance']);
+

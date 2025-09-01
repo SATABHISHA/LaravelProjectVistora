@@ -465,4 +465,148 @@ class AttendanceApiController extends Controller
             ], 500);
         }
     }
+
+    /**
+     * Fetch monthly attendance details with pagination
+     * @param Request $request
+     * @return \Illuminate\Http\JsonResponse
+     */
+    public function fetchMonthlyAttendance(Request $request)
+    {
+        try {
+            $request->validate([
+                'corpId' => 'required|string',
+                'userName' => 'nullable|string',
+                'empCode' => 'nullable|string',
+                'companyName' => 'nullable|string',
+                'month' => 'nullable|integer|min:1|max:12',
+                'year' => 'nullable|integer|min:2000|max:2100'
+            ]);
+
+            // Set default values for month and year if not provided
+            $month = $request->month ?: Carbon::now('Asia/Kolkata')->month;
+            $year = $request->year ?: Carbon::now('Asia/Kolkata')->year;
+            
+            // Create Carbon instance for the requested month
+            $date = Carbon::createFromDate($year, $month, 1, 'Asia/Kolkata');
+            
+            // Get month name with year
+            $monthName = $date->format('F Y');
+            
+            // Calculate days in month
+            $daysInMonth = $date->daysInMonth;
+            
+            // Build query
+            $query = Attendance::where('corpId', $request->corpId);
+            
+            // Add optional filters
+            if ($request->userName) {
+                $query->where('userName', $request->userName);
+            }
+            
+            if ($request->empCode) {
+                $query->where('empCode', $request->empCode);
+            }
+            
+            if ($request->companyName) {
+                $query->where('companyName', $request->companyName);
+            }
+            
+            // Filter by date range for the requested month
+            $startDate = $date->format('Y-m-d');
+            $endDate = $date->copy()->endOfMonth()->format('Y-m-d');
+            
+            $query->whereBetween('date', [$startDate, $endDate]);
+            
+            // Get attendance records
+            $attendanceRecords = $query->orderBy('date', 'asc')->get();
+            
+            // Create calendar array with all days in month
+            $calendar = [];
+            
+            // Prepare attendance data by date
+            $attendanceByDate = [];
+            foreach ($attendanceRecords as $record) {
+                $recordDate = Carbon::parse($record->date);
+                $dateKey = $recordDate->format('Y-m-d');
+                $attendanceByDate[$dateKey] = [
+                    'id' => $record->id,
+                    'puid' => $record->puid,
+                    'checkIn' => $record->checkIn,
+                    'checkOut' => $record->checkOut,
+                    'status' => $record->status,
+                    'attendanceStatus' => $record->attendanceStatus,
+                    'totalHrsForTheDay' => $record->totalHrsForTheDay,
+                    'dayName' => $recordDate->format('D'), // Short day name (Mon, Tue, etc.)
+                    'dateOnly' => $recordDate->format('d'), // Day number only (01-31)
+                    'fullDate' => $recordDate->format('Y-m-d'),
+                    'Lat' => $record->Lat,
+                    'Long' => $record->Long,
+                    'Address' => $record->Address
+                ];
+            }
+            
+            // Fill calendar array with all days in month
+            for ($day = 1; $day <= $daysInMonth; $day++) {
+                $currentDate = Carbon::createFromDate($year, $month, $day, 'Asia/Kolkata');
+                $dateKey = $currentDate->format('Y-m-d');
+                
+                if (isset($attendanceByDate[$dateKey])) {
+                    // Day has attendance record
+                    $calendar[] = $attendanceByDate[$dateKey];
+                } else {
+                    // Day without attendance record
+                    $calendar[] = [
+                        'id' => null,
+                        'puid' => null,
+                        'checkIn' => null,
+                        'checkOut' => null,
+                        'status' => 'ABSENT',
+                        'attendanceStatus' => 'Absent',
+                        'totalHrsForTheDay' => '00:00',
+                        'dayName' => $currentDate->format('D'), // Short day name
+                        'dateOnly' => $currentDate->format('d'), // Day number
+                        'fullDate' => $dateKey,
+                        'Lat' => null,
+                        'Long' => null,
+                        'Address' => null
+                    ];
+                }
+            }
+            
+            // Get previous and next month info for pagination
+            $prevMonth = $date->copy()->subMonth();
+            $nextMonth = $date->copy()->addMonth();
+            
+            return response()->json([
+                'status' => true,
+                'message' => 'Monthly attendance records retrieved successfully',
+                'data' => [
+                    'corpId' => $request->corpId,
+                    'userName' => $request->userName,
+                    'empCode' => $request->empCode,
+                    'companyName' => $request->companyName,
+                    'monthName' => $monthName,
+                    'year' => $year,
+                    'month' => $month,
+                    'daysInMonth' => $daysInMonth,
+                    'attendance' => $calendar,
+                    'pagination' => [
+                        'prevMonth' => $prevMonth->month,
+                        'prevYear' => $prevMonth->year,
+                        'prevMonthName' => $prevMonth->format('F Y'),
+                        'nextMonth' => $nextMonth->month,
+                        'nextYear' => $nextMonth->year,
+                        'nextMonthName' => $nextMonth->format('F Y')
+                    ]
+                ]
+            ]);
+            
+        } catch (\Exception $e) {
+            return response()->json([
+                'status' => false,
+                'message' => 'Error: ' . $e->getMessage()
+            ], 500);
+        }
+    }
 }
