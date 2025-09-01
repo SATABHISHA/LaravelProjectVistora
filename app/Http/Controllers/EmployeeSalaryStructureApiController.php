@@ -23,7 +23,7 @@ class EmployeeSalaryStructureApiController extends Controller
                 'ctcYearly' => 'required|string|max:20',
                 'monthlyBasic' => 'required|string|max:20',
                 'leaveEnchashOnGross' => 'required|string|max:20',
-                'grossList' => 'required|string|max:255',
+                'grossList' => 'required|string',
             ]);
 
             $data = $request->all();
