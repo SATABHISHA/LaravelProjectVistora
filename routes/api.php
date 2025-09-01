@@ -547,4 +547,5 @@ Route::post('/attendance/bulk-insert', [AttendanceApiController::class, 'bulkIns
 
 // Monthly Attendance Route
 Route::get('/attendance/monthly', [AttendanceApiController::class, 'fetchMonthlyAttendance']);
+Route::post('/attendance/monthly', [AttendanceApiController::class, 'fetchMonthlyAttendance']); // New POST route
 
