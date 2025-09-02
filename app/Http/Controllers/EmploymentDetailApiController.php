@@ -236,16 +236,36 @@ class EmploymentDetailApiController extends Controller
         $totalActiveEmployees = EmploymentDetail::where('corp_id', $corpid)->where('ActiveYn', 1)->count();
         $totalInactiveEmployees = EmploymentDetail::where('corp_id', $corpid)->where('ActiveYn', 0)->count();
 
+        // Get active employee codes for this corp
+        $activeEmpCodes = EmploymentDetail::where('corp_id', $corpid)
+            ->where('ActiveYn', 1)
+            ->pluck('EmpCode')
+            ->toArray();
+
+        // Get employee codes with attendance records today
+        $attendingEmpCodes = \App\Models\Attendance::where('corpId', $corpid)
+            ->where('date', $today)
+            ->pluck('empCode')
+            ->toArray();
+        
         // Get today's attendance counts for the entire corporation
         $totalPresentToday = \App\Models\Attendance::where('corpId', $corpid)
             ->where('date', $today)
             ->where('attendanceStatus', 'Present')
             ->count();
         
-        $totalAbsentToday = \App\Models\Attendance::where('corpId', $corpid)
+        // Count employees explicitly marked absent plus those without any attendance record
+        $explicitlyAbsent = \App\Models\Attendance::where('corpId', $corpid)
             ->where('date', $today)
             ->where('attendanceStatus', 'Absent')
             ->count();
+        
+        // Find employee codes who don't have any attendance record today
+        $missingEmpCodes = array_diff($activeEmpCodes, $attendingEmpCodes);
+        $missingCount = count($missingEmpCodes);
+        
+        // Total absent is explicitly absent plus missing attendance records
+        $totalAbsentToday = $explicitlyAbsent + $missingCount;
 
         // Get all unique company names for this corp_id
         $companyNames = \App\Models\CompanyDetails::where('corp_id', $corpid)->pluck('company_name')->unique();
@@ -267,18 +287,39 @@ class EmploymentDetailApiController extends Controller
                 ->where('company_name', $companyName)
                 ->first();
 
-            // Get company-specific attendance counts for today
+            // Get active employee codes for this company
+            $companyActiveEmpCodes = EmploymentDetail::where('corp_id', $corpid)
+                ->where('company_name', $companyName)
+                ->where('ActiveYn', 1)
+                ->pluck('EmpCode')
+                ->toArray();
+
+            // Get employee codes with attendance records today for this company
+            $companyAttendingEmpCodes = \App\Models\Attendance::where('corpId', $corpid)
+                ->where('companyName', $companyName)
+                ->where('date', $today)
+                ->pluck('empCode')
+                ->toArray();
+
+            // Company-specific attendance counts
             $companyPresentToday = \App\Models\Attendance::where('corpId', $corpid)
                 ->where('companyName', $companyName)
                 ->where('date', $today)
                 ->where('attendanceStatus', 'Present')
                 ->count();
-            
-            $companyAbsentToday = \App\Models\Attendance::where('corpId', $corpid)
+                
+            $companyExplicitlyAbsent = \App\Models\Attendance::where('corpId', $corpid)
                 ->where('companyName', $companyName)
                 ->where('date', $today)
                 ->where('attendanceStatus', 'Absent')
                 ->count();
+                
+            // Find company employee codes who don't have any attendance record today
+            $companyMissingEmpCodes = array_diff($companyActiveEmpCodes, $companyAttendingEmpCodes);
+            $companyMissingCount = count($companyMissingEmpCodes);
+            
+            // Total absent for this company
+            $companyAbsentToday = $companyExplicitlyAbsent + $companyMissingCount;
 
             // Generate a random base hue for the company
             $hue = rand(180, 300); // blue to purple range (soothing)
@@ -306,8 +347,8 @@ class EmploymentDetailApiController extends Controller
             'total_employees' => $totalEmployees,
             'total_active_employees' => $totalActiveEmployees,
             'total_inactive_employees' => $totalInactiveEmployees,
-            'total_present_today' => $totalPresentToday,    // Add this line
-            'total_absent_today' => $totalAbsentToday,      // Add this line
+            'total_present_today' => $totalPresentToday,
+            'total_absent_today' => $totalAbsentToday,
             'companies' => $companies
         ]);
     }
