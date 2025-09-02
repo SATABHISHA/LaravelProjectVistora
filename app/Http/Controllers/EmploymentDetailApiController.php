@@ -228,9 +228,24 @@ class EmploymentDetailApiController extends Controller
 
     public function summaryByCorpId($corpid)
     {
+        // Get today's date in Y-m-d format for attendance queries
+        $today = \Carbon\Carbon::now()->format('Y-m-d');
+
+        // Original employee counts
         $totalEmployees = EmploymentDetail::where('corp_id', $corpid)->count();
         $totalActiveEmployees = EmploymentDetail::where('corp_id', $corpid)->where('ActiveYn', 1)->count();
         $totalInactiveEmployees = EmploymentDetail::where('corp_id', $corpid)->where('ActiveYn', 0)->count();
+
+        // Get today's attendance counts for the entire corporation
+        $totalPresentToday = \App\Models\Attendance::where('corpId', $corpid)
+            ->where('date', $today)
+            ->where('attendanceStatus', 'Present')
+            ->count();
+        
+        $totalAbsentToday = \App\Models\Attendance::where('corpId', $corpid)
+            ->where('date', $today)
+            ->where('attendanceStatus', 'Absent')
+            ->count();
 
         // Get all unique company names for this corp_id
         $companyNames = \App\Models\CompanyDetails::where('corp_id', $corpid)->pluck('company_name')->unique();
@@ -252,6 +267,19 @@ class EmploymentDetailApiController extends Controller
                 ->where('company_name', $companyName)
                 ->first();
 
+            // Get company-specific attendance counts for today
+            $companyPresentToday = \App\Models\Attendance::where('corpId', $corpid)
+                ->where('companyName', $companyName)
+                ->where('date', $today)
+                ->where('attendanceStatus', 'Present')
+                ->count();
+            
+            $companyAbsentToday = \App\Models\Attendance::where('corpId', $corpid)
+                ->where('companyName', $companyName)
+                ->where('date', $today)
+                ->where('attendanceStatus', 'Absent')
+                ->count();
+
             // Generate a random base hue for the company
             $hue = rand(180, 300); // blue to purple range (soothing)
             // First color: lighter, more pastel
@@ -268,6 +296,8 @@ class EmploymentDetailApiController extends Controller
                 'id' => $firstEmployment ? $firstEmployment->id : null,
                 'colorcode' => $colorcode,     // pastel
                 'colorcode2' => $colorcode2,   // deeper pastel
+                'total_present_today' => $companyPresentToday,
+                'total_absent_today' => $companyAbsentToday
             ];
         }
 
