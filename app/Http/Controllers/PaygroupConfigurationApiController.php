@@ -506,4 +506,28 @@ class PaygroupConfigurationApiController extends Controller
         ]);
     }
 
+    /**
+     * DEBUG METHOD: Check what's in formula_builders table
+     */
+    public function debugFormulaBuilder($componentName = 'HRA')
+    {
+        $specificComponent = DB::table('formula_builders')
+            ->where('componentName', $componentName)
+            ->first();
+
+        $allComponents = DB::table('formula_builders')
+            ->select('componentName', 'formula', 'componentNameRefersTo', 'referenceValue')
+            ->get();
+
+        return response()->json([
+            'status' => true,
+            'data' => [
+                'searchedComponent' => $componentName,
+                'componentData' => $specificComponent,
+                'allComponents' => $allComponents,
+                'testCalculation' => $specificComponent ? $this->calculateComponentValue($componentName, 10000) : 'Component not found'
+            ]
+        ]);
+    }
+
 }

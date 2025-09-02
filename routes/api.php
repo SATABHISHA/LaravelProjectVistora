@@ -551,3 +551,6 @@ Route::post('/attendance/monthly', [AttendanceApiController::class, 'fetchMonthl
 
 // Get current month and year
 Route::get('/attendance/current-month-year', [AttendanceApiController::class, 'getCurrentMonthYear']);
+
+// Debug Formula Builder Route
+Route::get('/debug/formula-builder/{componentName?}', [PaygroupConfigurationApiController::class, 'debugFormulaBuilder']);
