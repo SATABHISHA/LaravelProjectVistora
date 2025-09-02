@@ -306,6 +306,8 @@ class EmploymentDetailApiController extends Controller
             'total_employees' => $totalEmployees,
             'total_active_employees' => $totalActiveEmployees,
             'total_inactive_employees' => $totalInactiveEmployees,
+            'total_present_today' => $totalPresentToday,    // Add this line
+            'total_absent_today' => $totalAbsentToday,      // Add this line
             'companies' => $companies
         ]);
     }
