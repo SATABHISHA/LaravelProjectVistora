@@ -286,7 +286,7 @@ class PaygroupConfigurationApiController extends Controller
     }
 
     /**
-     * NEW HELPER METHOD for calculating component value based on the new formula_builders logic.
+     * FIXED HELPER METHOD for calculating component value based on the formula_builders logic.
      */
     private function calculateComponentValue($componentName, $basicSalary)
     {
@@ -296,26 +296,44 @@ class PaygroupConfigurationApiController extends Controller
 
         // If no formula is defined for the component, return defaults.
         if (!$formulaBuilder) {
-            return ['calculatedValue' => 0.0, 'formula' => null];
+            return ['calculatedValue' => 0.0, 'formula' => 'N/A'];
         }
 
         $formulaType = $formulaBuilder->formula ?? null;
+        $refersTo = $formulaBuilder->componentNameRefersTo ?? null;
+        $percentage = (float)($formulaBuilder->referenceValue ?? 0);
         $calculatedValue = 0.0;
+        $formula = $formulaType; // Default to formula type
 
-        // ✅ **MODIFIED LINE:** Convert formula type to lowercase for case-insensitive comparison.
+        // ✅ **FIXED:** Handle different formula types properly
         if (strtolower($formulaType) === 'percent') {
-            $refersTo = $formulaBuilder->componentNameRefersTo ?? null;
-            $percentage = (float)($formulaBuilder->referenceValue ?? 0);
-
-            // For now, we only handle calculations based on 'Basic' salary.
-            // This can be expanded later if formulas can refer to other components.
-            if (strtolower($refersTo) === 'basic' && $percentage > 0) {
+            // For percentage-based calculations
+            // Handle case where componentNameRefersTo might be 'BASIC' or 'Basic'
+            if (strtolower($refersTo ?? '') === 'basic' && $percentage > 0) {
                 $calculatedValue = ($percentage / 100) * (float)$basicSalary;
+                $formula = $percentage . '% of Basic'; // ✅ Return descriptive formula
+            } else {
+                $calculatedValue = 0.0;
+                $formula = $percentage . '% of ' . ($refersTo ?? 'Unknown');
             }
+        } elseif (strtolower($formulaType) === 'fixed') {
+            // For fixed amount (referenceValue contains the fixed amount)
+            $calculatedValue = $percentage; // referenceValue is the fixed amount
+            $formula = 'Fixed: ₹' . number_format($percentage, 2);
+        } elseif (strtolower($formulaType) === 'variable') {
+            // Variable amounts are manually entered
+            $calculatedValue = 0.0;
+            $formula = 'Variable';
+        } else {
+            // Unknown formula type
+            $calculatedValue = 0.0;
+            $formula = 'Unknown Formula Type: ' . $formulaType;
         }
-        // For 'Fixed' or 'Variable', the calculated value is 0.0 as per requirements.
 
-        return ['calculatedValue' => round($calculatedValue, 2), 'formula' => $formulaType];
+        return [
+            'calculatedValue' => round($calculatedValue, 2), 
+            'formula' => $formula
+        ];
     }
 
 
