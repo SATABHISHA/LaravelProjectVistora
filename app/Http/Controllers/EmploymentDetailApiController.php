@@ -242,12 +242,46 @@ class EmploymentDetailApiController extends Controller
             ->pluck('EmpCode')
             ->toArray();
 
-        // Get employee codes with attendance records today
-        $attendingEmpCodes = \App\Models\Attendance::where('corpId', $corpid)
-            ->where('date', $today)
-            ->pluck('empCode')
+        // Get employee codes registered in userlogin
+        $registeredEmpCodes = \App\Models\UserLogin::where('corp_id', $corpid)
+            ->where('active_yn', 1)
+            ->pluck('empcode')
             ->toArray();
+            
+        // Find employee codes who aren't registered in userlogin
+        $nonRegisteredEmpCodes = array_diff($activeEmpCodes, $registeredEmpCodes);
         
+        // Get details of non-registered employees
+        $nonRegisteredDetails = [];
+        if (!empty($nonRegisteredEmpCodes)) {
+            $nonRegisteredEmployees = EmploymentDetail::where('corp_id', $corpid)
+                ->whereIn('EmpCode', $nonRegisteredEmpCodes)
+                ->get();
+                
+            foreach ($nonRegisteredEmployees as $employee) {
+                // Get employee name from EmployeeDetail
+                $employeeDetail = \App\Models\EmployeeDetail::where('corp_id', $corpid)
+                    ->where('EmpCode', $employee->EmpCode)
+                    ->first();
+                    
+                $firstName = $employeeDetail && $employeeDetail->FirstName ? $employeeDetail->FirstName : '';
+                $middleName = $employeeDetail && $employeeDetail->MiddleName ? $employeeDetail->MiddleName : '';
+                $lastName = $employeeDetail && $employeeDetail->LastName ? $employeeDetail->LastName : '';
+                
+                if ($firstName === '' && $lastName === '') {
+                    $fullName = 'N/A';
+                } else {
+                    $fullName = trim($firstName . ' ' . ($middleName !== '' ? $middleName . ' ' : '') . $lastName);
+                }
+                
+                $nonRegisteredDetails[] = [
+                    'name' => $fullName,
+                    'empCode' => $employee->EmpCode,
+                    'company_name' => $employee->company_name
+                ];
+            }
+        }
+
         // Get today's attendance counts for the entire corporation
         $totalPresentToday = \App\Models\Attendance::where('corpId', $corpid)
             ->where('date', $today)
@@ -260,6 +294,12 @@ class EmploymentDetailApiController extends Controller
             ->where('attendanceStatus', 'Absent')
             ->count();
         
+        // Get employee codes with attendance records today
+        $attendingEmpCodes = \App\Models\Attendance::where('corpId', $corpid)
+            ->where('date', $today)
+            ->pluck('empCode')
+            ->toArray();
+            
         // Find employee codes who don't have any attendance record today
         $missingEmpCodes = array_diff($activeEmpCodes, $attendingEmpCodes);
         $missingCount = count($missingEmpCodes);
@@ -293,6 +333,12 @@ class EmploymentDetailApiController extends Controller
                 ->where('ActiveYn', 1)
                 ->pluck('EmpCode')
                 ->toArray();
+                
+            // Company-specific non-registered employee codes
+            $companyNonRegisteredEmpCodes = array_intersect($nonRegisteredEmpCodes, $companyActiveEmpCodes);
+            $companyNonRegisteredDetails = array_filter($nonRegisteredDetails, function($employee) use ($companyName) {
+                return $employee['company_name'] === $companyName;
+            });
 
             // Get employee codes with attendance records today for this company
             $companyAttendingEmpCodes = \App\Models\Attendance::where('corpId', $corpid)
@@ -338,7 +384,9 @@ class EmploymentDetailApiController extends Controller
                 'colorcode' => $colorcode,     // pastel
                 'colorcode2' => $colorcode2,   // deeper pastel
                 'total_present_today' => $companyPresentToday,
-                'total_absent_today' => $companyAbsentToday
+                'total_absent_today' => $companyAbsentToday,
+                'nonregistered' => array_values($companyNonRegisteredDetails),  // Add non-registered employees for this company
+                'nonregistered_count' => count($companyNonRegisteredDetails)    // Add count of non-registered employees
             ];
         }
 
@@ -349,6 +397,8 @@ class EmploymentDetailApiController extends Controller
             'total_inactive_employees' => $totalInactiveEmployees,
             'total_present_today' => $totalPresentToday,
             'total_absent_today' => $totalAbsentToday,
+            'nonregistered' => $nonRegisteredDetails,                // Add non-registered employees array
+            'nonregistered_count' => count($nonRegisteredDetails),   // Add count of non-registered employees
             'companies' => $companies
         ]);
     }
