@@ -260,7 +260,8 @@ Route::post('/employment/add', [EmploymentDetailApiController::class, 'store']);
 Route::put('/employment/update/{corp_id}/{EmpCode}', [EmploymentDetailApiController::class, 'update']);
 Route::delete('/employment/delete/{corp_id}/{EmpCode}', [EmploymentDetailApiController::class, 'destroy']);
 Route::get('/employment/next-empcode/{corp_id}', [EmploymentDetailApiController::class, 'getNextEmpCode']);
-Route::get('/employment/summary/{corp_id}/{company_name}', [EmploymentDetailApiController::class, 'fetchEmploymentAndEmployeeDetails']);
+Route::get('/employment/summary/{corp_id}/{company_name}', [EmploymentDetailApiController::class, 'fetchEmploymentAndEmployeeDetails'])
+    ->middleware('throttle:60,1');
 Route::post('/employment/check-empcode', [EmploymentDetailApiController::class, 'checkEmpCodeExists']);
 Route::post('/employment/check-empcode-flutter', [EmploymentDetailApiController::class, 'checkEmpCodeExists'])
     ->middleware('throttle:60,1');
