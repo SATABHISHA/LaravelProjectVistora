@@ -262,13 +262,15 @@ Route::delete('/employment/delete/{corp_id}/{EmpCode}', [EmploymentDetailApiCont
 Route::get('/employment/next-empcode/{corp_id}', [EmploymentDetailApiController::class, 'getNextEmpCode'])
     ->middleware('throttle:100,1');
 Route::get('/employment/summary/{corp_id}/{company_name}', [EmploymentDetailApiController::class, 'fetchEmploymentAndEmployeeDetails'])
-    ->middleware('throttle:100,1');
-Route::post('/employment/check-empcode', [EmploymentDetailApiController::class, 'checkEmpCodeExists']);
+     ->withoutMiddleware(['throttle']);
+Route::post('/employment/check-empcode', [EmploymentDetailApiController::class, 'checkEmpCodeExists'])
+     ->withoutMiddleware(['throttle']);
 Route::post('/employment/check-empcode-flutter', [EmploymentDetailApiController::class, 'checkEmpCodeExists'])
-    ->middleware('throttle:100,1');
-Route::get('/employment/summary-by-corp/{corpid}', [EmploymentDetailApiController::class, 'summaryByCorpId']);
+     ->withoutMiddleware(['throttle']);
+Route::get('/employment/summary-by-corp/{corpid}', [EmploymentDetailApiController::class, 'summaryByCorpId'])
+    ->withoutMiddleware(['throttle']);
 Route::get('/employment/{corp_id}/{EmpCode}', [EmploymentDetailApiController::class, 'show'])
-    ->middleware('throttle:100,1');
+    ->withoutMiddleware(['throttle']);
 
 
 
