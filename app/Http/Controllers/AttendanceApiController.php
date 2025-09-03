@@ -636,4 +636,85 @@ class AttendanceApiController extends Controller
             ], 500);
         }
     }
+
+    /**
+     * Fetch today's attendance with calculated hours
+     * Returns N/A for missing check-in/out times and calculates hours based on different scenarios
+     */
+    public function fetchTodayAttendanceWithHours($empCode, $corpId, $companyName)
+    {
+        try {
+            // Get today's date in the correct timezone
+            $today = Carbon::now('Asia/Kolkata')->format('Y-m-d');
+            $currentTime = Carbon::now('Asia/Kolkata');
+            
+            // Find today's attendance record
+            $attendance = Attendance::where('empCode', $empCode)
+                ->where('corpId', $corpId)
+                ->where('companyName', $companyName)
+                ->where('date', $today)
+                ->first();
+            
+            // Initialize response data
+            $responseData = [
+                'empCode' => $empCode,
+                'corpId' => $corpId,
+                'companyName' => $companyName,
+                'date' => $today,
+                'currentTime' => $currentTime->format('g:i A'),
+                'checkIn' => 'N/A',
+                'checkOut' => 'N/A',
+                'totalHours' => '0.0',
+                'status' => 'No Record',
+                'attendanceStatus' => 'Absent'
+            ];
+            
+            if (!$attendance) {
+                // No attendance record found for today
+                return response()->json([
+                    'status' => true,
+                    'message' => 'No attendance record found for today',
+                    'data' => $responseData
+                ]);
+            }
+            
+            // Update response data with found attendance
+            $responseData['checkIn'] = $attendance->checkIn ?? 'N/A';
+            $responseData['checkOut'] = $attendance->checkOut ?? 'N/A';
+            $responseData['status'] = $attendance->status ?? 'No Record';
+            $responseData['attendanceStatus'] = $attendance->attendanceStatus ?? 'Absent';
+            $responseData['puid'] = $attendance->puid;
+            $responseData['userName'] = $attendance->userName;
+            
+            // Calculate hours based on different scenarios
+            if ($attendance->checkIn && $attendance->checkOut) {
+                // Scenario 1: Both check-in and check-out done
+                $responseData['totalHours'] = $this->calculateWorkingHours($attendance->checkIn, $attendance->checkOut);
+                $responseData['hoursType'] = 'Completed Shift';
+                
+            } elseif ($attendance->checkIn && !$attendance->checkOut) {
+                // Scenario 2: Only check-in done, calculate hours till current time
+                $responseData['totalHours'] = $this->calculateWorkingHours($attendance->checkIn, $currentTime->format('g:i A'));
+                $responseData['hoursType'] = 'Ongoing Shift';
+                
+            } else {
+                // Scenario 3: Not yet checked in
+                $responseData['totalHours'] = '0.0';
+                $responseData['hoursType'] = 'Not Started';
+            }
+            
+            return response()->json([
+                'status' => true,
+                'message' => 'Today\'s attendance retrieved successfully',
+                'data' => $responseData
+            ]);
+            
+        } catch (\Exception $e) {
+            return response()->json([
+                'status' => false,
+                'message' => 'Error: ' . $e->getMessage(),
+                'data' => null
+            ], 500);
+        }
+    }
 }
