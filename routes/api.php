@@ -525,7 +525,7 @@ Route::get('/formula-builder/{corpId}/{componentGroupName}', [FormulaBuilderApiC
 Route::delete('/formula-builder/delete/{puid}/{paygroupPuid}', [FormulaBuilderApiController::class, 'destroy']);
 
 // Other Benefits Allowances Route
-Route::get('/paygroup-configuration/other-benefits-allowances/{groupName}/{corpId}', [PaygroupConfigurationApiController::class, 'fetchOtherBenefitsAllowances']);
+Route::get('/paygroup/benefits/{groupName}/{corpId}/{basicSalary?}', [PaygroupConfigurationApiController::class, 'fetchOtherBenefitsAllowances']);
 
 // Deductions Route
 Route::get('/paygroup-configuration/deductions/{groupName}/{basicSalary}', [PaygroupConfigurationApiController::class, 'fetchDeductionsByGroupName']);
@@ -556,3 +556,6 @@ Route::get('/attendance/current-month-year', [AttendanceApiController::class, 'g
 
 // Debug Formula Builder Route
 Route::get('/debug/formula-builder/{componentName?}', [PaygroupConfigurationApiController::class, 'debugFormulaBuilder']);
+
+// New route for complete payroll breakdown
+Route::get('/paygroup/complete/{groupName}/{corpId}/{basicSalary}', [PaygroupConfigurationApiController::class, 'fetchCompletePayrollBreakdown']);

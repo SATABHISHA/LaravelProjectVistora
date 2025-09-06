@@ -211,7 +211,7 @@ class PaygroupConfigurationApiController extends Controller
     public function fetchGrossByGroupName($groupName, $basicSalary)
     {
         // Validate basic salary
-        if (!is_numeric($basicSalary) || $basicSalary < 0) { // Allow 0 basic salary
+        if (!is_numeric($basicSalary) || $basicSalary < 0) {
             return response()->json([
                 'status' => false,
                 'message' => 'Valid basic salary is required.',
@@ -236,14 +236,18 @@ class PaygroupConfigurationApiController extends Controller
         $includedComponents = array_filter(array_map('trim', explode(',', $paygroup->IncludedComponents)));
 
         $result = [];
-        $totalGross = 0;
+        $totalGrossMonthly = 0;
+        $totalGrossAnnual = 0;
 
         foreach ($includedComponents as $componentName) {
-            // Fetch from pay_components with conditions
+            // Fetch from pay_components with conditions for Addition OR Addition & Deduction
             $payComponent = DB::table('pay_components')
                 ->where('componentName', $componentName)
                 ->where('isPartOfCtcYn', 1)
-                ->where('payType', 'Addition')
+                ->where(function($query) {
+                    $query->where('payType', 'Addition')
+                          ->orWhere('payType', 'Addition & Deduction');
+                })
                 ->first();
 
             if ($payComponent) {
@@ -253,24 +257,28 @@ class PaygroupConfigurationApiController extends Controller
                 // Check if component name is "Basic" (case-insensitive)
                 if (strtolower(trim($componentName)) === 'basic') {
                     $calculatedValue = (float)$basicSalary;
-                    $formula = 'Basic'; // A fixed identifier for Basic salary
+                    $formula = 'Basic';
                 } else {
-                    // ** NEW LOGIC **
-                    // Use the new helper method for all other components
                     $calculationResult = $this->calculateComponentValue($componentName, $basicSalary);
                     $calculatedValue = $calculationResult['calculatedValue'];
                     $formula = $calculationResult['formula'];
                 }
 
+                // ✅ **NEW:** Calculate annual value
+                $annualCalculatedValue = $calculatedValue > 0 ? $calculatedValue * 12 : 0;
+
                 $componentResult = [
                     'componentName' => $componentName,
+                    'payType' => $payComponent->payType,
                     'paymentNature' => $payComponent->paymentNature,
                     'formula' => $formula,
-                    'calculatedValue' => $calculatedValue
+                    'calculatedValue' => $calculatedValue,
+                    'annualCalculatedValue' => $annualCalculatedValue
                 ];
 
                 $result[] = $componentResult;
-                $totalGross += $calculatedValue;
+                $totalGrossMonthly += $calculatedValue;
+                $totalGrossAnnual += $annualCalculatedValue;
             }
         }
 
@@ -280,7 +288,10 @@ class PaygroupConfigurationApiController extends Controller
                 'groupName' => $groupName,
                 'basicSalary' => (float)$basicSalary,
                 'components' => $result,
-                'totalGross' => $totalGross
+                'totalGross' => [
+                    'monthly' => $totalGrossMonthly,
+                    'annual' => $totalGrossAnnual
+                ]
             ]
         ]);
     }
@@ -338,56 +349,100 @@ class PaygroupConfigurationApiController extends Controller
 
 
     // Fetch OtherBenefitsAllowances by GroupName and corpId
-    public function fetchOtherBenefitsAllowances($groupName, $corpId)
+    public function fetchOtherBenefitsAllowances($groupName, $corpId, $basicSalary = 0)
     {
-        // Get CTCAllowances from paygroup_configurations
+        // Get both IncludedComponents and CTCAllowances from paygroup_configurations
         $paygroup = DB::table('paygroup_configurations')
             ->where('GroupName', $groupName)
             ->where('corpId', $corpId)
             ->first();
 
-        if (!$paygroup || empty($paygroup->CTCAllowances)) {
+        if (!$paygroup) {
             return response()->json([
                 'status' => false,
-                'message' => 'GroupName not found for this corpId or no CTCAllowances available.',
+                'message' => 'GroupName not found for this corpId.',
                 'data' => []
             ], 404);
         }
 
-        // Split CTCAllowances by comma and trim each value
-        $ctcAllowances = array_filter(array_map('trim', explode(',', $paygroup->CTCAllowances)));
-
         $result = [];
+        $totalBenefitsMonthly = 0;
+        $totalBenefitsAnnual = 0;
 
-        foreach ($ctcAllowances as $allowanceName) {
-            // Fetch from pay_components for each allowance
-            $payComponent = DB::table('pay_components')
-                ->where('componentName', $allowanceName)
-                ->first();
+        // Process IncludedComponents for "Benefits" payType
+        if (!empty($paygroup->IncludedComponents)) {
+            $includedComponents = array_filter(array_map('trim', explode(',', $paygroup->IncludedComponents)));
+            
+            foreach ($includedComponents as $componentName) {
+                $payComponent = DB::table('pay_components')
+                    ->where('componentName', $componentName)
+                    ->where('payType', 'Benefits')
+                    ->first();
 
-            if ($payComponent) {
-                $allowanceResult = [
-                    'componentName' => $payComponent->componentName,
-                    'payType' => $payComponent->payType ?? null,
-                    'paymentNature' => $payComponent->paymentNature ?? null,
-                    'isPartOfCtcYn' => $payComponent->isPartOfCtcYn ?? null,
-                    'componentDescription' => $payComponent->componentDescription ?? null,
-                    'calculatedValue' => 0.0
-                ];
+                if ($payComponent) {
+                    $calculationResult = $this->calculateComponentValue($componentName, $basicSalary);
+                    $calculatedValue = $calculationResult['calculatedValue'];
+                    $formula = $calculationResult['formula'];
+                    $annualCalculatedValue = $calculatedValue > 0 ? $calculatedValue * 12 : 0;
+
+                    $benefitResult = [
+                        'componentName' => $payComponent->componentName,
+                        'payType' => $payComponent->payType,
+                        'paymentNature' => $payComponent->paymentNature ?? null,
+                        'isPartOfCtcYn' => $payComponent->isPartOfCtcYn ?? null,
+                        'componentDescription' => $payComponent->componentDescription ?? null,
+                        'formula' => $formula,
+                        'calculatedValue' => $calculatedValue,
+                        'annualCalculatedValue' => $annualCalculatedValue
+                    ];
+
+                    $result[] = $benefitResult;
+                    $totalBenefitsMonthly += $calculatedValue;
+                    $totalBenefitsAnnual += $annualCalculatedValue;
+                }
+            }
+        }
+
+        // Process CTCAllowances (existing logic)
+        if (!empty($paygroup->CTCAllowances)) {
+            $ctcAllowances = array_filter(array_map('trim', explode(',', $paygroup->CTCAllowances)));
+
+            foreach ($ctcAllowances as $allowanceName) {
+                $payComponent = DB::table('pay_components')
+                    ->where('componentName', $allowanceName)
+                    ->first();
+
+                $calculatedValue = 0.0;
+                $formula = 'Manual Entry';
+                $annualCalculatedValue = 0.0;
+
+                if ($payComponent) {
+                    $allowanceResult = [
+                        'componentName' => $payComponent->componentName,
+                        'payType' => $payComponent->payType ?? 'CTC Allowance',
+                        'paymentNature' => $payComponent->paymentNature ?? null,
+                        'isPartOfCtcYn' => $payComponent->isPartOfCtcYn ?? null,
+                        'componentDescription' => $payComponent->componentDescription ?? null,
+                        'formula' => $formula,
+                        'calculatedValue' => $calculatedValue,
+                        'annualCalculatedValue' => $annualCalculatedValue
+                    ];
+                } else {
+                    $allowanceResult = [
+                        'componentName' => $allowanceName,
+                        'payType' => 'CTC Allowance',
+                        'paymentNature' => null,
+                        'isPartOfCtcYn' => null,
+                        'componentDescription' => null,
+                        'formula' => $formula,
+                        'calculatedValue' => $calculatedValue,
+                        'annualCalculatedValue' => $annualCalculatedValue
+                    ];
+                }
 
                 $result[] = $allowanceResult;
-            } else {
-                // Even if pay component not found, add the allowance with default values
-                $allowanceResult = [
-                    'componentName' => $allowanceName,
-                    'payType' => null,
-                    'paymentNature' => null,
-                    'isPartOfCtcYn' => null,
-                    'componentDescription' => null,
-                    'calculatedValue' => 0.0
-                ];
-
-                $result[] = $allowanceResult;
+                $totalBenefitsMonthly += $calculatedValue;
+                $totalBenefitsAnnual += $annualCalculatedValue;
             }
         }
 
@@ -396,7 +451,12 @@ class PaygroupConfigurationApiController extends Controller
             'data' => [
                 'groupName' => $groupName,
                 'corpId' => $corpId,
-                'otherBenefitsAllowances' => $result,  // Remove ctcAllowances, only return processed result
+                'basicSalary' => (float)$basicSalary,
+                'otherBenefitsAllowances' => $result,
+                'totalBenefits' => [
+                    'monthly' => $totalBenefitsMonthly,
+                    'annual' => $totalBenefitsAnnual
+                ],
                 'totalCount' => count($result)
             ]
         ]);
@@ -406,7 +466,7 @@ class PaygroupConfigurationApiController extends Controller
     public function fetchDeductionsByGroupName($groupName, $basicSalary)
     {
         // Validate basic salary
-        if (!is_numeric($basicSalary) || $basicSalary < 0) { // Allow 0 basic salary
+        if (!is_numeric($basicSalary) || $basicSalary < 0) {
             return response()->json([
                 'status' => false,
                 'message' => 'Valid basic salary is required.',
@@ -431,32 +491,40 @@ class PaygroupConfigurationApiController extends Controller
         $includedComponents = array_filter(array_map('trim', explode(',', $paygroup->IncludedComponents)));
 
         $result = [];
-        $totalDeductions = 0;
+        $totalDeductionsMonthly = 0;
+        $totalDeductionsAnnual = 0;
 
         foreach ($includedComponents as $componentName) {
-            // Fetch from pay_components with conditions for Deductions
+            // Fetch from pay_components with conditions for Deduction OR Addition & Deduction
             $payComponent = DB::table('pay_components')
                 ->where('componentName', $componentName)
                 ->where('isPartOfCtcYn', 1)
-                ->where('payType', 'Deduction')
+                ->where(function($query) {
+                    $query->where('payType', 'Deduction')
+                          ->orWhere('payType', 'Addition & Deduction');
+                })
                 ->first();
 
             if ($payComponent) {
-                // ** NEW LOGIC **
-                // Use the new helper method for all deduction components
                 $calculationResult = $this->calculateComponentValue($componentName, $basicSalary);
                 $calculatedValue = $calculationResult['calculatedValue'];
                 $formula = $calculationResult['formula'];
 
+                // ✅ **NEW:** Calculate annual value
+                $annualCalculatedValue = $calculatedValue > 0 ? $calculatedValue * 12 : 0;
+
                 $componentResult = [
                     'componentName' => $componentName,
+                    'payType' => $payComponent->payType,
                     'paymentNature' => $payComponent->paymentNature,
                     'formula' => $formula,
-                    'calculatedValue' => $calculatedValue
+                    'calculatedValue' => $calculatedValue,
+                    'annualCalculatedValue' => $annualCalculatedValue
                 ];
 
                 $result[] = $componentResult;
-                $totalDeductions += $calculatedValue;
+                $totalDeductionsMonthly += $calculatedValue;
+                $totalDeductionsAnnual += $annualCalculatedValue;
             }
         }
 
@@ -466,42 +534,80 @@ class PaygroupConfigurationApiController extends Controller
                 'groupName' => $groupName,
                 'basicSalary' => (float)$basicSalary,
                 'deductions' => $result,
-                'totalDeductions' => $totalDeductions
+                'totalDeductions' => [
+                    'monthly' => $totalDeductionsMonthly,
+                    'annual' => $totalDeductionsAnnual
+                ]
             ]
         ]);
     }
 
-    // Add the Save Payroll Data method(not required in this way)
-    public function savePayrollData(Request $request)
+    // ✅ **NEW METHOD:** Fetch complete payroll breakdown with all components
+    public function fetchCompletePayrollBreakdown($groupName, $corpId, $basicSalary)
     {
-        $data = $request->all();
-        
-        // Validate the JSON structure
-        $validator = Validator::make($data, [
-            'Gross' => 'required|array',
-            'Allowances' => 'required|array',
-            'Deductions' => 'required|array',
-        ]);
-
-        if ($validator->fails()) {
+        // Validate basic salary
+        if (!is_numeric($basicSalary) || $basicSalary < 0) {
             return response()->json([
                 'status' => false,
-                'message' => 'Invalid data structure',
-                'errors' => $validator->errors()
+                'message' => 'Valid basic salary is required.',
+                'data' => []
             ], 400);
         }
-        
+
+        // Get all three categories
+        $grossResponse = $this->fetchGrossByGroupName($groupName, $basicSalary);
+        $deductionsResponse = $this->fetchDeductionsByGroupName($groupName, $basicSalary);
+        $benefitsResponse = $this->fetchOtherBenefitsAllowances($groupName, $corpId, $basicSalary);
+
+        // Extract data from responses
+        $grossData = $grossResponse->getData(true)['data'] ?? [];
+        $deductionsData = $deductionsResponse->getData(true)['data'] ?? [];
+        $benefitsData = $benefitsResponse->getData(true)['data'] ?? [];
+
+        // Calculate net salary
+        $grossMonthly = $grossData['totalGross']['monthly'] ?? 0;
+        $grossAnnual = $grossData['totalGross']['annual'] ?? 0;
+        $deductionsMonthly = $deductionsData['totalDeductions']['monthly'] ?? 0;
+        $deductionsAnnual = $deductionsData['totalDeductions']['annual'] ?? 0;
+        $benefitsMonthly = $benefitsData['totalBenefits']['monthly'] ?? 0;
+        $benefitsAnnual = $benefitsData['totalBenefits']['annual'] ?? 0;
+
+        $netSalaryMonthly = $grossMonthly - $deductionsMonthly;
+        $netSalaryAnnual = $grossAnnual - $deductionsAnnual;
+        $totalCTCMonthly = $grossMonthly + $benefitsMonthly;
+        $totalCTCAnnual = $grossAnnual + $benefitsAnnual;
+
         return response()->json([
             'status' => true,
-            'message' => 'Payroll data saved successfully',
             'data' => [
-                'grossCount' => count($data['Gross']),
-                'allowancesCount' => count($data['Allowances']),
-                'deductionsCount' => count($data['Deductions']),
-                'totalGross' => array_sum(array_column($data['Gross'], 'calculatedValue')),
-                'totalAllowances' => array_sum(array_column($data['Allowances'], 'calculatedValue')),
-                'totalDeductions' => array_sum(array_column($data['Deductions'], 'calculatedValue')),
-                'savedAt' => now()->toDateTimeString()
+                'groupName' => $groupName,
+                'corpId' => $corpId,
+                'basicSalary' => (float)$basicSalary,
+                'gross' => $grossData['components'] ?? [],
+                'deductions' => $deductionsData['deductions'] ?? [],
+                'otherBenefitsAllowances' => $benefitsData['otherBenefitsAllowances'] ?? [],
+                'summary' => [
+                    'totalGross' => [
+                        'monthly' => $grossMonthly,
+                        'annual' => $grossAnnual
+                    ],
+                    'totalDeductions' => [
+                        'monthly' => $deductionsMonthly,
+                        'annual' => $deductionsAnnual
+                    ],
+                    'totalBenefits' => [
+                        'monthly' => $benefitsMonthly,
+                        'annual' => $benefitsAnnual
+                    ],
+                    'netSalary' => [
+                        'monthly' => $netSalaryMonthly,
+                        'annual' => $netSalaryAnnual
+                    ],
+                    'totalCTC' => [
+                        'monthly' => $totalCTCMonthly,
+                        'annual' => $totalCTCAnnual
+                    ]
+                ]
             ]
         ]);
     }
