@@ -69,10 +69,31 @@ class EmployeeSalaryStructureApiController extends Controller
             // Prepare response with JSON parsed fields
             $responseData = $salaryStructure->toArray();
             
-            // Parse JSON strings to arrays with JSON objects inside using square brackets
-            $responseData['grossList'] = $this->parseJsonField($salaryStructure->grossList);
-            $responseData['otherBenifits'] = $this->parseJsonField($salaryStructure->otherBenifits);
-            $responseData['recurringDeductions'] = $this->parseJsonField($salaryStructure->recurringDeductions);
+            // Parse JSON strings to arrays
+            $grossList = $this->parseJsonField($salaryStructure->grossList);
+            $otherBenefits = $this->parseJsonField($salaryStructure->otherBenifits);
+            $recurringDeductions = $this->parseJsonField($salaryStructure->recurringDeductions);
+
+            $responseData['grossList'] = $grossList;
+            $responseData['otherBenifits'] = $otherBenefits;
+            $responseData['recurringDeductions'] = $recurringDeductions;
+
+            // ✅ **NEW:** Calculate totals
+            $calculations = $this->calculateSalaryTotals(
+                $grossList,
+                $otherBenefits, 
+                $recurringDeductions
+            );
+
+            // ✅ **NEW:** Add calculated totals to response
+            $responseData['monthlyGross'] = $calculations['monthlyGross'];
+            $responseData['annualGross'] = $calculations['annualGross'];
+            $responseData['monthlyDeduction'] = $calculations['monthlyDeduction'];
+            $responseData['annualDeduction'] = $calculations['annualDeduction'];
+            $responseData['monthlyAllowance'] = $calculations['monthlyAllowance'];
+            $responseData['annualAllowance'] = $calculations['annualAllowance'];
+            $responseData['monthlyNetSalary'] = $calculations['monthlyNetSalary'];
+            $responseData['annualNetSalary'] = $calculations['annualNetSalary'];
 
             return response()->json([
                 'status' => true,
@@ -131,5 +152,61 @@ class EmployeeSalaryStructureApiController extends Controller
         // Try to decode JSON string
         $decoded = json_decode($field, true);
         return $decoded !== null ? $decoded : $field;
+    }
+
+    // ✅ **NEW METHOD:** Calculate salary totals
+    private function calculateSalaryTotals($grossList, $otherBenefits, $recurringDeductions)
+    {
+        // Initialize totals
+        $monthlyGross = 0.0;
+        $monthlyAllowance = 0.0;
+        $monthlyDeduction = 0.0;
+
+        // Calculate gross total
+        if (is_array($grossList)) {
+            foreach ($grossList as $item) {
+                if (isset($item['calculatedValue'])) {
+                    $monthlyGross += (float)$item['calculatedValue'];
+                }
+            }
+        }
+
+        // Calculate other benefits/allowances total
+        if (is_array($otherBenefits)) {
+            foreach ($otherBenefits as $item) {
+                if (isset($item['calculatedValue'])) {
+                    $monthlyAllowance += (float)$item['calculatedValue'];
+                }
+            }
+        }
+
+        // Calculate deductions total
+        if (is_array($recurringDeductions)) {
+            foreach ($recurringDeductions as $item) {
+                if (isset($item['calculatedValue'])) {
+                    $monthlyDeduction += (float)$item['calculatedValue'];
+                }
+            }
+        }
+
+        // Calculate net salary
+        $monthlyNetSalary = $monthlyGross - $monthlyDeduction;
+
+        // Calculate annual values
+        $annualGross = $monthlyGross * 12;
+        $annualAllowance = $monthlyAllowance * 12;
+        $annualDeduction = $monthlyDeduction * 12;
+        $annualNetSalary = $monthlyNetSalary * 12;
+
+        return [
+            'monthlyGross' => round($monthlyGross, 2),
+            'annualGross' => round($annualGross, 2),
+            'monthlyDeduction' => round($monthlyDeduction, 2),
+            'annualDeduction' => round($annualDeduction, 2),
+            'monthlyAllowance' => round($monthlyAllowance, 2),
+            'annualAllowance' => round($annualAllowance, 2),
+            'monthlyNetSalary' => round($monthlyNetSalary, 2),
+            'annualNetSalary' => round($annualNetSalary, 2)
+        ];
     }
 }
