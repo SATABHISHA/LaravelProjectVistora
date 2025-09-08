@@ -559,3 +559,12 @@ Route::get('/debug/formula-builder/{componentName?}', [PaygroupConfigurationApiC
 
 // New route for complete payroll breakdown
 Route::get('/paygroup/complete/{groupName}/{corpId}/{basicSalary}', [PaygroupConfigurationApiController::class, 'fetchCompletePayrollBreakdown']);
+
+// Holiday List API Routes
+Route::post('/holiday-list', [HolidayListApiController::class, 'storeOrUpdate']);
+Route::get('/holiday-list/puid/{puid}', [HolidayListApiController::class, 'fetchByPuid']);
+Route::delete('/holiday-list/{puid}', [HolidayListApiController::class, 'destroy']);
+Route::get('/holiday-list/corp/{corpId}', [HolidayListApiController::class, 'fetchByCorpId']);
+Route::get('/holiday-list/company/{corpId}/{companyNames}', [HolidayListApiController::class, 'fetchByCorpAndCompany']);
+Route::get('/holiday-list/location/{country}/{state?}/{city?}', [HolidayListApiController::class, 'fetchByLocation']);
+Route::get('/holiday-list/date-range/{startDate}/{endDate}/{corpId?}', [HolidayListApiController::class, 'fetchByDateRange']);
