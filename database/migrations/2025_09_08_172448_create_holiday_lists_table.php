@@ -15,13 +15,14 @@ return new class extends Migration
             $table->id();
             $table->string('corpId', 10)->index();
             $table->string('puid', 50)->unique();
-            $table->string('companyNames', 100);
+            $table->string('companyNames', 255);
             $table->string('country', 50);
             $table->string('state', 50);
             $table->string('city', 50);
-            $table->string('holidayName', 100);
+            $table->string('holidayName', 255);
             $table->date('holidayDate');
-            $table->string('holidayType', 50); // Removed enum constraint
+            $table->string('year', 4);
+            $table->string('holidayType', 100); // Removed enum constraint
             $table->string('recurringType', 50); // Removed enum constraint
             $table->timestamps();
             

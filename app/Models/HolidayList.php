@@ -20,6 +20,7 @@ class HolidayList extends Model
         'city',
         'holidayName',
         'holidayDate',
+        'year', // ✅ Added year field
         'holidayType',
         'recurringType'
     ];
@@ -60,6 +61,12 @@ class HolidayList extends Model
     public function scopeByDateRange($query, $startDate, $endDate)
     {
         return $query->whereBetween('holidayDate', [$startDate, $endDate]);
+    }
+
+    // ✅ NEW: Scope for filtering by year
+    public function scopeByYear($query, $year)
+    {
+        return $query->where('year', $year);
     }
 
     // Scope for filtering by holiday type

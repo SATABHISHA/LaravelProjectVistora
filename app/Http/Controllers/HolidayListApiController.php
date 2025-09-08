@@ -14,7 +14,7 @@ class HolidayListApiController extends Controller
     public function storeOrUpdate(Request $request)
     {
         try {
-            // Validation rules
+            // ✅ Updated validation rules with year field
             $validator = Validator::make($request->all(), [
                 'corpId' => 'required|string|max:10',
                 'puid' => 'required|string|max:50',
@@ -24,6 +24,7 @@ class HolidayListApiController extends Controller
                 'city' => 'required|string|max:50',
                 'holidayName' => 'required|string|max:255',
                 'holidayDate' => 'required|date',
+                'year' => 'required|string|max:4', // ✅ Added year validation
                 'holidayType' => 'required|string|max:100',
                 'recurringType' => 'required|string|max:50'
             ]);
@@ -135,6 +136,7 @@ class HolidayListApiController extends Controller
     {
         try {
             $holidays = HolidayList::where('corpId', $corpId)
+                ->orderBy('year', 'desc')
                 ->orderBy('holidayDate', 'asc')
                 ->get();
 
@@ -161,6 +163,7 @@ class HolidayListApiController extends Controller
         try {
             $holidays = HolidayList::where('corpId', $corpId)
                 ->where('companyNames', $companyNames)
+                ->orderBy('year', 'desc')
                 ->orderBy('holidayDate', 'asc')
                 ->get();
 
@@ -180,15 +183,20 @@ class HolidayListApiController extends Controller
     }
 
     /**
-     * Fetch Holidays by location
+     * ✅ UPDATED: Fetch Holidays by location with optional year filter
      */
-    public function fetchByLocation($country, $state = null, $city = null)
+    public function fetchByLocation($country, $state = null, $city = null, $year = null)
     {
         try {
-            $query = HolidayList::byLocation($country, $state, $city)
-                ->orderBy('holidayDate', 'asc');
-
-            $holidays = $query->get();
+            $query = HolidayList::byLocation($country, $state, $city);
+            
+            if ($year) {
+                $query->byYear($year);
+            }
+            
+            $holidays = $query->orderBy('year', 'desc')
+                            ->orderBy('holidayDate', 'asc')
+                            ->get();
 
             return response()->json([
                 'status' => true,
@@ -198,7 +206,8 @@ class HolidayListApiController extends Controller
                 'filters' => [
                     'country' => $country,
                     'state' => $state,
-                    'city' => $city
+                    'city' => $city,
+                    'year' => $year
                 ]
             ], 200);
 
@@ -211,13 +220,54 @@ class HolidayListApiController extends Controller
     }
 
     /**
-     * Fetch Holidays by date range
+     * ✅ UPDATED: Fetch Holidays by date range with optional year filter
      */
-    public function fetchByDateRange($startDate, $endDate, $corpId = null)
+    public function fetchByDateRange($startDate, $endDate, $corpId = null, $year = null)
     {
         try {
             $query = HolidayList::byDateRange($startDate, $endDate);
 
+            if ($corpId) {
+                $query->where('corpId', $corpId);
+            }
+            
+            if ($year) {
+                $query->byYear($year);
+            }
+
+            $holidays = $query->orderBy('year', 'desc')
+                            ->orderBy('holidayDate', 'asc')
+                            ->get();
+
+            return response()->json([
+                'status' => true,
+                'message' => 'Holidays fetched successfully',
+                'data' => $holidays,
+                'count' => $holidays->count(),
+                'filters' => [
+                    'startDate' => $startDate,
+                    'endDate' => $endDate,
+                    'corpId' => $corpId,
+                    'year' => $year
+                ]
+            ], 200);
+
+        } catch (\Exception $e) {
+            return response()->json([
+                'status' => false,
+                'message' => 'Error: ' . $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * ✅ NEW: Fetch Holidays by Year
+     */
+    public function fetchByYear($year, $corpId = null)
+    {
+        try {
+            $query = HolidayList::byYear($year);
+            
             if ($corpId) {
                 $query->where('corpId', $corpId);
             }
@@ -230,8 +280,7 @@ class HolidayListApiController extends Controller
                 'data' => $holidays,
                 'count' => $holidays->count(),
                 'filters' => [
-                    'startDate' => $startDate,
-                    'endDate' => $endDate,
+                    'year' => $year,
                     'corpId' => $corpId
                 ]
             ], 200);

@@ -74,6 +74,7 @@ use App\Http\Controllers\EmployeeSalaryStructureApiController;
 use App\Http\Controllers\AttendanceApiController;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
+use App\Http\Controllers\HolidayListApiController;
 
 /*
 |--------------------------------------------------------------------------
@@ -566,5 +567,6 @@ Route::get('/holiday-list/puid/{puid}', [HolidayListApiController::class, 'fetch
 Route::delete('/holiday-list/{puid}', [HolidayListApiController::class, 'destroy']);
 Route::get('/holiday-list/corp/{corpId}', [HolidayListApiController::class, 'fetchByCorpId']);
 Route::get('/holiday-list/company/{corpId}/{companyNames}', [HolidayListApiController::class, 'fetchByCorpAndCompany']);
-Route::get('/holiday-list/location/{country}/{state?}/{city?}', [HolidayListApiController::class, 'fetchByLocation']);
-Route::get('/holiday-list/date-range/{startDate}/{endDate}/{corpId?}', [HolidayListApiController::class, 'fetchByDateRange']);
+Route::get('/holiday-list/location/{country}/{state?}/{city?}/{year?}', [HolidayListApiController::class, 'fetchByLocation']);
+Route::get('/holiday-list/date-range/{startDate}/{endDate}/{corpId?}/{year?}', [HolidayListApiController::class, 'fetchByDateRange']);
+Route::get('/holiday-list/year/{year}/{corpId?}', [HolidayListApiController::class, 'fetchByYear']); // ✅ NEW route
