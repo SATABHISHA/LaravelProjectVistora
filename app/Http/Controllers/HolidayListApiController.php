@@ -5,16 +5,73 @@ namespace App\Http\Controllers;
 use Illuminate\Http\Request;
 use App\Models\HolidayList;
 use Illuminate\Support\Facades\Validator;
+use Carbon\Carbon;
 
 class HolidayListApiController extends Controller
 {
+    /**
+     * Helper method to format date as "1st Nov" format
+     */
+    private function formatHolidayDate($date)
+    {
+        if (!$date) return null;
+        
+        try {
+            $carbon = Carbon::parse($date);
+            $day = $carbon->day;
+            $month = $carbon->format('M'); // Short month name (Jan, Feb, etc.)
+            
+            // Add ordinal suffix to day
+            $suffix = '';
+            if ($day % 10 == 1 && $day != 11) {
+                $suffix = 'st';
+            } elseif ($day % 10 == 2 && $day != 12) {
+                $suffix = 'nd';
+            } elseif ($day % 10 == 3 && $day != 13) {
+                $suffix = 'rd';
+            } else {
+                $suffix = 'th';
+            }
+            
+            return $day . $suffix . ' ' . $month;
+        } catch (\Exception $e) {
+            return $date; // Return original if parsing fails
+        }
+    }
+
+    /**
+     * Helper method to format holiday data with formatted date
+     */
+    private function formatHolidayData($holiday)
+    {
+        if (is_array($holiday)) {
+            $holiday['holidayDateFormatted'] = $this->formatHolidayDate($holiday['holidayDate']);
+        } else {
+            $holidayArray = $holiday->toArray();
+            $holidayArray['holidayDateFormatted'] = $this->formatHolidayDate($holiday->holidayDate);
+            return $holidayArray;
+        }
+        
+        return $holiday;
+    }
+
+    /**
+     * Helper method to format collection of holidays
+     */
+    private function formatHolidaysCollection($holidays)
+    {
+        return $holidays->map(function ($holiday) {
+            return $this->formatHolidayData($holiday);
+        });
+    }
+
     /**
      * Add or Update Holiday (same API for both operations)
      */
     public function storeOrUpdate(Request $request)
     {
         try {
-            // ✅ Updated validation rules with year field
+            // Validation rules with year field
             $validator = Validator::make($request->all(), [
                 'corpId' => 'required|string|max:10',
                 'puid' => 'required|string|max:50',
@@ -24,7 +81,7 @@ class HolidayListApiController extends Controller
                 'city' => 'required|string|max:50',
                 'holidayName' => 'required|string|max:255',
                 'holidayDate' => 'required|date',
-                'year' => 'required|string|max:4', // ✅ Added year validation
+                'year' => 'required|string|max:4',
                 'holidayType' => 'required|string|max:100',
                 'recurringType' => 'required|string|max:50'
             ]);
@@ -54,10 +111,13 @@ class HolidayListApiController extends Controller
                 $status = 'created';
             }
 
+            // Format the response data
+            $formattedHoliday = $this->formatHolidayData($holiday);
+
             return response()->json([
                 'status' => true,
                 'message' => $message,
-                'data' => $holiday,
+                'data' => $formattedHoliday,
                 'operation' => $status
             ], 200);
 
@@ -115,10 +175,13 @@ class HolidayListApiController extends Controller
                 ], 404);
             }
 
+            // Format the holiday data
+            $formattedHoliday = $this->formatHolidayData($holiday);
+
             return response()->json([
                 'status' => true,
                 'message' => 'Holiday fetched successfully',
-                'data' => $holiday
+                'data' => $formattedHoliday
             ], 200);
 
         } catch (\Exception $e) {
@@ -140,10 +203,13 @@ class HolidayListApiController extends Controller
                 ->orderBy('holidayDate', 'asc')
                 ->get();
 
+            // Format the holidays collection
+            $formattedHolidays = $this->formatHolidaysCollection($holidays);
+
             return response()->json([
                 'status' => true,
                 'message' => 'Holidays fetched successfully',
-                'data' => $holidays,
+                'data' => $formattedHolidays,
                 'count' => $holidays->count()
             ], 200);
 
@@ -167,10 +233,13 @@ class HolidayListApiController extends Controller
                 ->orderBy('holidayDate', 'asc')
                 ->get();
 
+            // Format the holidays collection
+            $formattedHolidays = $this->formatHolidaysCollection($holidays);
+
             return response()->json([
                 'status' => true,
                 'message' => 'Holidays fetched successfully',
-                'data' => $holidays,
+                'data' => $formattedHolidays,
                 'count' => $holidays->count()
             ], 200);
 
@@ -183,7 +252,7 @@ class HolidayListApiController extends Controller
     }
 
     /**
-     * ✅ UPDATED: Fetch Holidays by location with optional year filter
+     * Fetch Holidays by location with optional year filter
      */
     public function fetchByLocation($country, $state = null, $city = null, $year = null)
     {
@@ -198,10 +267,13 @@ class HolidayListApiController extends Controller
                             ->orderBy('holidayDate', 'asc')
                             ->get();
 
+            // Format the holidays collection
+            $formattedHolidays = $this->formatHolidaysCollection($holidays);
+
             return response()->json([
                 'status' => true,
                 'message' => 'Holidays fetched successfully',
-                'data' => $holidays,
+                'data' => $formattedHolidays,
                 'count' => $holidays->count(),
                 'filters' => [
                     'country' => $country,
@@ -220,7 +292,7 @@ class HolidayListApiController extends Controller
     }
 
     /**
-     * ✅ UPDATED: Fetch Holidays by date range with optional year filter
+     * Fetch Holidays by date range with optional year filter
      */
     public function fetchByDateRange($startDate, $endDate, $corpId = null, $year = null)
     {
@@ -239,10 +311,13 @@ class HolidayListApiController extends Controller
                             ->orderBy('holidayDate', 'asc')
                             ->get();
 
+            // Format the holidays collection
+            $formattedHolidays = $this->formatHolidaysCollection($holidays);
+
             return response()->json([
                 'status' => true,
                 'message' => 'Holidays fetched successfully',
-                'data' => $holidays,
+                'data' => $formattedHolidays,
                 'count' => $holidays->count(),
                 'filters' => [
                     'startDate' => $startDate,
@@ -261,7 +336,7 @@ class HolidayListApiController extends Controller
     }
 
     /**
-     * ✅ NEW: Fetch Holidays by Year
+     * Fetch Holidays by Year
      */
     public function fetchByYear($year, $corpId = null)
     {
@@ -274,10 +349,13 @@ class HolidayListApiController extends Controller
 
             $holidays = $query->orderBy('holidayDate', 'asc')->get();
 
+            // Format the holidays collection
+            $formattedHolidays = $this->formatHolidaysCollection($holidays);
+
             return response()->json([
                 'status' => true,
                 'message' => 'Holidays fetched successfully',
-                'data' => $holidays,
+                'data' => $formattedHolidays,
                 'count' => $holidays->count(),
                 'filters' => [
                     'year' => $year,
