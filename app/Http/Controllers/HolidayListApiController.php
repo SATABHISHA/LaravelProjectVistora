@@ -40,6 +40,20 @@ class HolidayListApiController extends Controller
     }
 
     /**
+     * Helper method to format created_at date as "Jan 15, 2025"
+     */
+    private function formatCreatedDate($date)
+    {
+        if (!$date) return null;
+        
+        try {
+            return Carbon::parse($date)->format('M j, Y');
+        } catch (\Exception $e) {
+            return $date;
+        }
+    }
+
+    /**
      * Helper method to format holiday data with formatted date
      */
     private function formatHolidayData($holiday)
@@ -193,7 +207,7 @@ class HolidayListApiController extends Controller
     }
 
     /**
-     * Fetch Holidays by corpId
+     * ✅ UPDATED: Fetch Holidays by corpId - Grouped by Company
      */
     public function fetchByCorpId($corpId)
     {
@@ -203,14 +217,39 @@ class HolidayListApiController extends Controller
                 ->orderBy('holidayDate', 'asc')
                 ->get();
 
-            // Format the holidays collection
-            $formattedHolidays = $this->formatHolidaysCollection($holidays);
+            // Group holidays by company name
+            $groupedHolidays = $holidays->groupBy('companyNames');
+
+            // Format the grouped data
+            $formattedData = [];
+            $totalHolidays = 0;
+
+            foreach ($groupedHolidays as $companyName => $companyHolidays) {
+                $formattedCompanyHolidays = $this->formatHolidaysCollection($companyHolidays);
+                
+                // Get the most recent created_at date for this company
+                $latestCreatedAt = $companyHolidays->max('created_at');
+                
+                // Get unique years for this company
+                $years = $companyHolidays->pluck('year')->unique()->sort()->values();
+                
+                $formattedData[] = [
+                    'companyName' => $companyName,
+                    'totalHolidays' => $companyHolidays->count(),
+                    'years' => $years,
+                    'createdAt' => $this->formatCreatedDate($latestCreatedAt),
+                    'holidays' => $formattedCompanyHolidays
+                ];
+
+                $totalHolidays += $companyHolidays->count();
+            }
 
             return response()->json([
                 'status' => true,
                 'message' => 'Holidays fetched successfully',
-                'data' => $formattedHolidays,
-                'count' => $holidays->count()
+                'data' => $formattedData,
+                'totalCompanies' => count($formattedData),
+                'totalHolidays' => $totalHolidays
             ], 200);
 
         } catch (\Exception $e) {
