@@ -566,7 +566,7 @@ Route::post('/holiday-list', [HolidayListApiController::class, 'storeOrUpdate'])
 Route::get('/holiday-list/puid/{puid}', [HolidayListApiController::class, 'fetchByPuid']);
 Route::delete('/holiday-list/{puid}', [HolidayListApiController::class, 'destroy']);
 Route::get('/holiday-list/corp/{corpId}', [HolidayListApiController::class, 'fetchByCorpId']);
-Route::get('/holiday-list/company/{corpId}/{companyNames}', [HolidayListApiController::class, 'fetchByCorpAndCompany']);
+Route::get('/holiday-list/company/{corpId}/{companyNames}/{year?}', [HolidayListApiController::class, 'fetchByCorpAndCompany']); // ✅ Added optional year parameter
 Route::get('/holiday-list/location/{country}/{state?}/{city?}/{year?}', [HolidayListApiController::class, 'fetchByLocation']);
 Route::get('/holiday-list/date-range/{startDate}/{endDate}/{corpId?}/{year?}', [HolidayListApiController::class, 'fetchByDateRange']);
-Route::get('/holiday-list/year/{year}/{corpId?}', [HolidayListApiController::class, 'fetchByYear']); // ✅ NEW route
+Route::get('/holiday-list/year/{year}/{corpId?}', [HolidayListApiController::class, 'fetchByYear']);

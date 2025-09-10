@@ -281,7 +281,7 @@ class HolidayListApiController extends Controller
     /**
      * Fetch Holidays by corpId and companyNames
      */
-    public function fetchByCorpAndCompany($corpId, $companyNames)
+   /* public function fetchByCorpAndCompany($corpId, $companyNames)
     {
         try {
             $holidays = HolidayList::where('corpId', $corpId)
@@ -306,7 +306,7 @@ class HolidayListApiController extends Controller
                 'message' => 'Error: ' . $e->getMessage()
             ], 500);
         }
-    }
+    }*/
 
     /**
      * Fetch Holidays by location with optional year filter
@@ -417,6 +417,72 @@ class HolidayListApiController extends Controller
                 'filters' => [
                     'year' => $year,
                     'corpId' => $corpId
+                ]
+            ], 200);
+
+        } catch (\Exception $e) {
+            return response()->json([
+                'status' => false,
+                'message' => 'Error: ' . $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * ✅ UPDATED: Fetch Holidays by corpId and companyNames - Grouped by Year
+     */
+    public function fetchByCorpAndCompany($corpId, $companyNames, $year = null)
+    {
+        try {
+            $query = HolidayList::where('corpId', $corpId)
+                ->where('companyNames', $companyNames);
+            
+            // If year is provided, filter by year
+            if ($year) {
+                $query->where('year', $year);
+            }
+            
+            $holidays = $query->orderBy('year', 'desc')
+                            ->orderBy('holidayDate', 'asc')
+                            ->get();
+
+            // Group holidays by year
+            $groupedByYear = $holidays->groupBy('year');
+
+            // Format the grouped data
+            $formattedData = [];
+            $totalHolidays = 0;
+            $totalYears = 0;
+
+            foreach ($groupedByYear as $yearValue => $yearHolidays) {
+                $totalYears++;
+                
+                $formattedYearHolidays = $this->formatHolidaysCollection($yearHolidays);
+                
+                // Get the most recent created_at date for this year
+                $latestCreatedAt = $yearHolidays->max('created_at');
+                
+                $formattedData[] = [
+                    'year' => $yearValue,
+                    'companyName' => $companyNames,
+                    'totalHolidays' => $yearHolidays->count(),
+                    'createdAt' => $this->formatCreatedDate($latestCreatedAt),
+                    'holidays' => $formattedYearHolidays
+                ];
+                
+                $totalHolidays += $yearHolidays->count();
+            }
+
+            return response()->json([
+                'status' => true,
+                'message' => 'Holidays fetched successfully',
+                'data' => $formattedData,
+                'totalYears' => $totalYears,
+                'totalHolidays' => $totalHolidays,
+                'filters' => [
+                    'corpId' => $corpId,
+                    'companyNames' => $companyNames,
+                    'year' => $year
                 ]
             ], 200);
 
