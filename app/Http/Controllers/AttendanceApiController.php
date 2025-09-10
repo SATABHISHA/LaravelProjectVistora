@@ -496,7 +496,37 @@ class AttendanceApiController extends Controller
             // Calculate days in month
             $daysInMonth = $date->daysInMonth;
             
-            // Build query
+            // Filter by date range for the requested month
+            $startDate = $date->format('Y-m-d');
+            $endDate = $date->copy()->endOfMonth()->format('Y-m-d');
+            
+            // Get holidays for this month, corp and company
+            $holidayQuery = \App\Models\HolidayList::where('corpId', $request->corpId)
+                ->where('year', $year)
+                ->whereBetween('holidayDate', [$startDate, $endDate]);
+                
+            // Apply company filter if provided
+            if ($request->companyName) {
+                // Check if the holiday applies to this company
+                // This handles both exact matches and comma-separated lists of companies
+                $holidayQuery->where(function($query) use ($request) {
+                    $query->where('companyNames', $request->companyName)
+                          ->orWhere('companyNames', 'like', $request->companyName . ',%')
+                          ->orWhere('companyNames', 'like', '%,' . $request->companyName . ',%')
+                          ->orWhere('companyNames', 'like', '%,' . $request->companyName);
+                });
+            }
+            
+            $holidays = $holidayQuery->get();
+            
+            // Create a map of holidays by date for quick lookup
+            $holidaysByDate = [];
+            foreach ($holidays as $holiday) {
+                $holidayDate = Carbon::parse($holiday->holidayDate)->format('Y-m-d');
+                $holidaysByDate[$holidayDate] = $holiday;
+            }
+            
+            // Build attendance query
             $query = Attendance::where('corpId', $request->corpId);
             
             // Add optional filters
@@ -513,9 +543,6 @@ class AttendanceApiController extends Controller
             }
             
             // Filter by date range for the requested month
-            $startDate = $date->format('Y-m-d');
-            $endDate = $date->copy()->endOfMonth()->format('Y-m-d');
-            
             $query->whereBetween('date', [$startDate, $endDate]);
             
             // Get attendance records
@@ -555,14 +582,17 @@ class AttendanceApiController extends Controller
                     // Day has attendance record
                     $calendar[] = $attendanceByDate[$dateKey];
                 } else {
+                    // Check if this day is a holiday
+                    $isHoliday = isset($holidaysByDate[$dateKey]);
+                    
                     // Day without attendance record
-                    $calendar[] = [
+                    $calendarEntry = [
                         'id' => null,
                         'puid' => null,
                         'checkIn' => null,
                         'checkOut' => null,
-                        'status' => 'ABSENT',
-                        'attendanceStatus' => 'Absent',
+                        'status' => $isHoliday ? 'HOLIDAY' : 'ABSENT',
+                        'attendanceStatus' => $isHoliday ? 'Holiday' : 'Absent',
                         'totalHrsForTheDay' => '00:00',
                         'dayName' => $currentDate->format('D'), // Short day name
                         'dateOnly' => $currentDate->format('d'), // Day number
@@ -571,6 +601,15 @@ class AttendanceApiController extends Controller
                         'Long' => null,
                         'Address' => null
                     ];
+                    
+                    // Add holiday information if applicable
+                    if ($isHoliday) {
+                        $holiday = $holidaysByDate[$dateKey];
+                        $calendarEntry['holidayName'] = $holiday->holidayName;
+                        $calendarEntry['holidayType'] = $holiday->holidayType;
+                    }
+                    
+                    $calendar[] = $calendarEntry;
                 }
             }
             
