@@ -573,3 +573,6 @@ Route::get('/employee-payroll-salary/{corpId}/{empCode}/{year}/{month}', [Employ
 
 // Year Utility Route
 Route::get('/utility/years/{count?}', [UtilityApiController::class, 'getYearsList']);
+
+// Bulk process employee salary structures to payroll
+Route::post('/employee-payroll/bulk-process', [EmployeePayrollSalaryProcessApiController::class, 'bulkProcessFromSalaryStructures']);

@@ -17,7 +17,7 @@ return new class extends Migration
             $table->string('empCode', 20);
             $table->string('companyName', 100);
             $table->string('year', 4);
-            $table->string('month', 2);
+            $table->string('month', 50);
             $table->text('grossList');
             $table->text('otherAllowances')->nullable();
             $table->text('otherBenefits')->nullable();

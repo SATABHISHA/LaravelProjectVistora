@@ -64,4 +64,92 @@ class EmployeePayrollSalaryProcessApiController extends Controller
 
         return response()->json(['data' => $payroll]);
     }
+
+    /**
+     * Process employee salary structures into payroll entries in bulk
+     *
+     * @param Request $request
+     * @return \Illuminate\Http\JsonResponse
+     */
+    public function bulkProcessFromSalaryStructures(Request $request)
+    {
+        // Validate required bulk fields
+        $request->validate([
+            'corpId' => 'required|string|max:10',
+            'companyName' => 'nullable|string|max:100', // Added optional companyName
+            'year' => 'required|string|max:4',
+            'month' => 'required|string|max:50',
+            'status' => 'required|string',
+            'isShownToEmployeeYn' => 'required|integer',
+        ]);
+
+        // Build query for salary structures
+        $query = \App\Models\EmployeeSalaryStructure::where('corpId', $request->corpId);
+        
+        // Add company name filter if provided
+        if ($request->has('companyName') && !empty($request->companyName)) {
+            $query->where('companyName', $request->companyName);
+        }
+        
+        // Get filtered salary structures
+        $salaryStructures = $query->get();
+
+        if ($salaryStructures->isEmpty()) {
+            $message = $request->has('companyName') && !empty($request->companyName) 
+                ? "No salary structures found for the given corpId and companyName" 
+                : "No salary structures found for the given corpId";
+                
+            return response()->json([
+                'message' => $message,
+                'status' => 'error'
+            ], 404);
+        }
+
+        $processedCount = 0;
+        $errors = [];
+
+        // Process each salary structure
+        foreach ($salaryStructures as $structure) {
+            try {
+                // Create or update payroll entry
+                \App\Models\EmployeePayrollSalaryProcess::updateOrCreate(
+                    [
+                        'corpId' => $structure->corpId,
+                        'empCode' => $structure->empCode,
+                        'year' => $request->year,
+                        'month' => $request->month,
+                    ],
+                    [
+                        'companyName' => $structure->companyName,
+                        'grossList' => $structure->grossList,
+                        'otherAllowances' => $structure->otherAlowances,
+                        'otherBenefits' => $structure->otherBenifits,
+                        'recurringDeduction' => $structure->recurringDeductions,
+                        'status' => $request->status,
+                        'isShownToEmployeeYn' => $request->isShownToEmployeeYn,
+                    ]
+                );
+
+                $processedCount++;
+            } catch (\Exception $e) {
+                $errors[] = [
+                    'empCode' => $structure->empCode,
+                    'error' => $e->getMessage()
+                ];
+            }
+        }
+
+        $filterDescription = $request->has('companyName') && !empty($request->companyName)
+            ? "corpId: {$request->corpId}, companyName: {$request->companyName}"
+            : "corpId: {$request->corpId}";
+
+        return response()->json([
+            'message' => "Processed $processedCount employee records from salary structures to payroll",
+            'filter' => $filterDescription,
+            'total_structures' => $salaryStructures->count(),
+            'processed' => $processedCount,
+            'errors' => $errors,
+            'status' => 'success'
+        ]);
+    }
 }
