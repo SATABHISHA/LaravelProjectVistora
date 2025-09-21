@@ -76,6 +76,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\HolidayListApiController;
 use App\Http\Controllers\EmployeePayrollSalaryProcessApiController;
+use App\Http\Controllers\UtilityApiController;
 
 /*
 |--------------------------------------------------------------------------
@@ -569,3 +570,6 @@ Route::get('/holiday-list/year/{year}/{corpId?}', [HolidayListApiController::cla
 Route::post('/employee-payroll-salary/add-or-update', [EmployeePayrollSalaryProcessApiController::class, 'storeOrUpdate']);
 Route::get('/employee-payroll-salary/all/{corpId}', [EmployeePayrollSalaryProcessApiController::class, 'getByCorpId']);
 Route::get('/employee-payroll-salary/{corpId}/{empCode}/{year}/{month}', [EmployeePayrollSalaryProcessApiController::class, 'getSpecific']);
+
+// Year Utility Route
+Route::get('/utility/years/{count?}', [UtilityApiController::class, 'getYearsList']);
