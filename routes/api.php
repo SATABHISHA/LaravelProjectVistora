@@ -568,8 +568,8 @@ Route::get('/holiday-list/year/{year}/{corpId?}', [HolidayListApiController::cla
 
 // Employee Payroll Salary Process Routes
 Route::post('/employee-payroll-salary/add-or-update', [EmployeePayrollSalaryProcessApiController::class, 'storeOrUpdate']);
-Route::get('/employee-payroll-salary/all/{corpId}', [EmployeePayrollSalaryProcessApiController::class, 'getByCorpId']);
-Route::get('/employee-payroll-salary/{corpId}/{empCode}/{year}/{month}', [EmployeePayrollSalaryProcessApiController::class, 'getSpecific']);
+Route::get('/employee-payroll-salary/all/{corpId}/{companyName?}', [EmployeePayrollSalaryProcessApiController::class, 'getByCorpId']);
+Route::get('/employee-payroll-salary/{corpId}/{empCode}/{year}/{month}/{companyName?}', [EmployeePayrollSalaryProcessApiController::class, 'getSpecific']);
 
 // Year Utility Route
 Route::get('/utility/years/{count?}', [UtilityApiController::class, 'getYearsList']);

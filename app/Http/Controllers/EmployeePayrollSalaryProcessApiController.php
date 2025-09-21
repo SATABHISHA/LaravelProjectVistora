@@ -42,27 +42,110 @@ class EmployeePayrollSalaryProcessApiController extends Controller
         ]);
     }
 
-    // Fetch all by corpId
-    public function getByCorpId($corpId)
+    /**
+     * Fetch all by corpId with optional company name filter
+     * and include salary summary calculations for each record
+     * 
+     * @param string $corpId
+     * @param string|null $companyName
+     * @return \Illuminate\Http\JsonResponse
+     */
+    public function getByCorpId($corpId, $companyName = null)
     {
-        $payrolls = EmployeePayrollSalaryProcess::where('corpId', $corpId)->get();
-        return response()->json(['data' => $payrolls]);
+        // Start building the query
+        $query = EmployeePayrollSalaryProcess::where('corpId', $corpId);
+        
+        // Add company name filter if provided
+        if ($companyName) {
+            $query->where('companyName', $companyName);
+        }
+        
+        $payrolls = $query->get();
+        
+        // Calculate salary summary for each payroll record
+        $payrollsWithSummary = $payrolls->map(function($payroll) {
+            // Parse JSON data from fields
+            $grossList = json_decode($payroll->grossList, true) ?: [];
+            $otherAllowances = json_decode($payroll->otherAllowances, true) ?: [];
+            $otherBenefits = json_decode($payroll->otherBenefits, true) ?: [];
+            $recurringDeduction = json_decode($payroll->recurringDeduction, true) ?: [];
+
+            // Calculate salary totals
+            $salarySummary = $this->calculateSalaryTotals(
+                $grossList,
+                $otherBenefits, 
+                $recurringDeduction,
+                $otherAllowances
+            );
+
+            // Add salary summary to the payroll data
+            return [
+                'payroll' => $payroll,
+                'salarySummary' => $salarySummary
+            ];
+        });
+        
+        return response()->json(['data' => $payrollsWithSummary]);
     }
 
-    // Fetch specific record
-    public function getSpecific($corpId, $empCode, $year, $month)
+    /**
+     * Fetch specific record with optional company name filter and calculate salary summary
+     * 
+     * @param string $corpId
+     * @param string $empCode
+     * @param string $year
+     * @param string $month
+     * @param string|null $companyName
+     * @return \Illuminate\Http\JsonResponse
+     */
+    public function getSpecific($corpId, $empCode, $year, $month, $companyName = null)
     {
-        $payroll = EmployeePayrollSalaryProcess::where('corpId', $corpId)
+        // Start building the query
+        $query = EmployeePayrollSalaryProcess::where('corpId', $corpId)
             ->where('empCode', $empCode)
             ->where('year', $year)
-            ->where('month', $month)
-            ->first();
+            ->where('month', $month);
+        
+        // Add company name filter if provided
+        if ($companyName) {
+            $query->where('companyName', $companyName);
+        }
+        
+        // Get the result
+        $payroll = $query->first();
 
         if (!$payroll) {
-            return response()->json(['message' => 'Payroll record not found'], 404);
+            return response()->json([
+                'message' => 'Payroll record not found', 
+                'filters' => [
+                    'corpId' => $corpId,
+                    'empCode' => $empCode,
+                    'year' => $year,
+                    'month' => $month,
+                    'companyName' => $companyName ?: 'Not specified'
+                ]
+            ], 404);
         }
 
-        return response()->json(['data' => $payroll]);
+        // Parse JSON data from fields
+        $grossList = json_decode($payroll->grossList, true) ?: [];
+        $otherAllowances = json_decode($payroll->otherAllowances, true) ?: [];
+        $otherBenefits = json_decode($payroll->otherBenefits, true) ?: [];
+        $recurringDeduction = json_decode($payroll->recurringDeduction, true) ?: [];
+
+        // Calculate salary totals
+        $salarySummary = $this->calculateSalaryTotals(
+            $grossList,
+            $otherBenefits, 
+            $recurringDeduction,
+            $otherAllowances
+        );
+
+        // Return data with calculated values
+        return response()->json([
+            'data' => $payroll,
+            'salarySummary' => $salarySummary
+        ]);
     }
 
     /**
@@ -151,5 +234,105 @@ class EmployeePayrollSalaryProcessApiController extends Controller
             'errors' => $errors,
             'status' => 'success'
         ]);
+    }
+
+    /**
+     * Calculate salary totals
+     *
+     * @param array $grossList
+     * @param array $otherBenefits
+     * @param array $recurringDeductions
+     * @param array $otherAllowances
+     * @return array
+     */
+    private function calculateSalaryTotals($grossList, $otherBenefits, $recurringDeductions, $otherAllowances = [])
+    {
+        // Initialize totals
+        $monthlyGross = 0.0;
+        $monthlyAllowance = 0.0;
+        $monthlyDeduction = 0.0;
+
+        // Calculate gross total
+        if (is_array($grossList)) {
+            foreach ($grossList as $item) {
+                if (isset($item['calculatedValue'])) {
+                    $monthlyGross += (float)$item['calculatedValue'];
+                }
+            }
+        }
+
+        // Calculate other benefits total
+        if (is_array($otherBenefits)) {
+            foreach ($otherBenefits as $item) {
+                if (isset($item['calculatedValue'])) {
+                    $monthlyAllowance += (float)$item['calculatedValue'];
+                }
+            }
+        }
+
+        // Calculate other allowances total (if provided separately)
+        if (is_array($otherAllowances)) {
+            foreach ($otherAllowances as $item) {
+                if (isset($item['calculatedValue'])) {
+                    $monthlyAllowance += (float)$item['calculatedValue'];
+                }
+            }
+        }
+
+        // Calculate deductions total
+        if (is_array($recurringDeductions)) {
+            foreach ($recurringDeductions as $item) {
+                if (isset($item['calculatedValue'])) {
+                    $monthlyDeduction += (float)$item['calculatedValue'];
+                }
+            }
+        }
+
+        // Calculate net salary
+        $monthlyNetSalary = $monthlyGross + $monthlyAllowance - $monthlyDeduction;
+
+        // Calculate annual values
+        $annualGross = $monthlyGross * 12;
+        $annualAllowance = $monthlyAllowance * 12;
+        $annualDeduction = $monthlyDeduction * 12;
+        $annualNetSalary = $monthlyNetSalary * 12;
+
+        return [
+            'monthlyGross' => round($monthlyGross, 2),
+            'annualGross' => round($annualGross, 2),
+            'monthlyDeduction' => round($monthlyDeduction, 2),
+            'annualDeduction' => round($annualDeduction, 2),
+            'monthlyAllowance' => round($monthlyAllowance, 2),
+            'annualAllowance' => round($annualAllowance, 2),
+            'monthlyNetSalary' => round($monthlyNetSalary, 2),
+            'annualNetSalary' => round($annualNetSalary, 2)
+        ];
+    }
+
+    /**
+     * Safely sum values in an array, recursively processing nested arrays
+     *
+     * @param array $array The array to sum
+     * @return float The sum of numeric values
+     */
+    private function safeArraySum($array) 
+    {
+        $sum = 0;
+        
+        if (!is_array($array)) {
+            return 0;
+        }
+        
+        foreach ($array as $value) {
+            if (is_array($value)) {
+                // Recursively sum nested arrays
+                $sum += $this->safeArraySum($value);
+            } else if (is_numeric($value)) {
+                // Only add numeric values
+                $sum += $value;
+            }
+        }
+        
+        return $sum;
     }
 }
