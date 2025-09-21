@@ -62,8 +62,16 @@ class EmployeePayrollSalaryProcessApiController extends Controller
         
         $payrolls = $query->get();
         
-        // Calculate salary summary for each payroll record
-        $payrollsWithSummary = $payrolls->map(function($payroll) {
+        if ($payrolls->isEmpty()) {
+            return response()->json([
+                'status' => false,
+                'message' => 'No payroll records found',
+                'data' => []
+            ]);
+        }
+
+        // Format each payroll record
+        $formattedPayrolls = $payrolls->map(function($payroll) {
             // Parse JSON data from fields
             $grossList = json_decode($payroll->grossList, true) ?: [];
             $otherAllowances = json_decode($payroll->otherAllowances, true) ?: [];
@@ -78,14 +86,41 @@ class EmployeePayrollSalaryProcessApiController extends Controller
                 $otherAllowances
             );
 
-            // Add salary summary to the payroll data
+            // Format individual payroll record
             return [
-                'payroll' => $payroll,
-                'salarySummary' => $salarySummary
+                'corpId' => $payroll->corpId,
+                'empCode' => $payroll->empCode,
+                'companyName' => $payroll->companyName,
+                'year' => $payroll->year,
+                'month' => $payroll->month,
+                'gross' => $grossList,
+                'deductions' => $recurringDeduction,
+                'otherBenefitsAllowances' => array_merge($otherBenefits, $otherAllowances),
+                'summary' => [
+                    'totalGross' => [
+                        'monthly' => $salarySummary['monthlyGross'],
+                        'annual' => $salarySummary['annualGross']
+                    ],
+                    'totalDeductions' => [
+                        'monthly' => $salarySummary['monthlyDeduction'],
+                        'annual' => $salarySummary['annualDeduction']
+                    ],
+                    'totalBenefits' => [
+                        'monthly' => $salarySummary['monthlyAllowance'],
+                        'annual' => $salarySummary['annualAllowance']
+                    ],
+                    'netSalary' => [
+                        'monthly' => $salarySummary['monthlyNetSalary'],
+                        'annual' => $salarySummary['annualNetSalary']
+                    ]
+                ]
             ];
         });
         
-        return response()->json(['data' => $payrollsWithSummary]);
+        return response()->json([
+            'status' => true,
+            'data' => $formattedPayrolls
+        ]);
     }
 
     /**
@@ -116,6 +151,7 @@ class EmployeePayrollSalaryProcessApiController extends Controller
 
         if (!$payroll) {
             return response()->json([
+                'status' => false,
                 'message' => 'Payroll record not found', 
                 'filters' => [
                     'corpId' => $corpId,
@@ -141,11 +177,40 @@ class EmployeePayrollSalaryProcessApiController extends Controller
             $otherAllowances
         );
 
-        // Return data with calculated values
-        return response()->json([
-            'data' => $payroll,
-            'salarySummary' => $salarySummary
-        ]);
+        // Format response in the desired structure
+        $response = [
+            'status' => true,
+            'data' => [
+                'corpId' => $payroll->corpId,
+                'empCode' => $payroll->empCode,
+                'companyName' => $payroll->companyName,
+                'year' => $payroll->year,
+                'month' => $payroll->month,
+                'gross' => $grossList,
+                'deductions' => $recurringDeduction,
+                'otherBenefitsAllowances' => array_merge($otherBenefits, $otherAllowances),
+                'summary' => [
+                    'totalGross' => [
+                        'monthly' => $salarySummary['monthlyGross'],
+                        'annual' => $salarySummary['annualGross']
+                    ],
+                    'totalDeductions' => [
+                        'monthly' => $salarySummary['monthlyDeduction'],
+                        'annual' => $salarySummary['annualDeduction']
+                    ],
+                    'totalBenefits' => [
+                        'monthly' => $salarySummary['monthlyAllowance'],
+                        'annual' => $salarySummary['annualAllowance']
+                    ],
+                    'netSalary' => [
+                        'monthly' => $salarySummary['monthlyNetSalary'],
+                        'annual' => $salarySummary['annualNetSalary']
+                    ]
+                ]
+            ]
+        ];
+
+        return response()->json($response);
     }
 
     /**
