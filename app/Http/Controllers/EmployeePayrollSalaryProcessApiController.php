@@ -88,11 +88,16 @@ class EmployeePayrollSalaryProcessApiController extends Controller
 
             // Format individual payroll record
             return [
+                'id' => $payroll->id,
                 'corpId' => $payroll->corpId,
                 'empCode' => $payroll->empCode,
                 'companyName' => $payroll->companyName,
                 'year' => $payroll->year,
                 'month' => $payroll->month,
+                'status' => $payroll->status,
+                'isShownToEmployeeYn' => $payroll->isShownToEmployeeYn,
+                'created_at' => $payroll->created_at,
+                'updated_at' => $payroll->updated_at,
                 'gross' => $grossList,
                 'deductions' => $recurringDeduction,
                 'otherBenefitsAllowances' => array_merge($otherBenefits, $otherAllowances),
@@ -181,11 +186,16 @@ class EmployeePayrollSalaryProcessApiController extends Controller
         $response = [
             'status' => true,
             'data' => [
+                'id' => $payroll->id,
                 'corpId' => $payroll->corpId,
                 'empCode' => $payroll->empCode,
                 'companyName' => $payroll->companyName,
                 'year' => $payroll->year,
                 'month' => $payroll->month,
+                'status' => $payroll->status,
+                'isShownToEmployeeYn' => $payroll->isShownToEmployeeYn,
+                'created_at' => $payroll->created_at,
+                'updated_at' => $payroll->updated_at,
                 'gross' => $grossList,
                 'deductions' => $recurringDeduction,
                 'otherBenefitsAllowances' => array_merge($otherBenefits, $otherAllowances),
