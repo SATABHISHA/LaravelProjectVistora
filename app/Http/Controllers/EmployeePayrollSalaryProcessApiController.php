@@ -488,4 +488,93 @@ class EmployeePayrollSalaryProcessApiController extends Controller
             ], 500);
         }
     }
+
+    /**
+     * Release salary in bulk - update status from any status to 'Released'
+     *
+     * @param Request $request
+     * @return \Illuminate\Http\JsonResponse
+     */
+    public function releaseSalary(Request $request)
+    {
+        // Validate required fields
+        $request->validate([
+            'corpId' => 'required|string|max:10',
+            'companyName' => 'required|string|max:100',
+            'year' => 'required|string|max:4',
+            'month' => 'required|string|max:50',
+        ]);
+
+        try {
+            // Check if payroll entries exist for this period
+            $payrollQuery = EmployeePayrollSalaryProcess::where('corpId', $request->corpId)
+                ->where('companyName', $request->companyName)
+                ->where('year', $request->year)
+                ->where('month', $request->month);
+
+            $payrollRecords = $payrollQuery->get();
+
+            if ($payrollRecords->isEmpty()) {
+                $filterDescription = "corpId: {$request->corpId}, companyName: {$request->companyName}, year: {$request->year}, month: {$request->month}";
+                
+                return response()->json([
+                    'status' => false,
+                    'message' => 'No payroll entries found for the specified period',
+                    'filter' => $filterDescription,
+                    'records_found' => 0
+                ], 404);
+            }
+
+            // Get current status breakdown before update
+            $statusBreakdown = $payrollRecords->groupBy('status')->map(function ($group) {
+                return $group->count();
+            })->toArray();
+
+            // Count records that are already released
+            $alreadyReleasedCount = $payrollRecords->where('status', 'Released')->count();
+            $toBeUpdatedCount = $payrollRecords->where('status', '!=', 'Released')->count();
+
+            // Update all records to 'Released' status
+            $updatedCount = EmployeePayrollSalaryProcess::where('corpId', $request->corpId)
+                ->where('companyName', $request->companyName)
+                ->where('year', $request->year)
+                ->where('month', $request->month)
+                ->where('status', '!=', 'Released') // Only update non-released records
+                ->update([
+                    'status' => 'Released',
+                    'updated_at' => now()
+                ]);
+
+            $filterDescription = "corpId: {$request->corpId}, companyName: {$request->companyName}, year: {$request->year}, month: {$request->month}";
+
+            // Prepare response message
+            if ($updatedCount > 0) {
+                $message = "Successfully released salary for {$updatedCount} employees";
+                if ($alreadyReleasedCount > 0) {
+                    $message .= ". {$alreadyReleasedCount} employees were already in 'Released' status";
+                }
+            } else {
+                $message = "All {$payrollRecords->count()} employees are already in 'Released' status";
+            }
+
+            return response()->json([
+                'status' => true,
+                'message' => $message,
+                'filter' => $filterDescription,
+                'summary' => [
+                    'total_records' => $payrollRecords->count(),
+                    'updated_to_released' => $updatedCount,
+                    'already_released' => $alreadyReleasedCount,
+                    'previous_status_breakdown' => $statusBreakdown
+                ]
+            ]);
+
+        } catch (\Exception $e) {
+            return response()->json([
+                'status' => false,
+                'message' => 'Error releasing salary: ' . $e->getMessage(),
+                'filter' => "corpId: {$request->corpId}, companyName: {$request->companyName}, year: {$request->year}, month: {$request->month}"
+            ], 500);
+        }
+    }
 }

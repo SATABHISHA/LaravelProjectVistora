@@ -579,3 +579,6 @@ Route::post('/employee-payroll/bulk-process', [EmployeePayrollSalaryProcessApiCo
 
 // Check if payroll is initiated for a specific period
 Route::get('/payroll-salary-process/check-initiated/{corpId}/{companyName}/{year}/{month}', [EmployeePayrollSalaryProcessApiController::class, 'checkPayrollInitiated']);
+
+// Release salary in bulk
+Route::post('/payroll-salary-process/release-salary', [EmployeePayrollSalaryProcessApiController::class, 'releaseSalary']);
