@@ -775,6 +775,7 @@ class EmployeePayrollSalaryProcessApiController extends Controller
                 $employee = $employees->get($payroll->empCode);
                 $empName = $this->getFullEmployeeName($employee);
 
+                
                 $rowData = [
                     'empCode' => $payroll->empCode,
                     'empName' => $empName,
