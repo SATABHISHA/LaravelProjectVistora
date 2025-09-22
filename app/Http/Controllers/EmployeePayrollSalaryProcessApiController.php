@@ -483,10 +483,7 @@ class EmployeePayrollSalaryProcessApiController extends Controller
             return Excel::download(new PayrollExport($excelData, $request->companyName, $request->month, $request->year, $dynamicHeaders), $fileName);
 
         } catch (\Exception $e) {
-            return response()->json([
-                'status' => false,
-                'message' => 'Error exporting payroll data: ' . $e->getMessage()
-            ], 500);
+            abort(500, 'Error exporting payroll data: ' . $e->getMessage());
         }
     }
 
