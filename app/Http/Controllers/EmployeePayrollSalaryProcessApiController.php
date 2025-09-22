@@ -19,7 +19,7 @@ class EmployeePayrollSalaryProcessApiController extends Controller
             'empCode' => 'required|string|max:20',
             'companyName' => 'required|string|max:100',
             'year' => 'required|string|max:4',
-            'month' => 'required|string|max:2',
+            'month' => 'required|string|max:30',
             'grossList' => 'required',
             'status' => 'required|string',
             'isShownToEmployeeYn' => 'required|integer',
