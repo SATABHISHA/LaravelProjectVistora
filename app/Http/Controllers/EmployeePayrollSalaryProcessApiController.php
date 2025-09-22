@@ -718,12 +718,16 @@ class EmployeePayrollSalaryProcessApiController extends Controller
      */
     public function exportReleasedPayrollExcel(Request $request)
     {
+        // Add a parameter to determine response type
+        $downloadDirectly = $request->input('download', true);
+        
         // Validate required fields
         $request->validate([
             'corpId' => 'required|string|max:10',
             'companyName' => 'required|string|max:100',
             'year' => 'required|string|max:4',
             'month' => 'required|string|max:50',
+            'download' => 'boolean'
         ]);
 
         try {
@@ -816,6 +820,22 @@ class EmployeePayrollSalaryProcessApiController extends Controller
             // Generate Excel file
             $fileName = "Payroll_Released_{$request->corpId}_{$request->companyName}_{$request->year}_{$request->month}.xlsx";
             
+            // For FlutterFlow, return a JSON response with file info instead of direct download
+            if (!$downloadDirectly) {
+                // Store the file temporarily and return download URL
+                $filePath = storage_path('app/temp/' . $fileName);
+                Excel::store(new PayrollExport($excelData, $dynamicHeaders), 'temp/' . $fileName);
+                
+                return response()->json([
+                    'status' => true,
+                    'message' => 'Excel file generated successfully',
+                    'download_url' => url('api/download-temp-file/' . urlencode($fileName)),
+                    'file_name' => $fileName,
+                    'record_count' => count($excelData)
+                ]);
+            }
+            
+            // Direct download (for web browsers)
             return Excel::download(new PayrollExport($excelData, $dynamicHeaders), $fileName);
 
         } catch (\Exception $e) {

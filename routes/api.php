@@ -588,3 +588,16 @@ Route::post('/payroll-salary-process/release-salary-initiated-only', [EmployeePa
 
 // Export Excel for released payroll
 Route::post('/payroll-salary-process/export-released-excel', [EmployeePayrollSalaryProcessApiController::class, 'exportReleasedPayrollExcel']);
+
+// Add this route BEFORE the export route
+Route::get('/download-temp-file/{filename}', function($filename) {
+    $filePath = storage_path('app/temp/' . $filename);
+    
+    if (!file_exists($filePath)) {
+        return response()->json(['error' => 'File not found'], 404);
+    }
+    
+    return response()->download($filePath, $filename, [
+        'Content-Type' => 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    ])->deleteFileAfterSend(true);
+})->name('download.temp.file');
