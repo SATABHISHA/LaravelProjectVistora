@@ -47,6 +47,29 @@ class EmployeePayrollSalaryProcessApiController extends Controller
     }
 
     /**
+     * Helper method to get full employee name by concatenating names
+     */
+    private function getFullEmployeeName($employee)
+    {
+        if (!$employee) {
+            return 'N/A';
+        }
+
+        $firstName = $employee->FirstName ?? '';
+        $middleName = $employee->MiddleName ?? '';
+        $lastName = $employee->LastName ?? '';
+        
+        // Handle cases where all names might be empty
+        if (empty($firstName) && empty($middleName) && empty($lastName)) {
+            return 'N/A';
+        }
+        
+        // Build full name with proper spacing
+        $nameParts = array_filter([$firstName, $middleName, $lastName]);
+        return implode(' ', $nameParts);
+    }
+
+    /**
      * Fetch all by corpId with optional company name filter
      * and include salary summary calculations for each record
      * 
@@ -363,10 +386,7 @@ class EmployeePayrollSalaryProcessApiController extends Controller
                 ->get();
 
             if ($payrollRecords->isEmpty()) {
-                return response()->json([
-                    'status' => false,
-                    'message' => 'No payroll records found for the specified period'
-                ], 404);
+                abort(404, 'No payroll records found for the specified period');
             }
 
             $excelData = [];
