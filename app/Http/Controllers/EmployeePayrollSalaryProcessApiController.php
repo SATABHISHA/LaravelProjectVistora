@@ -4,6 +4,10 @@ namespace App\Http\Controllers;
 
 use Illuminate\Http\Request;
 use App\Models\EmployeePayrollSalaryProcess;
+use App\Models\EmployeeDetail;
+use App\Models\EmploymentDetail;
+use App\Exports\PayrollExport;
+use Maatwebsite\Excel\Facades\Excel;
 
 class EmployeePayrollSalaryProcessApiController extends Controller
 {
@@ -331,6 +335,139 @@ class EmployeePayrollSalaryProcessApiController extends Controller
             'processed' => $processedCount,
             'errors' => $errors
         ]);
+    }
+
+    /**
+     * Export payroll data to Excel for all employees
+     *
+     * @param Request $request
+     * @return \Symfony\Component\HttpFoundation\BinaryFileResponse
+     */
+    public function exportPayrollExcel(Request $request)
+    {
+        // Validate required fields
+        $request->validate([
+            'corpId' => 'required|string|max:10',
+            'companyName' => 'required|string|max:100',
+            'year' => 'required|string|max:4',
+            'month' => 'required|string|max:50',
+        ]);
+
+        try {
+            // Get payroll records with employee and employment details
+            $payrollRecords = EmployeePayrollSalaryProcess::where('corpId', $request->corpId)
+                ->where('companyName', $request->companyName)
+                ->where('year', $request->year)
+                ->where('month', $request->month)
+                ->with(['employeeDetail', 'employmentDetail'])
+                ->get();
+
+            if ($payrollRecords->isEmpty()) {
+                return response()->json([
+                    'status' => false,
+                    'message' => 'No payroll records found for the specified period'
+                ], 404);
+            }
+
+            $excelData = [];
+            $dynamicHeaders = [];
+
+            foreach ($payrollRecords as $record) {
+                // Get employee details
+                $employeeDetail = $record->employeeDetail;
+                $employmentDetail = $record->employmentDetail;
+
+                // Build full name
+                $fullName = '';
+                if ($employeeDetail) {
+                    $firstName = $employeeDetail->FirstName ?? '';
+                    $middleName = $employeeDetail->MiddleName ?? '';
+                    $lastName = $employeeDetail->LastName ?? '';
+                    $fullName = trim($firstName . ' ' . $middleName . ' ' . $lastName);
+                }
+
+                // Get designation and date of joining
+                $designation = $employmentDetail->designation ?? '';
+                $dateOfJoining = $employmentDetail->dateofJoining ?? '';
+
+                // Parse JSON fields
+                $grossList = json_decode($record->grossList, true) ?: [];
+                $otherBenefits = json_decode($record->otherBenefits, true) ?: [];
+                $recurringDeductions = json_decode($record->recurringDeduction, true) ?: [];
+
+                // Collect all dynamic keys for headers
+                $allKeys = array_merge(
+                    array_keys($grossList),
+                    array_keys($otherBenefits),
+                    array_keys($recurringDeductions)
+                );
+                $dynamicHeaders = array_unique(array_merge($dynamicHeaders, $allKeys));
+
+                // Calculate totals
+                $grossSalary = 0;
+                $grossDeduction = 0;
+
+                // Sum calculated values from grossList
+                foreach ($grossList as $item) {
+                    if (isset($item['calculatedValue'])) {
+                        $grossSalary += (float)$item['calculatedValue'];
+                    }
+                }
+
+                // Sum calculated values from otherBenefits
+                foreach ($otherBenefits as $item) {
+                    if (isset($item['calculatedValue'])) {
+                        $grossSalary += (float)$item['calculatedValue'];
+                    }
+                }
+
+                // Sum calculated values from recurringDeductions
+                foreach ($recurringDeductions as $item) {
+                    if (isset($item['calculatedValue'])) {
+                        $grossDeduction += (float)$item['calculatedValue'];
+                    }
+                }
+
+                $netTakeHome = $grossSalary - $grossDeduction;
+
+                // Build row data
+                $row = [
+                    $record->empCode,
+                    $fullName,
+                    $designation,
+                    $dateOfJoining,
+                    round($grossSalary, 2),
+                    round($grossDeduction, 2),
+                    round($netTakeHome, 2)
+                ];
+
+                // Add dynamic column values
+                foreach ($dynamicHeaders as $key) {
+                    $value = '';
+                    if (isset($grossList[$key]['calculatedValue'])) {
+                        $value = $grossList[$key]['calculatedValue'];
+                    } elseif (isset($otherBenefits[$key]['calculatedValue'])) {
+                        $value = $otherBenefits[$key]['calculatedValue'];
+                    } elseif (isset($recurringDeductions[$key]['calculatedValue'])) {
+                        $value = $recurringDeductions[$key]['calculatedValue'];
+                    }
+                    $row[] = $value;
+                }
+
+                $excelData[] = $row;
+            }
+
+            // Generate filename
+            $fileName = "Payroll_{$request->companyName}_{$request->year}_{$request->month}.xlsx";
+
+            return Excel::download(new PayrollExport($excelData, $request->companyName, $request->month, $request->year, $dynamicHeaders), $fileName);
+
+        } catch (\Exception $e) {
+            return response()->json([
+                'status' => false,
+                'message' => 'Error exporting payroll data: ' . $e->getMessage()
+            ], 500);
+        }
     }
 
     /**
