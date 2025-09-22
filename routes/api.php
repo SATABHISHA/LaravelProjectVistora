@@ -582,3 +582,6 @@ Route::get('/payroll-salary-process/check-initiated/{corpId}/{companyName}/{year
 
 // Release salary in bulk
 Route::post('/payroll-salary-process/release-salary', [EmployeePayrollSalaryProcessApiController::class, 'releaseSalary']);
+
+// Release salary only for 'Initiated' status records
+Route::post('/payroll-salary-process/release-salary-initiated-only', [EmployeePayrollSalaryProcessApiController::class, 'releaseSalaryInitiatedOnly']);

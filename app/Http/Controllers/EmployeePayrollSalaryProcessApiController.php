@@ -577,4 +577,110 @@ class EmployeePayrollSalaryProcessApiController extends Controller
             ], 500);
         }
     }
+
+    /**
+     * Release salary only for records with 'Initiated' status
+     *
+     * @param Request $request
+     * @return \Illuminate\Http\JsonResponse
+     */
+    public function releaseSalaryInitiatedOnly(Request $request)
+    {
+        // Validate required fields
+        $request->validate([
+            'corpId' => 'required|string|max:10',
+            'companyName' => 'required|string|max:100',
+            'year' => 'required|string|max:4',
+            'month' => 'required|string|max:50',
+        ]);
+
+        try {
+            // Check if payroll entries exist for this period
+            $payrollQuery = EmployeePayrollSalaryProcess::where('corpId', $request->corpId)
+                ->where('companyName', $request->companyName)
+                ->where('year', $request->year)
+                ->where('month', $request->month);
+
+            $allPayrollRecords = $payrollQuery->get();
+
+            if ($allPayrollRecords->isEmpty()) {
+                $filterDescription = "corpId: {$request->corpId}, companyName: {$request->companyName}, year: {$request->year}, month: {$request->month}";
+                
+                return response()->json([
+                    'status' => false,
+                    'message' => 'No payroll entries found for the specified period',
+                    'filter' => $filterDescription,
+                    'records_found' => 0
+                ], 404);
+            }
+
+            // Get records with 'Initiated' status only
+            $initiatedRecords = $allPayrollRecords->where('status', 'Initiated');
+
+            if ($initiatedRecords->isEmpty()) {
+                $filterDescription = "corpId: {$request->corpId}, companyName: {$request->companyName}, year: {$request->year}, month: {$request->month}";
+                
+                // Get current status breakdown
+                $statusBreakdown = $allPayrollRecords->groupBy('status')->map(function ($group) {
+                    return $group->count();
+                })->toArray();
+
+                return response()->json([
+                    'status' => false,
+                    'message' => 'No payroll entries with "Initiated" status found for the specified period',
+                    'filter' => $filterDescription,
+                    'total_records' => $allPayrollRecords->count(),
+                    'initiated_records' => 0,
+                    'current_status_breakdown' => $statusBreakdown
+                ], 404);
+            }
+
+            // Get current status breakdown before update
+            $statusBreakdown = $allPayrollRecords->groupBy('status')->map(function ($group) {
+                return $group->count();
+            })->toArray();
+
+            // Update only 'Initiated' records to 'Released' status
+            $updatedCount = EmployeePayrollSalaryProcess::where('corpId', $request->corpId)
+                ->where('companyName', $request->companyName)
+                ->where('year', $request->year)
+                ->where('month', $request->month)
+                ->where('status', 'Initiated') // Only update 'Initiated' records
+                ->update([
+                    'status' => 'Released',
+                    'updated_at' => now()
+                ]);
+
+            $filterDescription = "corpId: {$request->corpId}, companyName: {$request->companyName}, year: {$request->year}, month: {$request->month}";
+
+            // Count records by other statuses (excluding the ones we just updated)
+            $otherStatusCount = $allPayrollRecords->where('status', '!=', 'Initiated')->count();
+
+            $message = "Successfully released salary for {$updatedCount} employees with 'Initiated' status";
+            if ($otherStatusCount > 0) {
+                $message .= ". {$otherStatusCount} employees with other statuses were not affected";
+            }
+
+            return response()->json([
+                'status' => true,
+                'message' => $message,
+                'filter' => $filterDescription,
+                'summary' => [
+                    'total_records' => $allPayrollRecords->count(),
+                    'initiated_records_updated' => $updatedCount,
+                    'other_status_records' => $otherStatusCount,
+                    'previous_status_breakdown' => $statusBreakdown,
+                    'updated_from' => 'Initiated',
+                    'updated_to' => 'Released'
+                ]
+            ]);
+
+        } catch (\Exception $e) {
+            return response()->json([
+                'status' => false,
+                'message' => 'Error releasing salary: ' . $e->getMessage(),
+                'filter' => "corpId: {$request->corpId}, companyName: {$request->companyName}, year: {$request->year}, month: {$request->month}"
+            ], 500);
+        }
+    }
 }
