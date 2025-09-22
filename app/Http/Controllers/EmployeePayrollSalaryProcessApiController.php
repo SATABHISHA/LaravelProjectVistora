@@ -410,10 +410,10 @@ class EmployeePayrollSalaryProcessApiController extends Controller
                 $designation = $employmentDetail->designation ?? '';
                 $dateOfJoining = $employmentDetail->dateofJoining ?? '';
 
-                // Parse JSON fields
-                $grossList = json_decode($record->grossList, true) ?: [];
-                $otherBenefits = json_decode($record->otherBenefits, true) ?: [];
-                $recurringDeductions = json_decode($record->recurringDeduction, true) ?: [];
+                // Parse JSON fields safely
+                $grossList = $this->safeJsonDecode($record->grossList);
+                $otherBenefits = $this->safeJsonDecode($record->otherBenefits);
+                $recurringDeductions = $this->safeJsonDecode($record->recurringDeduction);
 
                 // Collect all dynamic keys for headers
                 $allKeys = array_merge(
@@ -485,6 +485,25 @@ class EmployeePayrollSalaryProcessApiController extends Controller
         } catch (\Exception $e) {
             abort(500, 'Error in exporting payroll data: ' . $e->getMessage());
         }
+    }
+
+    /**
+     * Safely decode JSON to array
+     */
+    private function safeJsonDecode($jsonString)
+    {
+        if (empty($jsonString) || !is_string($jsonString)) {
+            return [];
+        }
+
+        $decoded = json_decode($jsonString, true);
+        
+        // If json_decode fails or returns non-array, return empty array
+        if (!is_array($decoded)) {
+            return [];
+        }
+
+        return $decoded;
     }
 
     /**
