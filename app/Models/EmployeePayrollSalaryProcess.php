@@ -24,4 +24,14 @@ class EmployeePayrollSalaryProcess extends Model
         'status',
         'isShownToEmployeeYn',
     ];
+
+    public function employeeDetail()
+    {
+        return $this->belongsTo(EmployeeDetail::class, 'empCode', 'empCode');
+    }
+
+    public function employmentDetail()
+    {
+        return $this->belongsTo(EmploymentDetail::class, 'empCode', 'empCode');
+    }
 }

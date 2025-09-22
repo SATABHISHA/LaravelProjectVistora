@@ -585,3 +585,6 @@ Route::post('/payroll-salary-process/release-salary', [EmployeePayrollSalaryProc
 
 // Release salary only for 'Initiated' status records
 Route::post('/payroll-salary-process/release-salary-initiated-only', [EmployeePayrollSalaryProcessApiController::class, 'releaseSalaryInitiatedOnly']);
+
+// Export payroll to Excel
+Route::post('/payroll-salary-process/export-excel', [EmployeePayrollSalaryProcessApiController::class, 'exportPayrollExcel']);
