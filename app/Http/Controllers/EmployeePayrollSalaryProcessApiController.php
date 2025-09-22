@@ -683,4 +683,121 @@ class EmployeePayrollSalaryProcessApiController extends Controller
             ], 500);
         }
     }
+
+    /**
+     * Export Excel file for employees with 'Released' status
+     *
+     * @param Request $request
+     * @return \Illuminate\Http\Response|\Illuminate\Http\JsonResponse
+     */
+    public function exportReleasedPayrollExcel(Request $request)
+    {
+        // Validate required fields
+        $request->validate([
+            'corpId' => 'required|string|max:10',
+            'companyName' => 'required|string|max:100',
+            'year' => 'required|string|max:4',
+            'month' => 'required|string|max:50',
+        ]);
+
+        try {
+            // Get payroll records with 'Released' status
+            $payrollRecords = EmployeePayrollSalaryProcess::where('corpId', $request->corpId)
+                ->where('companyName', $request->companyName)
+                ->where('year', $request->year)
+                ->where('month', $request->month)
+                ->where('status', 'Released')
+                ->get();
+
+            if ($payrollRecords->isEmpty()) {
+                return response()->json([
+                    'status' => false,
+                    'message' => 'No released payroll records found for the specified period',
+                    'filter' => "corpId: {$request->corpId}, companyName: {$request->companyName}, year: {$request->year}, month: {$request->month}"
+                ], 404);
+            }
+
+            // Get employee details from EmployeeMaster
+            $empCodes = $payrollRecords->pluck('empCode')->toArray();
+            $employees = \App\Models\EmployeeMaster::whereIn('empCode', $empCodes)->get()->keyBy('empCode');
+
+            // Prepare data for Excel export
+            $excelData = [];
+            $dynamicHeaders = [];
+
+            foreach ($payrollRecords as $payroll) {
+                // Parse JSON data
+                $grossList = json_decode($payroll->grossList, true) ?: [];
+                $otherBenefits = json_decode($payroll->otherBenefits, true) ?: [];
+                $recurringDeduction = json_decode($payroll->recurringDeduction, true) ?: [];
+
+                // Calculate totals
+                $salarySummary = $this->calculateSalaryTotals(
+                    $grossList,
+                    $otherBenefits, 
+                    $recurringDeduction
+                );
+
+                // Get employee name
+                $employee = $employees->get($payroll->empCode);
+                $empName = $employee ? $employee->empName : 'N/A';
+
+                $rowData = [
+                    'empCode' => $payroll->empCode,
+                    'empName' => $empName,
+                    'companyName' => $payroll->companyName,
+                ];
+
+                // Add gross components as individual columns
+                foreach ($grossList as $gross) {
+                    $componentName = $gross['componentName'] ?? 'Unknown Component';
+                    $rowData["gross_{$componentName}"] = $gross['calculatedValue'] ?? 0;
+                    $dynamicHeaders["gross_{$componentName}"] = "Gross - {$componentName}";
+                }
+
+                $rowData['monthlyTotalGross'] = $salarySummary['monthlyGross'];
+                $rowData['annualTotalGross'] = $salarySummary['annualGross'];
+
+                // Add other benefits components as individual columns
+                foreach ($otherBenefits as $benefit) {
+                    $componentName = $benefit['componentName'] ?? 'Unknown Component';
+                    $rowData["benefit_{$componentName}"] = $benefit['calculatedValue'] ?? 0;
+                    $dynamicHeaders["benefit_{$componentName}"] = "Benefit - {$componentName}";
+                }
+
+                $rowData['monthlyTotalBenefits'] = $salarySummary['monthlyAllowance'];
+                $rowData['annualTotalBenefits'] = $salarySummary['annualAllowance'];
+
+                // Add deduction components as individual columns
+                foreach ($recurringDeduction as $deduction) {
+                    $componentName = $deduction['componentName'] ?? 'Unknown Component';
+                    $rowData["deduction_{$componentName}"] = $deduction['calculatedValue'] ?? 0;
+                    $dynamicHeaders["deduction_{$componentName}"] = "Deduction - {$componentName}";
+                }
+
+                $rowData['monthlyTotalRecurringDeductions'] = $salarySummary['monthlyDeduction'];
+                $rowData['annualTotalRecurringDeductions'] = $salarySummary['annualDeduction'];
+                $rowData['netTakeHomeMonthly'] = $salarySummary['monthlyNetSalary'];
+                $rowData['year'] = $payroll->year;
+                $rowData['month'] = $payroll->month;
+
+                $excelData[] = $rowData;
+            }
+
+            // Generate Excel file
+            $fileName = "Payroll_Released_{$request->corpId}_{$request->companyName}_{$request->year}_{$request->month}.xlsx";
+            
+            return \Maatwebsite\Excel\Facades\Excel::download(
+                new PayrollExport($excelData, $dynamicHeaders), 
+                $fileName
+            );
+
+        } catch (\Exception $e) {
+            return response()->json([
+                'status' => false,
+                'message' => 'Error exporting payroll data: ' . $e->getMessage(),
+                'filter' => "corpId: {$request->corpId}, companyName: {$request->companyName}, year: {$request->year}, month: {$request->month}"
+            ], 500);
+        }
+    }
 }
