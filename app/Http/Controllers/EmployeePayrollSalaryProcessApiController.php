@@ -234,12 +234,38 @@ class EmployeePayrollSalaryProcessApiController extends Controller
         // Validate required bulk fields
         $request->validate([
             'corpId' => 'required|string|max:10',
-            'companyName' => 'nullable|string|max:100', // Added optional companyName
+            'companyName' => 'nullable|string|max:100',
             'year' => 'required|string|max:4',
             'month' => 'required|string|max:50',
             'status' => 'required|string',
             'isShownToEmployeeYn' => 'required|integer',
         ]);
+
+        // Check if payroll already exists for this period
+        $existingPayrollQuery = EmployeePayrollSalaryProcess::where('corpId', $request->corpId)
+            ->where('year', $request->year)
+            ->where('month', $request->month);
+
+        // Add company name filter if provided
+        if ($request->has('companyName') && !empty($request->companyName)) {
+            $existingPayrollQuery->where('companyName', $request->companyName);
+        }
+
+        $existingPayroll = $existingPayrollQuery->first();
+
+        if ($existingPayroll) {
+            $filterDescription = $request->has('companyName') && !empty($request->companyName)
+                ? "corpId: {$request->corpId}, companyName: {$request->companyName}, year: {$request->year}, month: {$request->month}"
+                : "corpId: {$request->corpId}, year: {$request->year}, month: {$request->month}";
+
+            return response()->json([
+                'status' => false,
+                'message' => 'Payroll for this period has already been processed',
+                'filter' => $filterDescription,
+                'existing_records_count' => $existingPayrollQuery->count(),
+                'duplicate_prevention' => true
+            ], 409); // 409 Conflict status code
+        }
 
         // Build query for salary structures
         $query = \App\Models\EmployeeSalaryStructure::where('corpId', $request->corpId);
@@ -258,8 +284,8 @@ class EmployeePayrollSalaryProcessApiController extends Controller
                 : "No salary structures found for the given corpId";
                 
             return response()->json([
-                'message' => $message,
-                'status' => 'error'
+                'status' => false,
+                'message' => $message
             ], 404);
         }
 
@@ -269,24 +295,20 @@ class EmployeePayrollSalaryProcessApiController extends Controller
         // Process each salary structure
         foreach ($salaryStructures as $structure) {
             try {
-                // Create or update payroll entry
-                \App\Models\EmployeePayrollSalaryProcess::updateOrCreate(
-                    [
-                        'corpId' => $structure->corpId,
-                        'empCode' => $structure->empCode,
-                        'year' => $request->year,
-                        'month' => $request->month,
-                    ],
-                    [
-                        'companyName' => $structure->companyName,
-                        'grossList' => $structure->grossList,
-                        'otherAllowances' => $structure->otherAlowances,
-                        'otherBenefits' => $structure->otherBenifits,
-                        'recurringDeduction' => $structure->recurringDeductions,
-                        'status' => $request->status,
-                        'isShownToEmployeeYn' => $request->isShownToEmployeeYn,
-                    ]
-                );
+                // Create payroll entry (using create instead of updateOrCreate to prevent duplicates)
+                EmployeePayrollSalaryProcess::create([
+                    'corpId' => $structure->corpId,
+                    'empCode' => $structure->empCode,
+                    'companyName' => $structure->companyName,
+                    'year' => $request->year,
+                    'month' => $request->month,
+                    'grossList' => $structure->grossList,
+                    'otherAllowances' => $structure->otherAlowances,
+                    'otherBenefits' => $structure->otherBenifits,
+                    'recurringDeduction' => $structure->recurringDeductions,
+                    'status' => $request->status,
+                    'isShownToEmployeeYn' => $request->isShownToEmployeeYn,
+                ]);
 
                 $processedCount++;
             } catch (\Exception $e) {
@@ -302,12 +324,12 @@ class EmployeePayrollSalaryProcessApiController extends Controller
             : "corpId: {$request->corpId}";
 
         return response()->json([
-            'message' => "Processed $processedCount employee records from salary structures to payroll",
+            'status' => true,
+            'message' => "Successfully processed $processedCount employee records from salary structures to payroll",
             'filter' => $filterDescription,
             'total_structures' => $salaryStructures->count(),
             'processed' => $processedCount,
-            'errors' => $errors,
-            'status' => 'success'
+            'errors' => $errors
         ]);
     }
 
