@@ -4,6 +4,9 @@ namespace App\Http\Controllers;
 
 use Illuminate\Http\Request;
 use App\Models\EmployeePayrollSalaryProcess;
+use App\Exports\PayrollExport;
+use Maatwebsite\Excel\Facades\Excel;
+use App\Models\EmployeeDetail;
 
 class EmployeePayrollSalaryProcessApiController extends Controller
 {
@@ -40,6 +43,29 @@ class EmployeePayrollSalaryProcessApiController extends Controller
             'status' => $status,
             'payroll' => $payroll
         ]);
+    }
+
+    /**
+     * Helper method to get full employee name by concatenating names
+     */
+    private function getFullEmployeeName($employee)
+    {
+        if (!$employee) {
+            return 'N/A';
+        }
+
+        $firstName = $employee->FirstName ?? '';
+        $middleName = $employee->MiddleName ?? '';
+        $lastName = $employee->LastName ?? '';
+        
+        // Handle cases where all names might be empty
+        if (empty($firstName) && empty($middleName) && empty($lastName)) {
+            return 'N/A';
+        }
+        
+        // Build full name with proper spacing
+        $nameParts = array_filter([$firstName, $middleName, $lastName]);
+        return implode(' ', $nameParts);
     }
 
     /**
@@ -688,7 +714,7 @@ class EmployeePayrollSalaryProcessApiController extends Controller
      * Export Excel file for employees with 'Released' status
      *
      * @param Request $request
-     * @return \Illuminate\Http\Response|\Illuminate\Http\JsonResponse
+     * @return \Symfony\Component\HttpFoundation\BinaryFileResponse|\Illuminate\Http\JsonResponse
      */
     public function exportReleasedPayrollExcel(Request $request)
     {
@@ -717,9 +743,12 @@ class EmployeePayrollSalaryProcessApiController extends Controller
                 ], 404);
             }
 
-            // Get employee details from EmployeeMaster
+            // Get employee details from EmployeeDetail using corp_id and EmpCode
             $empCodes = $payrollRecords->pluck('empCode')->toArray();
-            $employees = \App\Models\EmployeeMaster::whereIn('empCode', $empCodes)->get()->keyBy('empCode');
+            $employees = EmployeeDetail::where('corp_id', $request->corpId)
+                ->whereIn('EmpCode', $empCodes)
+                ->get()
+                ->keyBy('EmpCode');
 
             // Prepare data for Excel export
             $excelData = [];
@@ -738,9 +767,9 @@ class EmployeePayrollSalaryProcessApiController extends Controller
                     $recurringDeduction
                 );
 
-                // Get employee name
+                // Get employee full name by concatenating FirstName, MiddleName, LastName
                 $employee = $employees->get($payroll->empCode);
-                $empName = $employee ? $employee->empName : 'N/A';
+                $empName = $this->getFullEmployeeName($employee);
 
                 $rowData = [
                     'empCode' => $payroll->empCode,
@@ -787,10 +816,7 @@ class EmployeePayrollSalaryProcessApiController extends Controller
             // Generate Excel file
             $fileName = "Payroll_Released_{$request->corpId}_{$request->companyName}_{$request->year}_{$request->month}.xlsx";
             
-            return \Maatwebsite\Excel\Facades\Excel::download(
-                new PayrollExport($excelData, $dynamicHeaders), 
-                $fileName
-            );
+            return Excel::download(new PayrollExport($excelData, $dynamicHeaders), $fileName);
 
         } catch (\Exception $e) {
             return response()->json([
