@@ -432,4 +432,60 @@ class EmployeePayrollSalaryProcessApiController extends Controller
         
         return $sum;
     }
+
+    /**
+     * Check if payroll has been initiated for a specific period
+     *
+     * @param string $corpId
+     * @param string $companyName
+     * @param string $year
+     * @param string $month
+     * @return \Illuminate\Http\JsonResponse
+     */
+    public function checkPayrollInitiated($corpId, $companyName, $year, $month)
+    {
+        try {
+            // Check if payroll exists for this period
+            $payrollExists = EmployeePayrollSalaryProcess::where('corpId', $corpId)
+                ->where('companyName', $companyName)
+                ->where('year', $year)
+                ->where('month', $month)
+                ->exists();
+
+            $filterDescription = "corpId: {$corpId}, companyName: {$companyName}, year: {$year}, month: {$month}";
+
+            if ($payrollExists) {
+                // Get count of records for additional info
+                $recordsCount = EmployeePayrollSalaryProcess::where('corpId', $corpId)
+                    ->where('companyName', $companyName)
+                    ->where('year', $year)
+                    ->where('month', $month)
+                    ->count();
+
+                return response()->json([
+                    'status' => true,
+                    'initiated' => true,
+                    'message' => 'Payroll has been initiated for this period',
+                    'filter' => $filterDescription,
+                    'records_count' => $recordsCount
+                ]);
+            } else {
+                return response()->json([
+                    'status' => true,
+                    'initiated' => false,
+                    'message' => 'Payroll has not been initiated for this period',
+                    'filter' => $filterDescription,
+                    'records_count' => 0
+                ]);
+            }
+
+        } catch (\Exception $e) {
+            return response()->json([
+                'status' => false,
+                'initiated' => false,
+                'message' => 'Error checking payroll status: ' . $e->getMessage(),
+                'filter' => "corpId: {$corpId}, companyName: {$companyName}, year: {$year}, month: {$month}"
+            ], 500);
+        }
+    }
 }

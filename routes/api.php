@@ -576,3 +576,6 @@ Route::get('/utility/years/{count?}', [UtilityApiController::class, 'getYearsLis
 
 // Bulk process employee salary structures to payroll
 Route::post('/employee-payroll/bulk-process', [EmployeePayrollSalaryProcessApiController::class, 'bulkProcessFromSalaryStructures']);
+
+// Check if payroll is initiated for a specific period
+Route::get('/payroll-salary-process/check-initiated/{corpId}/{companyName}/{year}/{month}', [EmployeePayrollSalaryProcessApiController::class, 'checkPayrollInitiated']);
