@@ -412,66 +412,89 @@ class EmployeePayrollSalaryProcessApiController extends Controller
 
                 // Parse JSON fields safely
                 $grossList = $this->safeJsonDecode($record->grossList);
+                $otherAllowances = $this->safeJsonDecode($record->otherAllowances);
                 $otherBenefits = $this->safeJsonDecode($record->otherBenefits);
                 $recurringDeductions = $this->safeJsonDecode($record->recurringDeduction);
 
-                // Collect all dynamic keys for headers
-                $allKeys = array_merge(
-                    array_keys($grossList),
-                    array_keys($otherBenefits),
-                    array_keys($recurringDeductions)
-                );
-                $dynamicHeaders = array_unique(array_merge($dynamicHeaders, $allKeys));
+                // Build dynamic headers with prefixes
+                foreach ($grossList as $key => $item) {
+                    $dynamicHeaders['gross_' . $key] = 'Gross ' . $key;
+                }
+                foreach ($otherAllowances as $key => $item) {
+                    $dynamicHeaders['benefit_' . $key] = 'Benefit ' . $key;
+                }
+                foreach ($otherBenefits as $key => $item) {
+                    $dynamicHeaders['benefit_' . $key] = 'Benefit ' . $key;
+                }
+                foreach ($recurringDeductions as $key => $item) {
+                    $dynamicHeaders['deduction_' . $key] = 'Deduction ' . $key;
+                }
 
                 // Calculate totals
-                $grossSalary = 0;
-                $grossDeduction = 0;
+                $monthlyTotalGross = 0;
+                $monthlyTotalBenefits = 0;
+                $monthlyTotalDeductions = 0;
 
-                // Sum calculated values from grossList
+                // Calculate gross total
                 foreach ($grossList as $item) {
                     if (isset($item['calculatedValue'])) {
-                        $grossSalary += (float)$item['calculatedValue'];
+                        $monthlyTotalGross += (float)$item['calculatedValue'];
                     }
                 }
 
-                // Sum calculated values from otherBenefits
+                // Calculate benefits total
+                foreach ($otherAllowances as $item) {
+                    if (isset($item['calculatedValue'])) {
+                        $monthlyTotalBenefits += (float)$item['calculatedValue'];
+                    }
+                }
                 foreach ($otherBenefits as $item) {
                     if (isset($item['calculatedValue'])) {
-                        $grossSalary += (float)$item['calculatedValue'];
+                        $monthlyTotalBenefits += (float)$item['calculatedValue'];
                     }
                 }
 
-                // Sum calculated values from recurringDeductions
+                // Calculate deductions total
                 foreach ($recurringDeductions as $item) {
                     if (isset($item['calculatedValue'])) {
-                        $grossDeduction += (float)$item['calculatedValue'];
+                        $monthlyTotalDeductions += (float)$item['calculatedValue'];
                     }
                 }
 
-                $netTakeHome = $grossSalary - $grossDeduction;
+                // Calculate annual totals
+                $annualTotalGross = $monthlyTotalGross * 12;
+                $annualTotalBenefits = $monthlyTotalBenefits * 12;
+                $annualTotalDeductions = $monthlyTotalDeductions * 12;
+                $netTakeHomeMonthly = $monthlyTotalGross + $monthlyTotalBenefits - $monthlyTotalDeductions;
 
-                // Build row data
+                // Build row data as associative array
                 $row = [
-                    $record->empCode,
-                    $fullName,
-                    $designation,
-                    $dateOfJoining,
-                    round($grossSalary, 2),
-                    round($grossDeduction, 2),
-                    round($netTakeHome, 2)
+                    'empCode' => $record->empCode,
+                    'empName' => $fullName,
+                    'companyName' => $record->companyName,
+                    'monthlyTotalGross' => round($monthlyTotalGross, 2),
+                    'annualTotalGross' => round($annualTotalGross, 2),
+                    'monthlyTotalBenefits' => round($monthlyTotalBenefits, 2),
+                    'annualTotalBenefits' => round($annualTotalBenefits, 2),
+                    'monthlyTotalRecurringDeductions' => round($monthlyTotalDeductions, 2),
+                    'annualTotalRecurringDeductions' => round($annualTotalDeductions, 2),
+                    'netTakeHomeMonthly' => round($netTakeHomeMonthly, 2),
+                    'year' => $record->year,
+                    'month' => $record->month,
                 ];
 
-                // Add dynamic column values
-                foreach ($dynamicHeaders as $key) {
-                    $value = '';
-                    if (isset($grossList[$key]['calculatedValue'])) {
-                        $value = $grossList[$key]['calculatedValue'];
-                    } elseif (isset($otherBenefits[$key]['calculatedValue'])) {
-                        $value = $otherBenefits[$key]['calculatedValue'];
-                    } elseif (isset($recurringDeductions[$key]['calculatedValue'])) {
-                        $value = $recurringDeductions[$key]['calculatedValue'];
-                    }
-                    $row[] = $value;
+                // Add dynamic values
+                foreach ($grossList as $key => $item) {
+                    $row['gross_' . $key] = $item['calculatedValue'] ?? 0;
+                }
+                foreach ($otherAllowances as $key => $item) {
+                    $row['benefit_' . $key] = $item['calculatedValue'] ?? 0;
+                }
+                foreach ($otherBenefits as $key => $item) {
+                    $row['benefit_' . $key] = $item['calculatedValue'] ?? 0;
+                }
+                foreach ($recurringDeductions as $key => $item) {
+                    $row['deduction_' . $key] = $item['calculatedValue'] ?? 0;
                 }
 
                 $excelData[] = $row;
@@ -480,7 +503,7 @@ class EmployeePayrollSalaryProcessApiController extends Controller
             // Generate filename
             $fileName = "Payroll_{$request->companyName}_{$request->year}_{$request->month}.xlsx";
 
-            return Excel::download(new PayrollExport($excelData, $request->companyName, $request->month, $request->year, $dynamicHeaders), $fileName);
+            return Excel::download(new PayrollExport($excelData, $dynamicHeaders), $fileName);
 
         } catch (\Exception $e) {
             abort(500, 'Error in exporting payroll data: ' . $e->getMessage());
