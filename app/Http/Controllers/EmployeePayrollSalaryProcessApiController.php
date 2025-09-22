@@ -678,9 +678,10 @@ class EmployeePayrollSalaryProcessApiController extends Controller
         } catch (\Exception $e) {
             return response()->json([
                 'status' => false,
-                'message' => 'Error releasing salary: ' . $e->getMessage(),
+                'message' => 'Error in releasing salary: ' . $e->getMessage(),
                 'filter' => "corpId: {$request->corpId}, companyName: {$request->companyName}, year: {$request->year}, month: {$request->month}"
             ], 500);
         }
     }
 }
+
