@@ -236,7 +236,24 @@ class PayrollExport implements FromArray, WithHeadings, ShouldAutoSize, WithStyl
                 $sheet->getRowDimension(4)->setRowHeight(15);
                 $sheet->getRowDimension(5)->setRowHeight(25); // Header row
                 
-                // Apply borders to data area
+                // Apply header row styling specifically (row 5)
+                $sheet->getStyle("A5:{$lastColumn}5")->applyFromArray([
+                    'font' => [
+                        'bold' => true,
+                        'size' => 11,
+                        'color' => ['rgb' => 'FFFFFF']
+                    ],
+                    'fill' => [
+                        'fillType' => Fill::FILL_SOLID,
+                        'startColor' => ['rgb' => '2F5597']
+                    ],
+                    'alignment' => [
+                        'horizontal' => Alignment::HORIZONTAL_CENTER,
+                        'vertical' => Alignment::VERTICAL_CENTER
+                    ]
+                ]);
+                
+                // Apply borders to data area only (header + data rows)
                 $dataRange = "A5:{$lastColumn}" . ($sheet->getHighestRow());
                 $sheet->getStyle($dataRange)->applyFromArray([
                     'borders' => [
@@ -247,16 +264,35 @@ class PayrollExport implements FromArray, WithHeadings, ShouldAutoSize, WithStyl
                     ]
                 ]);
                 
-                // Apply alternating row colors to data rows (starting from row 6)
+                // Apply alternating row colors ONLY to data rows (starting from row 6)
                 $dataStartRow = 6;
                 $lastDataRow = $sheet->getHighestRow();
                 
+                // First, reset all data rows to white background
+                if ($lastDataRow >= $dataStartRow) {
+                    $sheet->getStyle("A{$dataStartRow}:{$lastColumn}{$lastDataRow}")->applyFromArray([
+                        'fill' => [
+                            'fillType' => Fill::FILL_SOLID,
+                            'startColor' => ['rgb' => 'FFFFFF']
+                        ],
+                        'font' => [
+                            'color' => ['rgb' => '000000'], // Black text for data rows
+                            'bold' => false
+                        ]
+                    ]);
+                }
+                
+                // Then apply light gray to every other row
                 for ($row = $dataStartRow; $row <= $lastDataRow; $row++) {
                     if (($row - $dataStartRow) % 2 == 1) { // Every other row
                         $sheet->getStyle("A{$row}:{$lastColumn}{$row}")->applyFromArray([
                             'fill' => [
                                 'fillType' => Fill::FILL_SOLID,
-                                'startColor' => ['rgb' => 'F2F2F2']
+                                'startColor' => ['rgb' => 'F8F8F8'] // Very light gray
+                            ],
+                            'font' => [
+                                'color' => ['rgb' => '000000'], // Black text
+                                'bold' => false
                             ]
                         ]);
                     }
