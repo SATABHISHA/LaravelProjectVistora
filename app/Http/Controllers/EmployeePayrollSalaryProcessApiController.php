@@ -377,38 +377,32 @@ class EmployeePayrollSalaryProcessApiController extends Controller
         ]);
 
         try {
-            // Get payroll records with employee and employment details
+            // Get payroll records
             $payrollRecords = EmployeePayrollSalaryProcess::where('corpId', $request->corpId)
                 ->where('companyName', $request->companyName)
                 ->where('year', $request->year)
                 ->where('month', $request->month)
-                ->with(['employeeDetail', 'employmentDetail'])
                 ->get();
 
             if ($payrollRecords->isEmpty()) {
                 abort(404, 'No payroll records found for the specified period');
             }
 
+            // Get all employee codes from payroll records
+            $empCodes = $payrollRecords->pluck('empCode')->unique()->toArray();
+            
+            // Fetch employee details for all employees at once
+            $employeeDetails = EmployeeDetail::whereIn('empCode', $empCodes)->get()->keyBy('empCode');
+
             $excelData = [];
             $dynamicHeaders = [];
 
             foreach ($payrollRecords as $record) {
-                // Get employee details
-                $employeeDetail = $record->employeeDetail;
-                $employmentDetail = $record->employmentDetail;
-
-                // Build full name
-                $fullName = '';
-                if ($employeeDetail) {
-                    $firstName = $employeeDetail->FirstName ?? '';
-                    $middleName = $employeeDetail->MiddleName ?? '';
-                    $lastName = $employeeDetail->LastName ?? '';
-                    $fullName = trim($firstName . ' ' . $middleName . ' ' . $lastName);
-                }
-
-                // Get designation and date of joining
-                $designation = $employmentDetail->designation ?? '';
-                $dateOfJoining = $employmentDetail->dateofJoining ?? '';
+                // Get employee details for this record
+                $employeeDetail = $employeeDetails->get($record->empCode);
+                
+                // Build full name using the helper method
+                $fullName = $this->getFullEmployeeName($employeeDetail);
 
                 // Parse JSON fields safely
                 $grossList = $this->safeJsonDecode($record->grossList);
@@ -416,18 +410,29 @@ class EmployeePayrollSalaryProcessApiController extends Controller
                 $otherBenefits = $this->safeJsonDecode($record->otherBenefits);
                 $recurringDeductions = $this->safeJsonDecode($record->recurringDeduction);
 
-                // Build dynamic headers with prefixes
-                foreach ($grossList as $key => $item) {
-                    $dynamicHeaders['gross_' . $key] = 'Gross ' . $key;
+                // Build dynamic headers using actual component names
+                foreach ($grossList as $item) {
+                    $componentName = $item['componentName'] ?? 'Unknown Component';
+                    $headerKey = 'gross_' . str_replace(' ', '_', strtolower($componentName));
+                    $dynamicHeaders[$headerKey] = $componentName;
                 }
-                foreach ($otherAllowances as $key => $item) {
-                    $dynamicHeaders['benefit_' . $key] = 'Benefit ' . $key;
+                
+                foreach ($otherAllowances as $item) {
+                    $componentName = $item['componentName'] ?? 'Unknown Component';
+                    $headerKey = 'allowance_' . str_replace(' ', '_', strtolower($componentName));
+                    $dynamicHeaders[$headerKey] = $componentName;
                 }
-                foreach ($otherBenefits as $key => $item) {
-                    $dynamicHeaders['benefit_' . $key] = 'Benefit ' . $key;
+                
+                foreach ($otherBenefits as $item) {
+                    $componentName = $item['componentName'] ?? 'Unknown Component';
+                    $headerKey = 'benefit_' . str_replace(' ', '_', strtolower($componentName));
+                    $dynamicHeaders[$headerKey] = $componentName;
                 }
-                foreach ($recurringDeductions as $key => $item) {
-                    $dynamicHeaders['deduction_' . $key] = 'Deduction ' . $key;
+                
+                foreach ($recurringDeductions as $item) {
+                    $componentName = $item['componentName'] ?? 'Unknown Component';
+                    $headerKey = 'deduction_' . str_replace(' ', '_', strtolower($componentName));
+                    $dynamicHeaders[$headerKey] = $componentName;
                 }
 
                 // Calculate totals
@@ -442,7 +447,7 @@ class EmployeePayrollSalaryProcessApiController extends Controller
                     }
                 }
 
-                // Calculate benefits total
+                // Calculate benefits total (allowances + benefits)
                 foreach ($otherAllowances as $item) {
                     if (isset($item['calculatedValue'])) {
                         $monthlyTotalBenefits += (float)$item['calculatedValue'];
@@ -470,7 +475,7 @@ class EmployeePayrollSalaryProcessApiController extends Controller
                 // Build row data as associative array
                 $row = [
                     'empCode' => $record->empCode,
-                    'empName' => $fullName,
+                    'empName' => $fullName ?: 'N/A', // Use the corrected full name
                     'companyName' => $record->companyName,
                     'monthlyTotalGross' => round($monthlyTotalGross, 2),
                     'annualTotalGross' => round($annualTotalGross, 2),
@@ -483,18 +488,29 @@ class EmployeePayrollSalaryProcessApiController extends Controller
                     'month' => $record->month,
                 ];
 
-                // Add dynamic values
-                foreach ($grossList as $key => $item) {
-                    $row['gross_' . $key] = $item['calculatedValue'] ?? 0;
+                // Add dynamic values using component names as keys
+                foreach ($grossList as $item) {
+                    $componentName = $item['componentName'] ?? 'Unknown Component';
+                    $headerKey = 'gross_' . str_replace(' ', '_', strtolower($componentName));
+                    $row[$headerKey] = $item['calculatedValue'] ?? 0;
                 }
-                foreach ($otherAllowances as $key => $item) {
-                    $row['benefit_' . $key] = $item['calculatedValue'] ?? 0;
+                
+                foreach ($otherAllowances as $item) {
+                    $componentName = $item['componentName'] ?? 'Unknown Component';
+                    $headerKey = 'allowance_' . str_replace(' ', '_', strtolower($componentName));
+                    $row[$headerKey] = $item['calculatedValue'] ?? 0;
                 }
-                foreach ($otherBenefits as $key => $item) {
-                    $row['benefit_' . $key] = $item['calculatedValue'] ?? 0;
+                
+                foreach ($otherBenefits as $item) {
+                    $componentName = $item['componentName'] ?? 'Unknown Component';
+                    $headerKey = 'benefit_' . str_replace(' ', '_', strtolower($componentName));
+                    $row[$headerKey] = $item['calculatedValue'] ?? 0;
                 }
-                foreach ($recurringDeductions as $key => $item) {
-                    $row['deduction_' . $key] = $item['calculatedValue'] ?? 0;
+                
+                foreach ($recurringDeductions as $item) {
+                    $componentName = $item['componentName'] ?? 'Unknown Component';
+                    $headerKey = 'deduction_' . str_replace(' ', '_', strtolower($componentName));
+                    $row[$headerKey] = $item['calculatedValue'] ?? 0;
                 }
 
                 $excelData[] = $row;
