@@ -134,9 +134,6 @@ class PayrollExport implements FromArray, WithHeadings, ShouldAutoSize, WithStyl
 
     public function styles(Worksheet $sheet)
     {
-        $lastColumn = $sheet->getHighestColumn();
-        $headerRow = 5; // Headers will be on row 5
-        
         return [
             // Style for the main title (row 1)
             1 => [
@@ -185,23 +182,8 @@ class PayrollExport implements FromArray, WithHeadings, ShouldAutoSize, WithStyl
                     'horizontal' => Alignment::HORIZONTAL_CENTER,
                     'vertical' => Alignment::VERTICAL_CENTER
                 ]
-            ],
-            // Style for header row (row 5)
-            $headerRow => [
-                'font' => [
-                    'bold' => true,
-                    'size' => 11,
-                    'color' => ['rgb' => 'FFFFFF']
-                ],
-                'fill' => [
-                    'fillType' => Fill::FILL_SOLID,
-                    'startColor' => ['rgb' => '2F5597']
-                ],
-                'alignment' => [
-                    'horizontal' => Alignment::HORIZONTAL_CENTER,
-                    'vertical' => Alignment::VERTICAL_CENTER
-                ]
             ]
+            // Removed header row styling from here - it will be handled in registerEvents
         ];
     }
 
@@ -236,7 +218,7 @@ class PayrollExport implements FromArray, WithHeadings, ShouldAutoSize, WithStyl
                 $sheet->getRowDimension(4)->setRowHeight(15);
                 $sheet->getRowDimension(5)->setRowHeight(25); // Header row
                 
-                // Apply header row styling specifically (row 5)
+                // Apply header row styling (row 5) - ONLY the header row
                 $sheet->getStyle("A5:{$lastColumn}5")->applyFromArray([
                     'font' => [
                         'bold' => true,
@@ -253,9 +235,45 @@ class PayrollExport implements FromArray, WithHeadings, ShouldAutoSize, WithStyl
                     ]
                 ]);
                 
-                // Apply borders to data area only (header + data rows)
-                $dataRange = "A5:{$lastColumn}" . ($sheet->getHighestRow());
-                $sheet->getStyle($dataRange)->applyFromArray([
+                // Get the range for data rows only (starting from row 6)
+                $dataStartRow = 6;
+                $lastDataRow = $sheet->getHighestRow();
+                
+                // FIRST: Reset ALL data rows to default formatting
+                if ($lastDataRow >= $dataStartRow) {
+                    $dataRange = "A{$dataStartRow}:{$lastColumn}{$lastDataRow}";
+                    $sheet->getStyle($dataRange)->applyFromArray([
+                        'font' => [
+                            'bold' => false,
+                            'size' => 11,
+                            'color' => ['rgb' => '000000'] // Black text
+                        ],
+                        'fill' => [
+                            'fillType' => Fill::FILL_SOLID,
+                            'startColor' => ['rgb' => 'FFFFFF'] // White background
+                        ],
+                        'alignment' => [
+                            'horizontal' => Alignment::HORIZONTAL_LEFT,
+                            'vertical' => Alignment::VERTICAL_CENTER
+                        ]
+                    ]);
+                }
+                
+                // SECOND: Apply alternating row colors (light gray for odd rows)
+                for ($row = $dataStartRow; $row <= $lastDataRow; $row++) {
+                    if (($row - $dataStartRow) % 2 == 1) { // Every other row (odd rows)
+                        $sheet->getStyle("A{$row}:{$lastColumn}{$row}")->applyFromArray([
+                            'fill' => [
+                                'fillType' => Fill::FILL_SOLID,
+                                'startColor' => ['rgb' => 'F2F2F2'] // Light gray
+                            ]
+                        ]);
+                    }
+                }
+                
+                // THIRD: Apply borders to the entire table (header + data)
+                $tableRange = "A5:{$lastColumn}{$lastDataRow}";
+                $sheet->getStyle($tableRange)->applyFromArray([
                     'borders' => [
                         'allBorders' => [
                             'borderStyle' => \PhpOffice\PhpSpreadsheet\Style\Border::BORDER_THIN,
@@ -264,42 +282,25 @@ class PayrollExport implements FromArray, WithHeadings, ShouldAutoSize, WithStyl
                     ]
                 ]);
                 
-                // Apply alternating row colors ONLY to data rows (starting from row 6)
-                $dataStartRow = 6;
-                $lastDataRow = $sheet->getHighestRow();
-                
-                // First, reset all data rows to white background
+                // FOURTH: Set specific alignment for numeric columns (right align numbers)
                 if ($lastDataRow >= $dataStartRow) {
-                    $sheet->getStyle("A{$dataStartRow}:{$lastColumn}{$lastDataRow}")->applyFromArray([
-                        'fill' => [
-                            'fillType' => Fill::FILL_SOLID,
-                            'startColor' => ['rgb' => 'FFFFFF']
-                        ],
-                        'font' => [
-                            'color' => ['rgb' => '000000'], // Black text for data rows
-                            'bold' => false
+                    // Assuming columns C onwards are numeric (adjust as needed)
+                    $numericRange = "C{$dataStartRow}:{$lastColumn}{$lastDataRow}";
+                    $sheet->getStyle($numericRange)->applyFromArray([
+                        'alignment' => [
+                            'horizontal' => Alignment::HORIZONTAL_RIGHT,
+                            'vertical' => Alignment::VERTICAL_CENTER
                         ]
                     ]);
                 }
                 
-                // Then apply light gray to every other row
-                for ($row = $dataStartRow; $row <= $lastDataRow; $row++) {
-                    if (($row - $dataStartRow) % 2 == 1) { // Every other row
-                        $sheet->getStyle("A{$row}:{$lastColumn}{$row}")->applyFromArray([
-                            'fill' => [
-                                'fillType' => Fill::FILL_SOLID,
-                                'startColor' => ['rgb' => 'F8F8F8'] // Very light gray
-                            ],
-                            'font' => [
-                                'color' => ['rgb' => '000000'], // Black text
-                                'bold' => false
-                            ]
-                        ]);
-                    }
-                }
-                
-                // Freeze the header row
+                // Freeze the header row for easy scrolling
                 $sheet->freezePane('A6');
+                
+                // Auto-size all columns for better readability
+                foreach (range('A', $lastColumn) as $column) {
+                    $sheet->getColumnDimension($column)->setAutoSize(true);
+                }
             }
         ];
     }
