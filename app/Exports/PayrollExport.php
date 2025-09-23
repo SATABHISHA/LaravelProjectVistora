@@ -6,18 +6,24 @@ use Maatwebsite\Excel\Concerns\FromArray;
 use Maatwebsite\Excel\Concerns\WithHeadings;
 use Maatwebsite\Excel\Concerns\ShouldAutoSize;
 use Maatwebsite\Excel\Concerns\WithStyles;
+use Maatwebsite\Excel\Concerns\WithEvents;
+use Maatwebsite\Excel\Events\AfterSheet;
 use PhpOffice\PhpSpreadsheet\Worksheet\Worksheet;
-use PhpOffice\PhpSpreadsheet\Style\Font;
+use PhpOffice\PhpSpreadsheet\Style\Alignment;
+use PhpOffice\PhpSpreadsheet\Style\Fill;
+use PhpOffice\PhpSpreadsheet\Style\Color;
 
-class PayrollExport implements FromArray, WithHeadings, ShouldAutoSize, WithStyles
+class PayrollExport implements FromArray, WithHeadings, ShouldAutoSize, WithStyles, WithEvents
 {
     protected $data;
     protected $dynamicHeaders;
+    protected $companyInfo;
     
-    public function __construct($data, $dynamicHeaders)
+    public function __construct($data, $dynamicHeaders, $companyInfo)
     {
         $this->data = $data;
         $this->dynamicHeaders = $dynamicHeaders;
+        $this->companyInfo = $companyInfo;
     }
 
     public function array(): array
@@ -128,17 +134,137 @@ class PayrollExport implements FromArray, WithHeadings, ShouldAutoSize, WithStyl
 
     public function styles(Worksheet $sheet)
     {
+        $lastColumn = $sheet->getHighestColumn();
+        $headerRow = 5; // Headers will be on row 5
+        
         return [
-            // Make first row (company info) bold and larger
+            // Style for the main title (row 1)
             1 => [
                 'font' => [
                     'bold' => true,
-                    'size' => 14,
-                    'color' => ['rgb' => '0066CC']
+                    'size' => 18,
+                    'color' => ['rgb' => 'FFFFFF']
+                ],
+                'fill' => [
+                    'fillType' => Fill::FILL_SOLID,
+                    'startColor' => ['rgb' => '1F4E79']
+                ],
+                'alignment' => [
+                    'horizontal' => Alignment::HORIZONTAL_CENTER,
+                    'vertical' => Alignment::VERTICAL_CENTER
                 ]
             ],
-            // Make header row bold
-            3 => ['font' => ['bold' => true]],
+            // Style for company info (row 2)
+            2 => [
+                'font' => [
+                    'bold' => true,
+                    'size' => 14,
+                    'color' => ['rgb' => 'FFFFFF']
+                ],
+                'fill' => [
+                    'fillType' => Fill::FILL_SOLID,
+                    'startColor' => ['rgb' => '4472C4']
+                ],
+                'alignment' => [
+                    'horizontal' => Alignment::HORIZONTAL_CENTER,
+                    'vertical' => Alignment::VERTICAL_CENTER
+                ]
+            ],
+            // Style for period info (row 3)
+            3 => [
+                'font' => [
+                    'bold' => true,
+                    'size' => 12,
+                    'color' => ['rgb' => 'FFFFFF']
+                ],
+                'fill' => [
+                    'fillType' => Fill::FILL_SOLID,
+                    'startColor' => ['rgb' => '70AD47']
+                ],
+                'alignment' => [
+                    'horizontal' => Alignment::HORIZONTAL_CENTER,
+                    'vertical' => Alignment::VERTICAL_CENTER
+                ]
+            ],
+            // Style for header row (row 5)
+            $headerRow => [
+                'font' => [
+                    'bold' => true,
+                    'size' => 11,
+                    'color' => ['rgb' => 'FFFFFF']
+                ],
+                'fill' => [
+                    'fillType' => Fill::FILL_SOLID,
+                    'startColor' => ['rgb' => '2F5597']
+                ],
+                'alignment' => [
+                    'horizontal' => Alignment::HORIZONTAL_CENTER,
+                    'vertical' => Alignment::VERTICAL_CENTER
+                ]
+            ]
+        ];
+    }
+
+    public function registerEvents(): array
+    {
+        return [
+            AfterSheet::class => function(AfterSheet $event) {
+                $sheet = $event->sheet->getDelegate();
+                $lastColumn = $sheet->getHighestColumn();
+                
+                // Insert title and company information rows at the top
+                $sheet->insertNewRowBefore(1, 4); // Insert 4 rows at the top
+                
+                // Set title (row 1)
+                $sheet->setCellValue('A1', 'PAYROLL REPORT');
+                $sheet->mergeCells("A1:{$lastColumn}1");
+                
+                // Set company name (row 2)
+                $sheet->setCellValue('A2', "Company: {$this->companyInfo['companyName']}");
+                $sheet->mergeCells("A2:{$lastColumn}2");
+                
+                // Set period (row 3)
+                $sheet->setCellValue('A3', "Period: {$this->companyInfo['month']} {$this->companyInfo['year']}");
+                $sheet->mergeCells("A3:{$lastColumn}3");
+                
+                // Row 4 is empty for spacing
+                
+                // Set row heights
+                $sheet->getRowDimension(1)->setRowHeight(30);
+                $sheet->getRowDimension(2)->setRowHeight(25);
+                $sheet->getRowDimension(3)->setRowHeight(25);
+                $sheet->getRowDimension(4)->setRowHeight(15);
+                $sheet->getRowDimension(5)->setRowHeight(25); // Header row
+                
+                // Apply borders to data area
+                $dataRange = "A5:{$lastColumn}" . ($sheet->getHighestRow());
+                $sheet->getStyle($dataRange)->applyFromArray([
+                    'borders' => [
+                        'allBorders' => [
+                            'borderStyle' => \PhpOffice\PhpSpreadsheet\Style\Border::BORDER_THIN,
+                            'color' => ['rgb' => '000000']
+                        ]
+                    ]
+                ]);
+                
+                // Apply alternating row colors to data rows (starting from row 6)
+                $dataStartRow = 6;
+                $lastDataRow = $sheet->getHighestRow();
+                
+                for ($row = $dataStartRow; $row <= $lastDataRow; $row++) {
+                    if (($row - $dataStartRow) % 2 == 1) { // Every other row
+                        $sheet->getStyle("A{$row}:{$lastColumn}{$row}")->applyFromArray([
+                            'fill' => [
+                                'fillType' => Fill::FILL_SOLID,
+                                'startColor' => ['rgb' => 'F2F2F2']
+                            ]
+                        ]);
+                    }
+                }
+                
+                // Freeze the header row
+                $sheet->freezePane('A6');
+            }
         ];
     }
 }
