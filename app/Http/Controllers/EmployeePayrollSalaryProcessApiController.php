@@ -472,7 +472,7 @@ class EmployeePayrollSalaryProcessApiController extends Controller
                 $annualTotalDeductions = $monthlyTotalDeductions * 12;
                 $netTakeHomeMonthly = $monthlyTotalGross + $monthlyTotalBenefits - $monthlyTotalDeductions;
 
-                // Build row data as associative array
+                // Build row data as associative array (status moved to the end)
                 $row = [
                     'empCode' => $record->empCode,
                     'empName' => $fullName ?: 'N/A',
@@ -483,6 +483,7 @@ class EmployeePayrollSalaryProcessApiController extends Controller
                     'monthlyTotalRecurringDeductions' => round($monthlyTotalDeductions, 2),
                     'annualTotalRecurringDeductions' => round($annualTotalDeductions, 2),
                     'netTakeHomeMonthly' => round($netTakeHomeMonthly, 2),
+                    'status' => $record->status, // Moved status to the end
                 ];
 
                 // Add dynamic values using component names as keys

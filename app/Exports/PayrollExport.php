@@ -34,7 +34,7 @@ class PayrollExport implements FromArray, WithHeadings, ShouldAutoSize, WithStyl
         foreach ($this->data as $row) {
             $excelRow = [];
             
-            // Static columns first
+            // Static columns first (without status)
             $excelRow[] = $row['empCode'] ?? '';
             $excelRow[] = $row['empName'] ?? '';
             
@@ -76,6 +76,9 @@ class PayrollExport implements FromArray, WithHeadings, ShouldAutoSize, WithStyl
             $excelRow[] = $row['annualTotalRecurringDeductions'] ?? 0;
             $excelRow[] = $row['netTakeHomeMonthly'] ?? 0;
             
+            // Status column at the end
+            $excelRow[] = $row['status'] ?? '';
+            
             $excelRows[] = $excelRow;
         }
         
@@ -87,6 +90,7 @@ class PayrollExport implements FromArray, WithHeadings, ShouldAutoSize, WithStyl
         $headers = [
             'Employee Code',
             'Employee Name'
+            // Removed status from here
         ];
 
         // Add dynamic gross headers
@@ -126,7 +130,8 @@ class PayrollExport implements FromArray, WithHeadings, ShouldAutoSize, WithStyl
         $headers = array_merge($headers, [
             'Monthly Total Deductions',
             'Annual Total Deductions',
-            'Net Take Home Monthly'
+            'Net Take Home Monthly',
+            'Status' // Added status at the end
         ]);
 
         return $headers;
@@ -282,13 +287,34 @@ class PayrollExport implements FromArray, WithHeadings, ShouldAutoSize, WithStyl
                     ]
                 ]);
                 
-                // FOURTH: Set specific alignment for numeric columns (right align numbers)
+                // FOURTH: Set specific alignment for different column types
                 if ($lastDataRow >= $dataStartRow) {
-                    // Assuming columns C onwards are numeric (adjust as needed)
-                    $numericRange = "C{$dataStartRow}:{$lastColumn}{$lastDataRow}";
-                    $sheet->getStyle($numericRange)->applyFromArray([
+                    // Left align text columns (A, B - Employee Code, Name)
+                    $textRange = "A{$dataStartRow}:B{$lastDataRow}";
+                    $sheet->getStyle($textRange)->applyFromArray([
                         'alignment' => [
-                            'horizontal' => Alignment::HORIZONTAL_RIGHT,
+                            'horizontal' => Alignment::HORIZONTAL_LEFT,
+                            'vertical' => Alignment::VERTICAL_CENTER
+                        ]
+                    ]);
+                    
+                    // Right align numeric columns (C to second last column)
+                    $lastColumnBefore = chr(ord($lastColumn) - 1); // Get column before the last one
+                    if ($lastColumnBefore >= 'C') {
+                        $numericRange = "C{$dataStartRow}:{$lastColumnBefore}{$lastDataRow}";
+                        $sheet->getStyle($numericRange)->applyFromArray([
+                            'alignment' => [
+                                'horizontal' => Alignment::HORIZONTAL_RIGHT,
+                                'vertical' => Alignment::VERTICAL_CENTER
+                            ]
+                        ]);
+                    }
+                    
+                    // Center align status column (last column)
+                    $statusRange = "{$lastColumn}{$dataStartRow}:{$lastColumn}{$lastDataRow}";
+                    $sheet->getStyle($statusRange)->applyFromArray([
+                        'alignment' => [
+                            'horizontal' => Alignment::HORIZONTAL_CENTER,
                             'vertical' => Alignment::VERTICAL_CENTER
                         ]
                     ]);
