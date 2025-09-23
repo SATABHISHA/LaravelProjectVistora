@@ -7,6 +7,7 @@ use App\Models\EmployeePayrollSalaryProcess;
 use App\Models\EmployeeDetail;
 use App\Models\EmploymentDetail;
 use App\Exports\PayrollExport;
+use App\Exports\ReleasedPayrollExport;
 use Maatwebsite\Excel\Facades\Excel;
 
 class EmployeePayrollSalaryProcessApiController extends Controller
@@ -535,6 +536,187 @@ class EmployeePayrollSalaryProcessApiController extends Controller
 
         } catch (\Exception $e) {
             abort(500, 'Error in exporting payroll data: ' . $e->getMessage());
+        }
+    }
+
+    /**
+     * Export payroll data to Excel for employees with Released status only
+     *
+     * @param Request $request
+     * @return \Symfony\Component\HttpFoundation\BinaryFileResponse
+     */
+    public function exportReleasedPayrollExcel(Request $request)
+    {
+        // Validate required fields
+        $request->validate([
+            'corpId' => 'required|string|max:10',
+            'companyName' => 'required|string|max:100',
+            'year' => 'required|string|max:4',
+            'month' => 'required|string|max:50',
+        ]);
+
+        try {
+            // Get payroll records with Released status only
+            $payrollRecords = EmployeePayrollSalaryProcess::where('corpId', $request->corpId)
+                ->where('companyName', $request->companyName)
+                ->where('year', $request->year)
+                ->where('month', $request->month)
+                ->where('status', 'Released') // Filter only Released status
+                ->get();
+
+            if ($payrollRecords->isEmpty()) {
+                abort(404, 'No released payroll records found for the specified period');
+            }
+
+            // Get all employee codes from payroll records
+            $empCodes = $payrollRecords->pluck('empCode')->unique()->toArray();
+            
+            // Fetch employee details using the correct column name 'EmpCode'
+            $employeeDetails = EmployeeDetail::whereIn('EmpCode', $empCodes)->get()->keyBy('EmpCode');
+
+            $excelData = [];
+            $dynamicHeaders = [];
+
+            foreach ($payrollRecords as $record) {
+                // Get employee details using the correct column name 'EmpCode'
+                $employeeDetail = $employeeDetails->get($record->empCode);
+                
+                // Build full name using the helper method
+                $fullName = $this->getFullEmployeeName($employeeDetail);
+
+                // Parse JSON fields safely
+                $grossList = $this->safeJsonDecode($record->grossList);
+                $otherAllowances = $this->safeJsonDecode($record->otherAllowances);
+                $otherBenefits = $this->safeJsonDecode($record->otherBenefits);
+                $recurringDeductions = $this->safeJsonDecode($record->recurringDeduction);
+
+                // Build dynamic headers using actual component names
+                foreach ($grossList as $item) {
+                    $componentName = $item['componentName'] ?? 'Unknown Component';
+                    $headerKey = 'gross_' . str_replace(' ', '_', strtolower($componentName));
+                    $dynamicHeaders[$headerKey] = $componentName;
+                }
+                
+                foreach ($otherAllowances as $item) {
+                    $componentName = $item['componentName'] ?? 'Unknown Component';
+                    $headerKey = 'allowance_' . str_replace(' ', '_', strtolower($componentName));
+                    $dynamicHeaders[$headerKey] = $componentName;
+                }
+                
+                foreach ($otherBenefits as $item) {
+                    $componentName = $item['componentName'] ?? 'Unknown Component';
+                    $headerKey = 'benefit_' . str_replace(' ', '_', strtolower($componentName));
+                    $dynamicHeaders[$headerKey] = $componentName;
+                }
+                
+                foreach ($recurringDeductions as $item) {
+                    $componentName = $item['componentName'] ?? 'Unknown Component';
+                    $headerKey = 'deduction_' . str_replace(' ', '_', strtolower($componentName));
+                    $dynamicHeaders[$headerKey] = $componentName;
+                }
+
+                // Calculate totals
+                $monthlyTotalGross = 0;
+                $monthlyTotalBenefits = 0;
+                $monthlyTotalDeductions = 0;
+
+                // Calculate gross total
+                foreach ($grossList as $item) {
+                    if (isset($item['calculatedValue'])) {
+                        $monthlyTotalGross += (float)$item['calculatedValue'];
+                    }
+                }
+
+                // Calculate benefits total (allowances + benefits)
+                foreach ($otherAllowances as $item) {
+                    if (isset($item['calculatedValue'])) {
+                        $monthlyTotalBenefits += (float)$item['calculatedValue'];
+                    }
+                }
+                foreach ($otherBenefits as $item) {
+                    if (isset($item['calculatedValue'])) {
+                        $monthlyTotalBenefits += (float)$item['calculatedValue'];
+                    }
+                }
+
+                // Calculate deductions total
+                foreach ($recurringDeductions as $item) {
+                    if (isset($item['calculatedValue'])) {
+                        $monthlyTotalDeductions += (float)$item['calculatedValue'];
+                    }
+                }
+
+                // Calculate annual totals
+                $annualTotalGross = $monthlyTotalGross * 12;
+                $annualTotalBenefits = $monthlyTotalBenefits * 12;
+                $annualTotalDeductions = $monthlyTotalDeductions * 12;
+                $netTakeHomeMonthly = $monthlyTotalGross + $monthlyTotalBenefits - $monthlyTotalDeductions;
+
+                // Build row data as associative array (status moved to the end)
+                $row = [
+                    'empCode' => $record->empCode,
+                    'empName' => $fullName ?: 'N/A',
+                    'monthlyTotalGross' => round($monthlyTotalGross, 2),
+                    'annualTotalGross' => round($annualTotalGross, 2),
+                    'monthlyTotalBenefits' => round($monthlyTotalBenefits, 2),
+                    'annualTotalBenefits' => round($annualTotalBenefits, 2),
+                    'monthlyTotalRecurringDeductions' => round($monthlyTotalDeductions, 2),
+                    'annualTotalRecurringDeductions' => round($annualTotalDeductions, 2),
+                    'netTakeHomeMonthly' => round($netTakeHomeMonthly, 2),
+                    'status' => $record->status, // Will always be 'Released'
+                ];
+
+                // Add dynamic values using component names as keys
+                foreach ($grossList as $item) {
+                    $componentName = $item['componentName'] ?? 'Unknown Component';
+                    $headerKey = 'gross_' . str_replace(' ', '_', strtolower($componentName));
+                    $row[$headerKey] = $item['calculatedValue'] ?? 0;
+                }
+                
+                foreach ($otherAllowances as $item) {
+                    $componentName = $item['componentName'] ?? 'Unknown Component';
+                    $headerKey = 'allowance_' . str_replace(' ', '_', strtolower($componentName));
+                    $row[$headerKey] = $item['calculatedValue'] ?? 0;
+                }
+                
+                foreach ($otherBenefits as $item) {
+                    $componentName = $item['componentName'] ?? 'Unknown Component';
+                    $headerKey = 'benefit_' . str_replace(' ', '_', strtolower($componentName));
+                    $row[$headerKey] = $item['calculatedValue'] ?? 0;
+                }
+                
+                foreach ($recurringDeductions as $item) {
+                    $componentName = $item['componentName'] ?? 'Unknown Component';
+                    $headerKey = 'deduction_' . str_replace(' ', '_', strtolower($componentName));
+                    $row[$headerKey] = $item['calculatedValue'] ?? 0;
+                }
+
+                // Initialize missing keys for dynamic headers in row
+                foreach ($dynamicHeaders as $key => $value) {
+                    if (!isset($row[$key])) {
+                        $row[$key] = 0;
+                    }
+                }
+
+                $excelData[] = $row;
+            }
+
+            // Company information for the heading (with Released status indicator)
+            $companyInfo = [
+                'companyName' => $request->companyName,
+                'year' => $request->year,
+                'month' => $request->month,
+                'statusFilter' => 'Released' // Indicate this is for Released status only
+            ];
+
+            // Generate filename with Released indicator
+            $fileName = "ReleasedPayroll_{$request->companyName}_{$request->year}_{$request->month}.xlsx";
+
+            // Use the new ReleasedPayrollExport class
+            return Excel::download(new ReleasedPayrollExport($excelData, $dynamicHeaders, $companyInfo), $fileName);
+
+        } catch (\Exception $e) {
+            abort(500, 'Error in exporting released payroll data: ' . $e->getMessage());
         }
     }
 
