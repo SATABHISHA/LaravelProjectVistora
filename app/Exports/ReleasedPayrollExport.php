@@ -34,9 +34,11 @@ class ReleasedPayrollExport implements FromArray, WithHeadings, ShouldAutoSize, 
         foreach ($this->data as $row) {
             $excelRow = [];
             
-            // Static columns first (without status)
+            // Static columns first (including new columns)
             $excelRow[] = $row['empCode'] ?? '';
             $excelRow[] = $row['empName'] ?? '';
+            $excelRow[] = $row['designation'] ?? ''; // New column
+            $excelRow[] = $row['dateOfJoining'] ?? ''; // New column
             
             // Dynamic gross columns
             foreach ($this->dynamicHeaders as $key => $header) {
@@ -89,7 +91,9 @@ class ReleasedPayrollExport implements FromArray, WithHeadings, ShouldAutoSize, 
     {
         $headers = [
             'Employee Code',
-            'Employee Name'
+            'Employee Name',
+            'Designation', // New column
+            'Date of Joining' // New column
         ];
 
         // Add dynamic gross headers
@@ -187,7 +191,7 @@ class ReleasedPayrollExport implements FromArray, WithHeadings, ShouldAutoSize, 
                     'vertical' => Alignment::VERTICAL_CENTER
                 ]
             ],
-            // Style for status filter info (row 4) - NEW
+            // Style for status filter info (row 4)
             4 => [
                 'font' => [
                     'bold' => true,
@@ -197,6 +201,22 @@ class ReleasedPayrollExport implements FromArray, WithHeadings, ShouldAutoSize, 
                 'fill' => [
                     'fillType' => Fill::FILL_SOLID,
                     'startColor' => ['rgb' => 'E74C3C'] // Red color for Released status
+                ],
+                'alignment' => [
+                    'horizontal' => Alignment::HORIZONTAL_CENTER,
+                    'vertical' => Alignment::VERTICAL_CENTER
+                ]
+            ],
+            // Style for SubBranch info (row 5) - NEW
+            5 => [
+                'font' => [
+                    'bold' => true,
+                    'size' => 12,
+                    'color' => ['rgb' => 'FFFFFF']
+                ],
+                'fill' => [
+                    'fillType' => Fill::FILL_SOLID,
+                    'startColor' => ['rgb' => '9B59B6'] // Purple color for SubBranch
                 ],
                 'alignment' => [
                     'horizontal' => Alignment::HORIZONTAL_CENTER,
@@ -214,7 +234,7 @@ class ReleasedPayrollExport implements FromArray, WithHeadings, ShouldAutoSize, 
                 $lastColumn = $sheet->getHighestColumn();
                 
                 // Insert title and company information rows at the top
-                $sheet->insertNewRowBefore(1, 5); // Insert 5 rows at the top (one more for status filter)
+                $sheet->insertNewRowBefore(1, 6); // Insert 6 rows at the top (added SubBranch row)
                 
                 // Set title (row 1)
                 $sheet->setCellValue('A1', 'RELEASED PAYROLL REPORT');
@@ -228,22 +248,27 @@ class ReleasedPayrollExport implements FromArray, WithHeadings, ShouldAutoSize, 
                 $sheet->setCellValue('A3', "Period: {$this->companyInfo['month']} {$this->companyInfo['year']}");
                 $sheet->mergeCells("A3:{$lastColumn}3");
                 
-                // Set status filter (row 4) - NEW
+                // Set status filter (row 4)
                 $sheet->setCellValue('A4', "Status Filter: Released Only");
                 $sheet->mergeCells("A4:{$lastColumn}4");
                 
-                // Row 5 is empty for spacing
+                // Set SubBranch (row 5) - NEW
+                $sheet->setCellValue('A5', "SubBranch: {$this->companyInfo['subBranch']}");
+                $sheet->mergeCells("A5:{$lastColumn}5");
+                
+                // Row 6 is empty for spacing
                 
                 // Set row heights
                 $sheet->getRowDimension(1)->setRowHeight(30);
                 $sheet->getRowDimension(2)->setRowHeight(25);
                 $sheet->getRowDimension(3)->setRowHeight(25);
                 $sheet->getRowDimension(4)->setRowHeight(20); // Status filter row
-                $sheet->getRowDimension(5)->setRowHeight(15); // Empty spacing row
-                $sheet->getRowDimension(6)->setRowHeight(25); // Header row
+                $sheet->getRowDimension(5)->setRowHeight(25); // SubBranch row
+                $sheet->getRowDimension(6)->setRowHeight(15); // Empty spacing row
+                $sheet->getRowDimension(7)->setRowHeight(25); // Header row
                 
-                // Apply header row styling (row 6) - ONLY the header row
-                $sheet->getStyle("A6:{$lastColumn}6")->applyFromArray([
+                // Apply header row styling (row 7) - ONLY the header row
+                $sheet->getStyle("A7:{$lastColumn}7")->applyFromArray([
                     'font' => [
                         'bold' => true,
                         'size' => 11,
@@ -259,13 +284,14 @@ class ReleasedPayrollExport implements FromArray, WithHeadings, ShouldAutoSize, 
                     ]
                 ]);
                 
-                // Get the range for data rows only (starting from row 7)
-                $dataStartRow = 7;
+                // Get the range for data rows only (starting from row 8)
+                $dataStartRow = 8;
                 $lastDataRow = $sheet->getHighestRow();
+                $totalsRow = $lastDataRow; // Last row is totals
                 
-                // FIRST: Reset ALL data rows to default formatting
-                if ($lastDataRow >= $dataStartRow) {
-                    $dataRange = "A{$dataStartRow}:{$lastColumn}{$lastDataRow}";
+                // FIRST: Reset ALL data rows to default formatting (except totals row)
+                if ($lastDataRow > $dataStartRow) {
+                    $dataRange = "A{$dataStartRow}:{$lastColumn}" . ($lastDataRow - 1); // Exclude totals row
                     $sheet->getStyle($dataRange)->applyFromArray([
                         'font' => [
                             'bold' => false,
@@ -283,8 +309,8 @@ class ReleasedPayrollExport implements FromArray, WithHeadings, ShouldAutoSize, 
                     ]);
                 }
                 
-                // SECOND: Apply alternating row colors (light gray for odd rows)
-                for ($row = $dataStartRow; $row <= $lastDataRow; $row++) {
+                // SECOND: Apply alternating row colors (light gray for odd rows, excluding totals)
+                for ($row = $dataStartRow; $row < $totalsRow; $row++) {
                     if (($row - $dataStartRow) % 2 == 1) { // Every other row (odd rows)
                         $sheet->getStyle("A{$row}:{$lastColumn}{$row}")->applyFromArray([
                             'fill' => [
@@ -295,8 +321,25 @@ class ReleasedPayrollExport implements FromArray, WithHeadings, ShouldAutoSize, 
                     }
                 }
                 
-                // THIRD: Apply borders to the entire table (header + data)
-                $tableRange = "A6:{$lastColumn}{$lastDataRow}";
+                // THIRD: Style the totals row with attractive colors
+                $sheet->getStyle("A{$totalsRow}:{$lastColumn}{$totalsRow}")->applyFromArray([
+                    'font' => [
+                        'bold' => true,
+                        'size' => 12,
+                        'color' => ['rgb' => 'FFFFFF'] // White text
+                    ],
+                    'fill' => [
+                        'fillType' => Fill::FILL_SOLID,
+                        'startColor' => ['rgb' => 'FF6B35'] // Attractive orange/red color
+                    ],
+                    'alignment' => [
+                        'horizontal' => Alignment::HORIZONTAL_CENTER,
+                        'vertical' => Alignment::VERTICAL_CENTER
+                    ]
+                ]);
+                
+                // FOURTH: Apply borders to the entire table (header + data + totals)
+                $tableRange = "A7:{$lastColumn}{$lastDataRow}";
                 $sheet->getStyle($tableRange)->applyFromArray([
                     'borders' => [
                         'allBorders' => [
@@ -306,10 +349,10 @@ class ReleasedPayrollExport implements FromArray, WithHeadings, ShouldAutoSize, 
                     ]
                 ]);
                 
-                // FOURTH: Set specific alignment for different column types
-                if ($lastDataRow >= $dataStartRow) {
-                    // Left align text columns (A, B - Employee Code, Name)
-                    $textRange = "A{$dataStartRow}:B{$lastDataRow}";
+                // FIFTH: Set specific alignment for different column types (excluding totals row)
+                if ($lastDataRow > $dataStartRow) {
+                    // Left align text columns (A, B, C, D - Employee Code, Name, Designation, Date)
+                    $textRange = "A{$dataStartRow}:D" . ($lastDataRow - 1);
                     $sheet->getStyle($textRange)->applyFromArray([
                         'alignment' => [
                             'horizontal' => Alignment::HORIZONTAL_LEFT,
@@ -317,10 +360,10 @@ class ReleasedPayrollExport implements FromArray, WithHeadings, ShouldAutoSize, 
                         ]
                     ]);
                     
-                    // Right align numeric columns (C to second last column)
+                    // Right align numeric columns (E to second last column)
                     $lastColumnBefore = chr(ord($lastColumn) - 1); // Get column before the last one
-                    if ($lastColumnBefore >= 'C') {
-                        $numericRange = "C{$dataStartRow}:{$lastColumnBefore}{$lastDataRow}";
+                    if ($lastColumnBefore >= 'E') {
+                        $numericRange = "E{$dataStartRow}:{$lastColumnBefore}" . ($lastDataRow - 1);
                         $sheet->getStyle($numericRange)->applyFromArray([
                             'alignment' => [
                                 'horizontal' => Alignment::HORIZONTAL_RIGHT,
@@ -329,8 +372,8 @@ class ReleasedPayrollExport implements FromArray, WithHeadings, ShouldAutoSize, 
                         ]);
                     }
                     
-                    // Center align status column (last column) and add green background for Released
-                    $statusRange = "{$lastColumn}{$dataStartRow}:{$lastColumn}{$lastDataRow}";
+                    // Center align and style status column (last column, excluding totals) with green background for Released
+                    $statusRange = "{$lastColumn}{$dataStartRow}:{$lastColumn}" . ($lastDataRow - 1);
                     $sheet->getStyle($statusRange)->applyFromArray([
                         'alignment' => [
                             'horizontal' => Alignment::HORIZONTAL_CENTER,
@@ -348,7 +391,7 @@ class ReleasedPayrollExport implements FromArray, WithHeadings, ShouldAutoSize, 
                 }
                 
                 // Freeze the header row for easy scrolling
-                $sheet->freezePane('A7');
+                $sheet->freezePane('A8');
                 
                 // Auto-size all columns for better readability
                 foreach (range('A', $lastColumn) as $column) {

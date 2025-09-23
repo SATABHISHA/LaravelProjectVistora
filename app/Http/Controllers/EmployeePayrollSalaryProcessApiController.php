@@ -375,6 +375,7 @@ class EmployeePayrollSalaryProcessApiController extends Controller
             'companyName' => 'required|string|max:100',
             'year' => 'required|string|max:4',
             'month' => 'required|string|max:50',
+            'subBranch' => 'nullable|string|max:100', // Optional SubBranch filter
         ]);
 
         try {
@@ -392,15 +393,36 @@ class EmployeePayrollSalaryProcessApiController extends Controller
             // Get all employee codes from payroll records
             $empCodes = $payrollRecords->pluck('empCode')->unique()->toArray();
             
-            // Fetch employee details using the correct column name 'EmpCode'
+            // Fetch employee details and employment details with SubBranch filter
             $employeeDetails = EmployeeDetail::whereIn('EmpCode', $empCodes)->get()->keyBy('EmpCode');
+            
+            $employmentDetailsQuery = EmploymentDetail::whereIn('EmpCode', $empCodes);
+            
+            // Apply SubBranch filter if provided
+            if ($request->has('subBranch') && !empty($request->subBranch)) {
+                $employmentDetailsQuery->where('SubBranch', $request->subBranch);
+            }
+            
+            $employmentDetails = $employmentDetailsQuery->get()->keyBy('EmpCode');
+
+            // Filter payroll records based on employment details (if SubBranch filter applied)
+            if ($request->has('subBranch') && !empty($request->subBranch)) {
+                $filteredEmpCodes = $employmentDetails->pluck('EmpCode')->toArray();
+                $payrollRecords = $payrollRecords->whereIn('empCode', $filteredEmpCodes);
+            }
+
+            if ($payrollRecords->isEmpty()) {
+                abort(404, 'No payroll records found for the specified SubBranch and period');
+            }
 
             $excelData = [];
             $dynamicHeaders = [];
+            $totals = []; // For calculating column totals
 
             foreach ($payrollRecords as $record) {
-                // Get employee details using the correct column name 'EmpCode'
+                // Get employee details and employment details
                 $employeeDetail = $employeeDetails->get($record->empCode);
+                $employmentDetail = $employmentDetails->get($record->empCode);
                 
                 // Build full name using the helper method
                 $fullName = $this->getFullEmployeeName($employeeDetail);
@@ -473,10 +495,12 @@ class EmployeePayrollSalaryProcessApiController extends Controller
                 $annualTotalDeductions = $monthlyTotalDeductions * 12;
                 $netTakeHomeMonthly = $monthlyTotalGross + $monthlyTotalBenefits - $monthlyTotalDeductions;
 
-                // Build row data as associative array (status moved to the end)
+                // Build row data as associative array (including new columns)
                 $row = [
                     'empCode' => $record->empCode,
                     'empName' => $fullName ?: 'N/A',
+                    'designation' => $employmentDetail->Designation ?? 'N/A',
+                    'dateOfJoining' => $employmentDetail->dateOfJoining ?? 'N/A',
                     'monthlyTotalGross' => round($monthlyTotalGross, 2),
                     'annualTotalGross' => round($annualTotalGross, 2),
                     'monthlyTotalBenefits' => round($monthlyTotalBenefits, 2),
@@ -484,33 +508,50 @@ class EmployeePayrollSalaryProcessApiController extends Controller
                     'monthlyTotalRecurringDeductions' => round($monthlyTotalDeductions, 2),
                     'annualTotalRecurringDeductions' => round($annualTotalDeductions, 2),
                     'netTakeHomeMonthly' => round($netTakeHomeMonthly, 2),
-                    'status' => $record->status, // Moved status to the end
+                    'status' => $record->status,
                 ];
 
-                // Add dynamic values using component names as keys
+                // Add dynamic values and calculate totals
                 foreach ($grossList as $item) {
                     $componentName = $item['componentName'] ?? 'Unknown Component';
                     $headerKey = 'gross_' . str_replace(' ', '_', strtolower($componentName));
-                    $row[$headerKey] = $item['calculatedValue'] ?? 0;
+                    $value = (float)($item['calculatedValue'] ?? 0);
+                    $row[$headerKey] = $value;
+                    $totals[$headerKey] = ($totals[$headerKey] ?? 0) + $value;
                 }
                 
                 foreach ($otherAllowances as $item) {
                     $componentName = $item['componentName'] ?? 'Unknown Component';
                     $headerKey = 'allowance_' . str_replace(' ', '_', strtolower($componentName));
-                    $row[$headerKey] = $item['calculatedValue'] ?? 0;
+                    $value = (float)($item['calculatedValue'] ?? 0);
+                    $row[$headerKey] = $value;
+                    $totals[$headerKey] = ($totals[$headerKey] ?? 0) + $value;
                 }
                 
                 foreach ($otherBenefits as $item) {
                     $componentName = $item['componentName'] ?? 'Unknown Component';
                     $headerKey = 'benefit_' . str_replace(' ', '_', strtolower($componentName));
-                    $row[$headerKey] = $item['calculatedValue'] ?? 0;
+                    $value = (float)($item['calculatedValue'] ?? 0);
+                    $row[$headerKey] = $value;
+                    $totals[$headerKey] = ($totals[$headerKey] ?? 0) + $value;
                 }
                 
                 foreach ($recurringDeductions as $item) {
                     $componentName = $item['componentName'] ?? 'Unknown Component';
                     $headerKey = 'deduction_' . str_replace(' ', '_', strtolower($componentName));
-                    $row[$headerKey] = $item['calculatedValue'] ?? 0;
+                    $value = (float)($item['calculatedValue'] ?? 0);
+                    $row[$headerKey] = $value;
+                    $totals[$headerKey] = ($totals[$headerKey] ?? 0) + $value;
                 }
+
+                // Add totals for summary columns
+                $totals['monthlyTotalGross'] = ($totals['monthlyTotalGross'] ?? 0) + $monthlyTotalGross;
+                $totals['annualTotalGross'] = ($totals['annualTotalGross'] ?? 0) + $annualTotalGross;
+                $totals['monthlyTotalBenefits'] = ($totals['monthlyTotalBenefits'] ?? 0) + $monthlyTotalBenefits;
+                $totals['annualTotalBenefits'] = ($totals['annualTotalBenefits'] ?? 0) + $annualTotalBenefits;
+                $totals['monthlyTotalRecurringDeductions'] = ($totals['monthlyTotalRecurringDeductions'] ?? 0) + $monthlyTotalDeductions;
+                $totals['annualTotalRecurringDeductions'] = ($totals['annualTotalRecurringDeductions'] ?? 0) + $annualTotalDeductions;
+                $totals['netTakeHomeMonthly'] = ($totals['netTakeHomeMonthly'] ?? 0) + $netTakeHomeMonthly;
 
                 // Initialize missing keys for dynamic headers in row
                 foreach ($dynamicHeaders as $key => $value) {
@@ -522,15 +563,41 @@ class EmployeePayrollSalaryProcessApiController extends Controller
                 $excelData[] = $row;
             }
 
+            // Create totals row
+            $totalsRow = [
+                'empCode' => 'TOTAL',
+                'empName' => '',
+                'designation' => '',
+                'dateOfJoining' => '',
+                'monthlyTotalGross' => round($totals['monthlyTotalGross'] ?? 0, 2),
+                'annualTotalGross' => round($totals['annualTotalGross'] ?? 0, 2),
+                'monthlyTotalBenefits' => round($totals['monthlyTotalBenefits'] ?? 0, 2),
+                'annualTotalBenefits' => round($totals['annualTotalBenefits'] ?? 0, 2),
+                'monthlyTotalRecurringDeductions' => round($totals['monthlyTotalRecurringDeductions'] ?? 0, 2),
+                'annualTotalRecurringDeductions' => round($totals['annualTotalRecurringDeductions'] ?? 0, 2),
+                'netTakeHomeMonthly' => round($totals['netTakeHomeMonthly'] ?? 0, 2),
+                'status' => '',
+            ];
+
+            // Add dynamic totals
+            foreach ($dynamicHeaders as $key => $value) {
+                $totalsRow[$key] = round($totals[$key] ?? 0, 2);
+            }
+
+            // Add totals row to data
+            $excelData[] = $totalsRow;
+
             // Company information for the heading
             $companyInfo = [
                 'companyName' => $request->companyName,
                 'year' => $request->year,
-                'month' => $request->month
+                'month' => $request->month,
+                'subBranch' => $request->subBranch ?? 'All SubBranches'
             ];
 
             // Generate filename
-            $fileName = "Payroll_{$request->companyName}_{$request->year}_{$request->month}.xlsx";
+            $subBranchSuffix = $request->has('subBranch') && !empty($request->subBranch) ? "_{$request->subBranch}" : '';
+            $fileName = "Payroll_{$request->companyName}_{$request->year}_{$request->month}{$subBranchSuffix}.xlsx";
 
             return Excel::download(new PayrollExport($excelData, $dynamicHeaders, $companyInfo), $fileName);
 
@@ -553,6 +620,7 @@ class EmployeePayrollSalaryProcessApiController extends Controller
             'companyName' => 'required|string|max:100',
             'year' => 'required|string|max:4',
             'month' => 'required|string|max:50',
+            'subBranch' => 'nullable|string|max:100', // Optional SubBranch filter
         ]);
 
         try {
@@ -571,15 +639,36 @@ class EmployeePayrollSalaryProcessApiController extends Controller
             // Get all employee codes from payroll records
             $empCodes = $payrollRecords->pluck('empCode')->unique()->toArray();
             
-            // Fetch employee details using the correct column name 'EmpCode'
+            // Fetch employee details and employment details with SubBranch filter
             $employeeDetails = EmployeeDetail::whereIn('EmpCode', $empCodes)->get()->keyBy('EmpCode');
+            
+            $employmentDetailsQuery = EmploymentDetail::whereIn('EmpCode', $empCodes);
+            
+            // Apply SubBranch filter if provided
+            if ($request->has('subBranch') && !empty($request->subBranch)) {
+                $employmentDetailsQuery->where('SubBranch', $request->subBranch);
+            }
+            
+            $employmentDetails = $employmentDetailsQuery->get()->keyBy('EmpCode');
+
+            // Filter payroll records based on employment details (if SubBranch filter applied)
+            if ($request->has('subBranch') && !empty($request->subBranch)) {
+                $filteredEmpCodes = $employmentDetails->pluck('EmpCode')->toArray();
+                $payrollRecords = $payrollRecords->whereIn('empCode', $filteredEmpCodes);
+            }
+
+            if ($payrollRecords->isEmpty()) {
+                abort(404, 'No released payroll records found for the specified SubBranch and period');
+            }
 
             $excelData = [];
             $dynamicHeaders = [];
+            $totals = []; // For calculating column totals
 
             foreach ($payrollRecords as $record) {
-                // Get employee details using the correct column name 'EmpCode'
+                // Get employee details and employment details
                 $employeeDetail = $employeeDetails->get($record->empCode);
+                $employmentDetail = $employmentDetails->get($record->empCode);
                 
                 // Build full name using the helper method
                 $fullName = $this->getFullEmployeeName($employeeDetail);
@@ -652,10 +741,12 @@ class EmployeePayrollSalaryProcessApiController extends Controller
                 $annualTotalDeductions = $monthlyTotalDeductions * 12;
                 $netTakeHomeMonthly = $monthlyTotalGross + $monthlyTotalBenefits - $monthlyTotalDeductions;
 
-                // Build row data as associative array (status moved to the end)
+                // Build row data as associative array (including new columns)
                 $row = [
                     'empCode' => $record->empCode,
                     'empName' => $fullName ?: 'N/A',
+                    'designation' => $employmentDetail->Designation ?? 'N/A',
+                    'dateOfJoining' => $employmentDetail->dateOfJoining ?? 'N/A',
                     'monthlyTotalGross' => round($monthlyTotalGross, 2),
                     'annualTotalGross' => round($annualTotalGross, 2),
                     'monthlyTotalBenefits' => round($monthlyTotalBenefits, 2),
@@ -666,30 +757,47 @@ class EmployeePayrollSalaryProcessApiController extends Controller
                     'status' => $record->status, // Will always be 'Released'
                 ];
 
-                // Add dynamic values using component names as keys
+                // Add dynamic values and calculate totals
                 foreach ($grossList as $item) {
                     $componentName = $item['componentName'] ?? 'Unknown Component';
                     $headerKey = 'gross_' . str_replace(' ', '_', strtolower($componentName));
-                    $row[$headerKey] = $item['calculatedValue'] ?? 0;
+                    $value = (float)($item['calculatedValue'] ?? 0);
+                    $row[$headerKey] = $value;
+                    $totals[$headerKey] = ($totals[$headerKey] ?? 0) + $value;
                 }
                 
                 foreach ($otherAllowances as $item) {
                     $componentName = $item['componentName'] ?? 'Unknown Component';
                     $headerKey = 'allowance_' . str_replace(' ', '_', strtolower($componentName));
-                    $row[$headerKey] = $item['calculatedValue'] ?? 0;
+                    $value = (float)($item['calculatedValue'] ?? 0);
+                    $row[$headerKey] = $value;
+                    $totals[$headerKey] = ($totals[$headerKey] ?? 0) + $value;
                 }
                 
                 foreach ($otherBenefits as $item) {
                     $componentName = $item['componentName'] ?? 'Unknown Component';
                     $headerKey = 'benefit_' . str_replace(' ', '_', strtolower($componentName));
-                    $row[$headerKey] = $item['calculatedValue'] ?? 0;
+                    $value = (float)($item['calculatedValue'] ?? 0);
+                    $row[$headerKey] = $value;
+                    $totals[$headerKey] = ($totals[$headerKey] ?? 0) + $value;
                 }
                 
                 foreach ($recurringDeductions as $item) {
                     $componentName = $item['componentName'] ?? 'Unknown Component';
                     $headerKey = 'deduction_' . str_replace(' ', '_', strtolower($componentName));
-                    $row[$headerKey] = $item['calculatedValue'] ?? 0;
+                    $value = (float)($item['calculatedValue'] ?? 0);
+                    $row[$headerKey] = $value;
+                    $totals[$headerKey] = ($totals[$headerKey] ?? 0) + $value;
                 }
+
+                // Add totals for summary columns
+                $totals['monthlyTotalGross'] = ($totals['monthlyTotalGross'] ?? 0) + $monthlyTotalGross;
+                $totals['annualTotalGross'] = ($totals['annualTotalGross'] ?? 0) + $annualTotalGross;
+                $totals['monthlyTotalBenefits'] = ($totals['monthlyTotalBenefits'] ?? 0) + $monthlyTotalBenefits;
+                $totals['annualTotalBenefits'] = ($totals['annualTotalBenefits'] ?? 0) + $annualTotalBenefits;
+                $totals['monthlyTotalRecurringDeductions'] = ($totals['monthlyTotalRecurringDeductions'] ?? 0) + $monthlyTotalDeductions;
+                $totals['annualTotalRecurringDeductions'] = ($totals['annualTotalRecurringDeductions'] ?? 0) + $annualTotalDeductions;
+                $totals['netTakeHomeMonthly'] = ($totals['netTakeHomeMonthly'] ?? 0) + $netTakeHomeMonthly;
 
                 // Initialize missing keys for dynamic headers in row
                 foreach ($dynamicHeaders as $key => $value) {
@@ -701,16 +809,42 @@ class EmployeePayrollSalaryProcessApiController extends Controller
                 $excelData[] = $row;
             }
 
+            // Create totals row
+            $totalsRow = [
+                'empCode' => 'TOTAL',
+                'empName' => '',
+                'designation' => '',
+                'dateOfJoining' => '',
+                'monthlyTotalGross' => round($totals['monthlyTotalGross'] ?? 0, 2),
+                'annualTotalGross' => round($totals['annualTotalGross'] ?? 0, 2),
+                'monthlyTotalBenefits' => round($totals['monthlyTotalBenefits'] ?? 0, 2),
+                'annualTotalBenefits' => round($totals['annualTotalBenefits'] ?? 0, 2),
+                'monthlyTotalRecurringDeductions' => round($totals['monthlyTotalRecurringDeductions'] ?? 0, 2),
+                'annualTotalRecurringDeductions' => round($totals['annualTotalRecurringDeductions'] ?? 0, 2),
+                'netTakeHomeMonthly' => round($totals['netTakeHomeMonthly'] ?? 0, 2),
+                'status' => '',
+            ];
+
+            // Add dynamic totals
+            foreach ($dynamicHeaders as $key => $value) {
+                $totalsRow[$key] = round($totals[$key] ?? 0, 2);
+            }
+
+            // Add totals row to data
+            $excelData[] = $totalsRow;
+
             // Company information for the heading (with Released status indicator)
             $companyInfo = [
                 'companyName' => $request->companyName,
                 'year' => $request->year,
                 'month' => $request->month,
-                'statusFilter' => 'Released' // Indicate this is for Released status only
+                'statusFilter' => 'Released',
+                'subBranch' => $request->subBranch ?? 'All SubBranches'
             ];
 
             // Generate filename with Released indicator
-            $fileName = "ReleasedPayroll_{$request->companyName}_{$request->year}_{$request->month}.xlsx";
+            $subBranchSuffix = $request->has('subBranch') && !empty($request->subBranch) ? "_{$request->subBranch}" : '';
+            $fileName = "ReleasedPayroll_{$request->companyName}_{$request->year}_{$request->month}{$subBranchSuffix}.xlsx";
 
             // Use the new ReleasedPayrollExport class
             return Excel::download(new ReleasedPayrollExport($excelData, $dynamicHeaders, $companyInfo), $fileName);
