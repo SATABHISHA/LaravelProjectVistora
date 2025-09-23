@@ -391,14 +391,57 @@ class EmployeePayrollSalaryProcessApiController extends Controller
             // Get all employee codes from payroll records
             $empCodes = $payrollRecords->pluck('empCode')->unique()->toArray();
             
-            // Fetch employee details for all employees at once
-            $employeeDetails = EmployeeDetail::whereIn('empCode', $empCodes)->get()->keyBy('empCode');
+            // Fetch employee details using the correct column name 'EmpCode'
+            $employeeDetails = EmployeeDetail::whereIn('EmpCode', $empCodes)->get()->keyBy('EmpCode');
 
             $excelData = [];
             $dynamicHeaders = [];
 
+            // Add company header information as the first row
+            $headerInfo = [
+                'empCode' => 'Company Information',
+                'empName' => '',
+                'monthlyTotalGross' => '',
+                'annualTotalGross' => '',
+                'monthlyTotalBenefits' => '',
+                'annualTotalBenefits' => '',
+                'monthlyTotalRecurringDeductions' => '',
+                'annualTotalRecurringDeductions' => '',
+                'netTakeHomeMonthly' => '',
+                'year' => '',
+                'month' => '',
+            ];
+
+            $companyInfo = [
+                'empCode' => "Company: {$request->companyName}",
+                'empName' => "Year: {$request->year}",
+                'monthlyTotalGross' => "Month: {$request->month}",
+                'annualTotalGross' => '',
+                'monthlyTotalBenefits' => '',
+                'annualTotalBenefits' => '',
+                'monthlyTotalRecurringDeductions' => '',
+                'annualTotalRecurringDeductions' => '',
+                'netTakeHomeMonthly' => '',
+                'year' => '',
+                'month' => '',
+            ];
+
+            $emptyRow = [
+                'empCode' => '',
+                'empName' => '',
+                'monthlyTotalGross' => '',
+                'annualTotalGross' => '',
+                'monthlyTotalBenefits' => '',
+                'annualTotalBenefits' => '',
+                'monthlyTotalRecurringDeductions' => '',
+                'annualTotalRecurringDeductions' => '',
+                'netTakeHomeMonthly' => '',
+                'year' => '',
+                'month' => '',
+            ];
+
             foreach ($payrollRecords as $record) {
-                // Get employee details for this record
+                // Get employee details using the correct column name 'EmpCode'
                 $employeeDetail = $employeeDetails->get($record->empCode);
                 
                 // Build full name using the helper method
@@ -415,24 +458,52 @@ class EmployeePayrollSalaryProcessApiController extends Controller
                     $componentName = $item['componentName'] ?? 'Unknown Component';
                     $headerKey = 'gross_' . str_replace(' ', '_', strtolower($componentName));
                     $dynamicHeaders[$headerKey] = $componentName;
+                    
+                    // Add to header info and company info rows
+                    if (!isset($headerInfo[$headerKey])) {
+                        $headerInfo[$headerKey] = '';
+                        $companyInfo[$headerKey] = '';
+                        $emptyRow[$headerKey] = '';
+                    }
                 }
                 
                 foreach ($otherAllowances as $item) {
                     $componentName = $item['componentName'] ?? 'Unknown Component';
                     $headerKey = 'allowance_' . str_replace(' ', '_', strtolower($componentName));
                     $dynamicHeaders[$headerKey] = $componentName;
+                    
+                    // Add to header info and company info rows
+                    if (!isset($headerInfo[$headerKey])) {
+                        $headerInfo[$headerKey] = '';
+                        $companyInfo[$headerKey] = '';
+                        $emptyRow[$headerKey] = '';
+                    }
                 }
                 
                 foreach ($otherBenefits as $item) {
                     $componentName = $item['componentName'] ?? 'Unknown Component';
                     $headerKey = 'benefit_' . str_replace(' ', '_', strtolower($componentName));
                     $dynamicHeaders[$headerKey] = $componentName;
+                    
+                    // Add to header info and company info rows
+                    if (!isset($headerInfo[$headerKey])) {
+                        $headerInfo[$headerKey] = '';
+                        $companyInfo[$headerKey] = '';
+                        $emptyRow[$headerKey] = '';
+                    }
                 }
                 
                 foreach ($recurringDeductions as $item) {
                     $componentName = $item['componentName'] ?? 'Unknown Component';
                     $headerKey = 'deduction_' . str_replace(' ', '_', strtolower($componentName));
                     $dynamicHeaders[$headerKey] = $componentName;
+                    
+                    // Add to header info and company info rows
+                    if (!isset($headerInfo[$headerKey])) {
+                        $headerInfo[$headerKey] = '';
+                        $companyInfo[$headerKey] = '';
+                        $emptyRow[$headerKey] = '';
+                    }
                 }
 
                 // Calculate totals
@@ -472,11 +543,10 @@ class EmployeePayrollSalaryProcessApiController extends Controller
                 $annualTotalDeductions = $monthlyTotalDeductions * 12;
                 $netTakeHomeMonthly = $monthlyTotalGross + $monthlyTotalBenefits - $monthlyTotalDeductions;
 
-                // Build row data as associative array
+                // Build row data as associative array (without company, year, month repetition)
                 $row = [
                     'empCode' => $record->empCode,
-                    'empName' => $fullName ?: 'N/A', // Use the corrected full name
-                    'companyName' => $record->companyName,
+                    'empName' => $fullName ?: 'N/A',
                     'monthlyTotalGross' => round($monthlyTotalGross, 2),
                     'annualTotalGross' => round($annualTotalGross, 2),
                     'monthlyTotalBenefits' => round($monthlyTotalBenefits, 2),
@@ -484,8 +554,8 @@ class EmployeePayrollSalaryProcessApiController extends Controller
                     'monthlyTotalRecurringDeductions' => round($monthlyTotalDeductions, 2),
                     'annualTotalRecurringDeductions' => round($annualTotalDeductions, 2),
                     'netTakeHomeMonthly' => round($netTakeHomeMonthly, 2),
-                    'year' => $record->year,
-                    'month' => $record->month,
+                    'year' => '', // Remove repetitive data
+                    'month' => '', // Remove repetitive data
                 ];
 
                 // Add dynamic values using component names as keys
@@ -513,13 +583,32 @@ class EmployeePayrollSalaryProcessApiController extends Controller
                     $row[$headerKey] = $item['calculatedValue'] ?? 0;
                 }
 
+                // Initialize missing keys for dynamic headers in row
+                foreach ($dynamicHeaders as $key => $value) {
+                    if (!isset($row[$key])) {
+                        $row[$key] = 0;
+                    }
+                }
+
                 $excelData[] = $row;
+            }
+
+            // Prepare final data with company info at top
+            $finalExcelData = [];
+            
+            // Add company information rows at the top
+            $finalExcelData[] = $companyInfo;
+            $finalExcelData[] = $emptyRow; // Empty row for spacing
+            
+            // Add all employee data
+            foreach ($excelData as $row) {
+                $finalExcelData[] = $row;
             }
 
             // Generate filename
             $fileName = "Payroll_{$request->companyName}_{$request->year}_{$request->month}.xlsx";
 
-            return Excel::download(new PayrollExport($excelData, $dynamicHeaders), $fileName);
+            return Excel::download(new PayrollExport($finalExcelData, $dynamicHeaders), $fileName);
 
         } catch (\Exception $e) {
             abort(500, 'Error in exporting payroll data: ' . $e->getMessage());

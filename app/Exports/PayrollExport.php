@@ -7,6 +7,7 @@ use Maatwebsite\Excel\Concerns\WithHeadings;
 use Maatwebsite\Excel\Concerns\ShouldAutoSize;
 use Maatwebsite\Excel\Concerns\WithStyles;
 use PhpOffice\PhpSpreadsheet\Worksheet\Worksheet;
+use PhpOffice\PhpSpreadsheet\Style\Font;
 
 class PayrollExport implements FromArray, WithHeadings, ShouldAutoSize, WithStyles
 {
@@ -30,7 +31,6 @@ class PayrollExport implements FromArray, WithHeadings, ShouldAutoSize, WithStyl
             // Static columns first
             $excelRow[] = $row['empCode'] ?? '';
             $excelRow[] = $row['empName'] ?? '';
-            $excelRow[] = $row['companyName'] ?? '';
             
             // Dynamic gross columns
             foreach ($this->dynamicHeaders as $key => $header) {
@@ -69,8 +69,6 @@ class PayrollExport implements FromArray, WithHeadings, ShouldAutoSize, WithStyl
             $excelRow[] = $row['monthlyTotalRecurringDeductions'] ?? 0;
             $excelRow[] = $row['annualTotalRecurringDeductions'] ?? 0;
             $excelRow[] = $row['netTakeHomeMonthly'] ?? 0;
-            $excelRow[] = $row['year'] ?? '';
-            $excelRow[] = $row['month'] ?? '';
             
             $excelRows[] = $excelRow;
         }
@@ -82,8 +80,7 @@ class PayrollExport implements FromArray, WithHeadings, ShouldAutoSize, WithStyl
     {
         $headers = [
             'Employee Code',
-            'Employee Name', 
-            'Company Name'
+            'Employee Name'
         ];
 
         // Add dynamic gross headers
@@ -123,9 +120,7 @@ class PayrollExport implements FromArray, WithHeadings, ShouldAutoSize, WithStyl
         $headers = array_merge($headers, [
             'Monthly Total Deductions',
             'Annual Total Deductions',
-            'Net Take Home Monthly',
-            'Year',
-            'Month'
+            'Net Take Home Monthly'
         ]);
 
         return $headers;
@@ -134,8 +129,16 @@ class PayrollExport implements FromArray, WithHeadings, ShouldAutoSize, WithStyl
     public function styles(Worksheet $sheet)
     {
         return [
+            // Make first row (company info) bold and larger
+            1 => [
+                'font' => [
+                    'bold' => true,
+                    'size' => 14,
+                    'color' => ['rgb' => '0066CC']
+                ]
+            ],
             // Make header row bold
-            1 => ['font' => ['bold' => true]],
+            3 => ['font' => ['bold' => true]],
         ];
     }
 }
