@@ -39,43 +39,47 @@ class ReleasedPayrollExport implements FromArray, WithHeadings, ShouldAutoSize, 
             $excelRow[] = $row['empCode'] ?? '';
             $excelRow[] = $row['empName'] ?? '';
             $excelRow[] = $row['designation'] ?? '';
-            $excelRow[] = $row['paidDays'] ?? 0; // Paid Days
+            $excelRow[] = is_numeric($row['paidDays'] ?? null) ? ($row['paidDays'] ?? 0) : 0; // Paid Days - ensure numeric
             $excelRow[] = $row['dateOfJoining'] ?? '';
             
             // Dynamic gross columns
             foreach ($this->dynamicHeaders as $key => $header) {
                 if (strpos($key, 'gross_') === 0) {
-                    $excelRow[] = $row[$key] ?? 0;
+                    $value = $row[$key] ?? 0;
+                    $excelRow[] = is_numeric($value) ? (float)$value : 0;
                 }
             }
             
-            $excelRow[] = $row['monthlyTotalGross'] ?? 0;
+            $excelRow[] = is_numeric($row['monthlyTotalGross'] ?? null) ? (float)($row['monthlyTotalGross'] ?? 0) : 0;
             
             // Dynamic allowance columns
             foreach ($this->dynamicHeaders as $key => $header) {
                 if (strpos($key, 'allowance_') === 0) {
-                    $excelRow[] = $row[$key] ?? 0;
+                    $value = $row[$key] ?? 0;
+                    $excelRow[] = is_numeric($value) ? (float)$value : 0;
                 }
             }
             
             // Dynamic benefit columns
             foreach ($this->dynamicHeaders as $key => $header) {
                 if (strpos($key, 'benefit_') === 0) {
-                    $excelRow[] = $row[$key] ?? 0;
+                    $value = $row[$key] ?? 0;
+                    $excelRow[] = is_numeric($value) ? (float)$value : 0;
                 }
             }
             
-            $excelRow[] = $row['monthlyTotalBenefits'] ?? 0;
+            $excelRow[] = is_numeric($row['monthlyTotalBenefits'] ?? null) ? (float)($row['monthlyTotalBenefits'] ?? 0) : 0;
             
             // Dynamic deduction columns
             foreach ($this->dynamicHeaders as $key => $header) {
                 if (strpos($key, 'deduction_') === 0) {
-                    $excelRow[] = $row[$key] ?? 0;
+                    $value = $row[$key] ?? 0;
+                    $excelRow[] = is_numeric($value) ? (float)$value : 0;
                 }
             }
             
-            $excelRow[] = $row['monthlyTotalRecurringDeductions'] ?? 0;
-            $excelRow[] = $row['netTakeHomeMonthly'] ?? 0;
+            $excelRow[] = is_numeric($row['monthlyTotalRecurringDeductions'] ?? null) ? (float)($row['monthlyTotalRecurringDeductions'] ?? 0) : 0;
+            $excelRow[] = is_numeric($row['netTakeHomeMonthly'] ?? null) ? (float)($row['netTakeHomeMonthly'] ?? 0) : 0;
             
             // Status column at the end (will always be 'Released')
             $excelRow[] = $row['status'] ?? 'Released';
@@ -244,10 +248,10 @@ class ReleasedPayrollExport implements FromArray, WithHeadings, ShouldAutoSize, 
                 $lastDataRow = $sheet->getHighestRow();
                 $totalsRow = $lastDataRow; // Last row is totals
                 
-                // FIRST: Reset ALL data rows to default formatting (except totals row)
-                if ($lastDataRow > $dataStartRow) {
-                    $dataRange = "A{$dataStartRow}:{$lastColumn}" . ($lastDataRow - 1); // Exclude totals row
-                    $sheet->getStyle($dataRange)->applyFromArray([
+                // FIRST: Apply center alignment to ALL data rows (including totals)
+                if ($lastDataRow >= $dataStartRow) {
+                    $allDataRange = "A{$dataStartRow}:{$lastColumn}{$lastDataRow}";
+                    $sheet->getStyle($allDataRange)->applyFromArray([
                         'font' => [
                             'bold' => false,
                             'size' => 11,
@@ -258,7 +262,7 @@ class ReleasedPayrollExport implements FromArray, WithHeadings, ShouldAutoSize, 
                             'startColor' => ['rgb' => 'FFFFFF'] // White background
                         ],
                         'alignment' => [
-                            'horizontal' => Alignment::HORIZONTAL_LEFT,
+                            'horizontal' => Alignment::HORIZONTAL_CENTER, // Center align all data
                             'vertical' => Alignment::VERTICAL_CENTER
                         ]
                     ]);
@@ -304,54 +308,8 @@ class ReleasedPayrollExport implements FromArray, WithHeadings, ShouldAutoSize, 
                     ]
                 ]);
                 
-                // FIFTH: Set specific alignment for different column types (excluding totals row)
+                // FIFTH: Apply specific styling to status column (excluding totals) with green background for Released
                 if ($lastDataRow > $dataStartRow) {
-                    // Center align serial number column (A)
-                    $serialRange = "A{$dataStartRow}:A" . ($lastDataRow - 1);
-                    $sheet->getStyle($serialRange)->applyFromArray([
-                        'alignment' => [
-                            'horizontal' => Alignment::HORIZONTAL_CENTER,
-                            'vertical' => Alignment::VERTICAL_CENTER
-                        ]
-                    ]);
-                    
-                    // Left align text columns (B, C, D, F - Employee Code, Name, Designation, Date)
-                    $textRanges = [
-                        "B{$dataStartRow}:D" . ($lastDataRow - 1), // Employee Code, Name, Designation
-                        "F{$dataStartRow}:F" . ($lastDataRow - 1)  // Date of Joining
-                    ];
-                    
-                    foreach ($textRanges as $textRange) {
-                        $sheet->getStyle($textRange)->applyFromArray([
-                            'alignment' => [
-                                'horizontal' => Alignment::HORIZONTAL_LEFT,
-                                'vertical' => Alignment::VERTICAL_CENTER
-                            ]
-                        ]);
-                    }
-                    
-                    // Center align Paid Days column (E)
-                    $paidDaysRange = "E{$dataStartRow}:E" . ($lastDataRow - 1);
-                    $sheet->getStyle($paidDaysRange)->applyFromArray([
-                        'alignment' => [
-                            'horizontal' => Alignment::HORIZONTAL_CENTER,
-                            'vertical' => Alignment::VERTICAL_CENTER
-                        ]
-                    ]);
-                    
-                    // Right align numeric columns (G to second last column)
-                    $lastColumnBefore = chr(ord($lastColumn) - 1); // Get column before the last one
-                    if ($lastColumnBefore >= 'G') {
-                        $numericRange = "G{$dataStartRow}:{$lastColumnBefore}" . ($lastDataRow - 1);
-                        $sheet->getStyle($numericRange)->applyFromArray([
-                            'alignment' => [
-                                'horizontal' => Alignment::HORIZONTAL_RIGHT,
-                                'vertical' => Alignment::VERTICAL_CENTER
-                            ]
-                        ]);
-                    }
-                    
-                    // Center align and style status column (last column, excluding totals) with green background for Released
                     $statusRange = "{$lastColumn}{$dataStartRow}:{$lastColumn}" . ($lastDataRow - 1);
                     $sheet->getStyle($statusRange)->applyFromArray([
                         'alignment' => [
