@@ -220,11 +220,17 @@ class ReleasedPayrollExport implements FromArray, WithHeadings, ShouldAutoSize, 
                 
                 // No empty row - header starts at row 4
                 
-                // Set row heights
-                $sheet->getRowDimension(1)->setRowHeight(30);
-                $sheet->getRowDimension(2)->setRowHeight(25);
-                $sheet->getRowDimension(3)->setRowHeight(25);
-                $sheet->getRowDimension(4)->setRowHeight(25); // Header row (moved up)
+                // Set row heights for better visibility
+                $sheet->getRowDimension(1)->setRowHeight(35);
+                $sheet->getRowDimension(2)->setRowHeight(30);
+                $sheet->getRowDimension(3)->setRowHeight(30);
+                $sheet->getRowDimension(4)->setRowHeight(30); // Header row
+                
+                // Set default row height for all data rows
+                $lastDataRow = $sheet->getHighestRow();
+                for ($row = 5; $row <= $lastDataRow; $row++) {
+                    $sheet->getRowDimension($row)->setRowHeight(25);
+                }
                 
                 // Apply header row styling (row 4) - ONLY the header row
                 $sheet->getStyle("A4:{$lastColumn}4")->applyFromArray([
@@ -245,10 +251,9 @@ class ReleasedPayrollExport implements FromArray, WithHeadings, ShouldAutoSize, 
                 
                 // Get the range for data rows only (starting from row 5)
                 $dataStartRow = 5;
-                $lastDataRow = $sheet->getHighestRow();
                 $totalsRow = $lastDataRow; // Last row is totals
                 
-                // FIRST: Apply center alignment to ALL data rows (including totals)
+                // FIRST: Apply proper alignment to ALL data rows with vertical centering
                 if ($lastDataRow >= $dataStartRow) {
                     $allDataRange = "A{$dataStartRow}:{$lastColumn}{$lastDataRow}";
                     $sheet->getStyle($allDataRange)->applyFromArray([
@@ -262,54 +267,47 @@ class ReleasedPayrollExport implements FromArray, WithHeadings, ShouldAutoSize, 
                             'startColor' => ['rgb' => 'FFFFFF'] // White background
                         ],
                         'alignment' => [
-                            'horizontal' => Alignment::HORIZONTAL_CENTER, // Center align all data
-                            'vertical' => Alignment::VERTICAL_CENTER
+                            'horizontal' => Alignment::HORIZONTAL_LEFT, // Left align for better readability
+                            'vertical' => Alignment::VERTICAL_CENTER,   // Vertical center is key
+                            'wrapText' => false
                         ]
                     ]);
                 }
                 
-                // SECOND: Apply alternating row colors (light gray for odd rows, excluding totals)
-                for ($row = $dataStartRow; $row < $totalsRow; $row++) {
-                    if (($row - $dataStartRow) % 2 == 1) { // Every other row (odd rows)
-                        $sheet->getStyle("A{$row}:{$lastColumn}{$row}")->applyFromArray([
-                            'fill' => [
-                                'fillType' => Fill::FILL_SOLID,
-                                'startColor' => ['rgb' => 'F2F2F2'] // Light gray
+                // SECOND: Apply specific alignment for different column types (excluding totals row)
+                if ($lastDataRow > $dataStartRow) {
+                    // Center align serial number column (A) - both horizontal and vertical
+                    $serialRange = "A{$dataStartRow}:A" . ($lastDataRow - 1);
+                    $sheet->getStyle($serialRange)->applyFromArray([
+                        'alignment' => [
+                            'horizontal' => Alignment::HORIZONTAL_CENTER,
+                            'vertical' => Alignment::VERTICAL_CENTER
+                        ]
+                    ]);
+                    
+                    // Center align Paid Days column (E) - both horizontal and vertical
+                    $paidDaysRange = "E{$dataStartRow}:E" . ($lastDataRow - 1);
+                    $sheet->getStyle($paidDaysRange)->applyFromArray([
+                        'alignment' => [
+                            'horizontal' => Alignment::HORIZONTAL_CENTER,
+                            'vertical' => Alignment::VERTICAL_CENTER
+                        ]
+                    ]);
+                    
+                    // Right align numeric columns (G onwards to second last column)
+                    $lastColumnIndex = ord($lastColumn);
+                    for ($col = ord('G'); $col < $lastColumnIndex; $col++) {
+                        $columnLetter = chr($col);
+                        $numericRange = "{$columnLetter}{$dataStartRow}:{$columnLetter}" . ($lastDataRow - 1);
+                        $sheet->getStyle($numericRange)->applyFromArray([
+                            'alignment' => [
+                                'horizontal' => Alignment::HORIZONTAL_RIGHT,
+                                'vertical' => Alignment::VERTICAL_CENTER
                             ]
                         ]);
                     }
-                }
-                
-                // THIRD: Style the totals row with attractive colors
-                $sheet->getStyle("A{$totalsRow}:{$lastColumn}{$totalsRow}")->applyFromArray([
-                    'font' => [
-                        'bold' => true,
-                        'size' => 12,
-                        'color' => ['rgb' => 'FFFFFF'] // White text
-                    ],
-                    'fill' => [
-                        'fillType' => Fill::FILL_SOLID,
-                        'startColor' => ['rgb' => 'FF6B35'] // Attractive orange/red color
-                    ],
-                    'alignment' => [
-                        'horizontal' => Alignment::HORIZONTAL_CENTER,
-                        'vertical' => Alignment::VERTICAL_CENTER
-                    ]
-                ]);
-                
-                // FOURTH: Apply borders to the entire table (header + data + totals)
-                $tableRange = "A4:{$lastColumn}{$lastDataRow}";
-                $sheet->getStyle($tableRange)->applyFromArray([
-                    'borders' => [
-                        'allBorders' => [
-                            'borderStyle' => \PhpOffice\PhpSpreadsheet\Style\Border::BORDER_THIN,
-                            'color' => ['rgb' => '000000']
-                        ]
-                    ]
-                ]);
-                
-                // FIFTH: Apply specific styling to status column (excluding totals) with green background for Released
-                if ($lastDataRow > $dataStartRow) {
+                    
+                    // Center align and style status column (last column, excluding totals) 
                     $statusRange = "{$lastColumn}{$dataStartRow}:{$lastColumn}" . ($lastDataRow - 1);
                     $sheet->getStyle($statusRange)->applyFromArray([
                         'alignment' => [
@@ -326,6 +324,46 @@ class ReleasedPayrollExport implements FromArray, WithHeadings, ShouldAutoSize, 
                         ]
                     ]);
                 }
+                
+                // THIRD: Apply alternating row colors (light gray for odd rows, excluding totals)
+                for ($row = $dataStartRow; $row < $totalsRow; $row++) {
+                    if (($row - $dataStartRow) % 2 == 1) { // Every other row (odd rows)
+                        $sheet->getStyle("A{$row}:{$lastColumn}{$row}")->applyFromArray([
+                            'fill' => [
+                                'fillType' => Fill::FILL_SOLID,
+                                'startColor' => ['rgb' => 'F2F2F2'] // Light gray
+                            ]
+                        ]);
+                    }
+                }
+                
+                // FOURTH: Style the totals row with attractive colors and proper alignment
+                $sheet->getStyle("A{$totalsRow}:{$lastColumn}{$totalsRow}")->applyFromArray([
+                    'font' => [
+                        'bold' => true,
+                        'size' => 12,
+                        'color' => ['rgb' => 'FFFFFF'] // White text
+                    ],
+                    'fill' => [
+                        'fillType' => Fill::FILL_SOLID,
+                        'startColor' => ['rgb' => 'FF6B35'] // Attractive orange/red color
+                    ],
+                    'alignment' => [
+                        'horizontal' => Alignment::HORIZONTAL_CENTER,
+                        'vertical' => Alignment::VERTICAL_CENTER
+                    ]
+                ]);
+                
+                // FIFTH: Apply borders to the entire table (header + data + totals)
+                $tableRange = "A4:{$lastColumn}{$lastDataRow}";
+                $sheet->getStyle($tableRange)->applyFromArray([
+                    'borders' => [
+                        'allBorders' => [
+                            'borderStyle' => \PhpOffice\PhpSpreadsheet\Style\Border::BORDER_THIN,
+                            'color' => ['rgb' => '000000']
+                        ]
+                    ]
+                ]);
                 
                 // Freeze the header row for easy scrolling
                 $sheet->freezePane('A5');
