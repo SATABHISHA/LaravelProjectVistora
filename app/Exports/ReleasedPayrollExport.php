@@ -211,7 +211,7 @@ class ReleasedPayrollExport implements FromArray, WithHeadings, ShouldAutoSize, 
                 $sheet->mergeCells("A2:{$lastColumn}2");
                 
                 // Set SubBranch (row 3)
-                $sheet->setCellValue('A3', "SubBranch: {$this->companyInfo['subBranch']}");
+                $sheet->setCellValue('A3', "Sub Branch: {$this->companyInfo['subBranch']}");
                 $sheet->mergeCells("A3:{$lastColumn}3");
                 
                 // Row 4 is empty for spacing
@@ -220,7 +220,7 @@ class ReleasedPayrollExport implements FromArray, WithHeadings, ShouldAutoSize, 
                 $sheet->getRowDimension(1)->setRowHeight(30);
                 $sheet->getRowDimension(2)->setRowHeight(25);
                 $sheet->getRowDimension(3)->setRowHeight(25);
-                $sheet->getRowDimension(4)->setRowHeight(15); // Empty spacing row
+                // $sheet->getRowDimension(4)->setRowHeight(15); // Empty spacing row
                 $sheet->getRowDimension(5)->setRowHeight(25); // Header row
                 
                 // Apply header row styling (row 5) - ONLY the header row
