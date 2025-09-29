@@ -34,8 +34,8 @@ class ReleasedPayrollExport implements FromArray, WithHeadings, ShouldAutoSize, 
         foreach ($this->data as $row) {
             $excelRow = [];
             
-            // Static columns first (including new columns)
-            $excelRow[] = $row['serialNo'] ?? ''; // Serial Number
+            // Static columns first (including serial number)
+            $excelRow[] = $row['serialNo'] ?? ''; // Serial Number - this was missing the proper value
             $excelRow[] = $row['empCode'] ?? '';
             $excelRow[] = $row['empName'] ?? '';
             $excelRow[] = $row['designation'] ?? '';
@@ -51,24 +51,6 @@ class ReleasedPayrollExport implements FromArray, WithHeadings, ShouldAutoSize, 
             }
             
             $excelRow[] = is_numeric($row['monthlyTotalGross'] ?? null) ? (float)($row['monthlyTotalGross'] ?? 0) : 0;
-            
-            // Dynamic allowance columns
-            foreach ($this->dynamicHeaders as $key => $header) {
-                if (strpos($key, 'allowance_') === 0) {
-                    $value = $row[$key] ?? 0;
-                    $excelRow[] = is_numeric($value) ? (float)$value : 0;
-                }
-            }
-            
-            // Dynamic benefit columns
-            foreach ($this->dynamicHeaders as $key => $header) {
-                if (strpos($key, 'benefit_') === 0) {
-                    $value = $row[$key] ?? 0;
-                    $excelRow[] = is_numeric($value) ? (float)$value : 0;
-                }
-            }
-            
-            $excelRow[] = is_numeric($row['monthlyTotalBenefits'] ?? null) ? (float)($row['monthlyTotalBenefits'] ?? 0) : 0;
             
             // Dynamic deduction columns
             foreach ($this->dynamicHeaders as $key => $header) {
@@ -109,22 +91,6 @@ class ReleasedPayrollExport implements FromArray, WithHeadings, ShouldAutoSize, 
         }
 
         $headers[] = 'Monthly Total Gross';
-
-        // Add dynamic allowance headers
-        foreach ($this->dynamicHeaders as $key => $header) {
-            if (strpos($key, 'allowance_') === 0) {
-                $headers[] = $header;
-            }
-        }
-
-        // Add dynamic benefit headers
-        foreach ($this->dynamicHeaders as $key => $header) {
-            if (strpos($key, 'benefit_') === 0) {
-                $headers[] = $header;
-            }
-        }
-
-        $headers[] = 'Monthly Total Benefits';
 
         // Add dynamic deduction headers
         foreach ($this->dynamicHeaders as $key => $header) {
