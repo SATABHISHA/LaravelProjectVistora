@@ -664,6 +664,7 @@ class EmployeePayrollSalaryProcessApiController extends Controller
             $excelData = [];
             $dynamicHeaders = [];
             $totals = []; // For calculating column totals
+            $serialNo = 1; // For serial number
 
             foreach ($payrollRecords as $record) {
                 // Get employee details and employment details
@@ -735,24 +736,20 @@ class EmployeePayrollSalaryProcessApiController extends Controller
                     }
                 }
 
-                // Calculate annual totals
-                $annualTotalGross = $monthlyTotalGross * 12;
-                $annualTotalBenefits = $monthlyTotalBenefits * 12;
-                $annualTotalDeductions = $monthlyTotalDeductions * 12;
+                // Calculate net salary
                 $netTakeHomeMonthly = $monthlyTotalGross + $monthlyTotalBenefits - $monthlyTotalDeductions;
 
-                // Build row data as associative array (including new columns)
+                // Build row data as associative array (with serial number and paid days)
                 $row = [
+                    'serialNo' => $serialNo++,
                     'empCode' => $record->empCode,
                     'empName' => $fullName ?: 'N/A',
                     'designation' => $employmentDetail->Designation ?? 'N/A',
+                    'paidDays' => 0, // Currently set to 0 as attendance not calculated
                     'dateOfJoining' => $employmentDetail->dateOfJoining ?? 'N/A',
                     'monthlyTotalGross' => round($monthlyTotalGross, 2),
-                    'annualTotalGross' => round($annualTotalGross, 2),
                     'monthlyTotalBenefits' => round($monthlyTotalBenefits, 2),
-                    'annualTotalBenefits' => round($annualTotalBenefits, 2),
                     'monthlyTotalRecurringDeductions' => round($monthlyTotalDeductions, 2),
-                    'annualTotalRecurringDeductions' => round($annualTotalDeductions, 2),
                     'netTakeHomeMonthly' => round($netTakeHomeMonthly, 2),
                     'status' => $record->status, // Will always be 'Released'
                 ];
@@ -792,12 +789,10 @@ class EmployeePayrollSalaryProcessApiController extends Controller
 
                 // Add totals for summary columns
                 $totals['monthlyTotalGross'] = ($totals['monthlyTotalGross'] ?? 0) + $monthlyTotalGross;
-                $totals['annualTotalGross'] = ($totals['annualTotalGross'] ?? 0) + $annualTotalGross;
                 $totals['monthlyTotalBenefits'] = ($totals['monthlyTotalBenefits'] ?? 0) + $monthlyTotalBenefits;
-                $totals['annualTotalBenefits'] = ($totals['annualTotalBenefits'] ?? 0) + $annualTotalBenefits;
                 $totals['monthlyTotalRecurringDeductions'] = ($totals['monthlyTotalRecurringDeductions'] ?? 0) + $monthlyTotalDeductions;
-                $totals['annualTotalRecurringDeductions'] = ($totals['annualTotalRecurringDeductions'] ?? 0) + $annualTotalDeductions;
                 $totals['netTakeHomeMonthly'] = ($totals['netTakeHomeMonthly'] ?? 0) + $netTakeHomeMonthly;
+                $totals['paidDays'] = ($totals['paidDays'] ?? 0) + 0; // Sum of paid days (0 for now)
 
                 // Initialize missing keys for dynamic headers in row
                 foreach ($dynamicHeaders as $key => $value) {
@@ -811,16 +806,15 @@ class EmployeePayrollSalaryProcessApiController extends Controller
 
             // Create totals row
             $totalsRow = [
+                'serialNo' => '',
                 'empCode' => 'TOTAL',
                 'empName' => '',
                 'designation' => '',
+                'paidDays' => round($totals['paidDays'] ?? 0, 0),
                 'dateOfJoining' => '',
                 'monthlyTotalGross' => round($totals['monthlyTotalGross'] ?? 0, 2),
-                'annualTotalGross' => round($totals['annualTotalGross'] ?? 0, 2),
                 'monthlyTotalBenefits' => round($totals['monthlyTotalBenefits'] ?? 0, 2),
-                'annualTotalBenefits' => round($totals['annualTotalBenefits'] ?? 0, 2),
                 'monthlyTotalRecurringDeductions' => round($totals['monthlyTotalRecurringDeductions'] ?? 0, 2),
-                'annualTotalRecurringDeductions' => round($totals['annualTotalRecurringDeductions'] ?? 0, 2),
                 'netTakeHomeMonthly' => round($totals['netTakeHomeMonthly'] ?? 0, 2),
                 'status' => '',
             ];
@@ -833,20 +827,19 @@ class EmployeePayrollSalaryProcessApiController extends Controller
             // Add totals row to data
             $excelData[] = $totalsRow;
 
-            // Company information for the heading (with Released status indicator)
+            // Company information for the heading
             $companyInfo = [
                 'companyName' => $request->companyName,
                 'year' => $request->year,
                 'month' => $request->month,
-                'statusFilter' => 'Released',
                 'subBranch' => $request->subBranch ?? 'All SubBranches'
             ];
 
             // Generate filename with Released indicator
             $subBranchSuffix = $request->has('subBranch') && !empty($request->subBranch) ? "_{$request->subBranch}" : '';
-            $fileName = "ReleasedPayroll_{$request->companyName}_{$request->year}_{$request->month}{$subBranchSuffix}.xlsx";
+            $fileName = "SalarySheet_{$request->companyName}_{$request->month}_{$request->year}{$subBranchSuffix}.xlsx";
 
-            // Use the new ReleasedPayrollExport class
+            // Use the ReleasedPayrollExport class
             return Excel::download(new ReleasedPayrollExport($excelData, $dynamicHeaders, $companyInfo), $fileName);
 
         } catch (\Exception $e) {
