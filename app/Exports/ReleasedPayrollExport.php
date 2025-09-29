@@ -226,6 +226,58 @@ class ReleasedPayrollExport implements FromArray, WithHeadings, ShouldAutoSize, 
                 $sheet->getRowDimension(3)->setRowHeight(30);
                 $sheet->getRowDimension(4)->setRowHeight(30); // Header row
                 
+                // Apply styling to title rows (1, 2, 3) with proper vertical centering
+                // Title row (row 1)
+                $sheet->getStyle("A1:{$lastColumn}1")->applyFromArray([
+                    'font' => [
+                        'bold' => true,
+                        'size' => 18,
+                        'color' => ['rgb' => 'FFFFFF']
+                    ],
+                    'fill' => [
+                        'fillType' => Fill::FILL_SOLID,
+                        'startColor' => ['rgb' => '1F4E79']
+                    ],
+                    'alignment' => [
+                        'horizontal' => Alignment::HORIZONTAL_CENTER,
+                        'vertical' => Alignment::VERTICAL_CENTER
+                    ]
+                ]);
+                
+                // Company row (row 2)
+                $sheet->getStyle("A2:{$lastColumn}2")->applyFromArray([
+                    'font' => [
+                        'bold' => true,
+                        'size' => 14,
+                        'color' => ['rgb' => 'FFFFFF']
+                    ],
+                    'fill' => [
+                        'fillType' => Fill::FILL_SOLID,
+                        'startColor' => ['rgb' => '4472C4']
+                    ],
+                    'alignment' => [
+                        'horizontal' => Alignment::HORIZONTAL_CENTER,
+                        'vertical' => Alignment::VERTICAL_CENTER
+                    ]
+                ]);
+                
+                // Sub Branch row (row 3)
+                $sheet->getStyle("A3:{$lastColumn}3")->applyFromArray([
+                    'font' => [
+                        'bold' => true,
+                        'size' => 12,
+                        'color' => ['rgb' => 'FFFFFF']
+                    ],
+                    'fill' => [
+                        'fillType' => Fill::FILL_SOLID,
+                        'startColor' => ['rgb' => '9B59B6'] // Purple color for SubBranch
+                    ],
+                    'alignment' => [
+                        'horizontal' => Alignment::HORIZONTAL_CENTER,
+                        'vertical' => Alignment::VERTICAL_CENTER
+                    ]
+                ]);
+                
                 // Set default row height for all data rows
                 $lastDataRow = $sheet->getHighestRow();
                 for ($row = 5; $row <= $lastDataRow; $row++) {
