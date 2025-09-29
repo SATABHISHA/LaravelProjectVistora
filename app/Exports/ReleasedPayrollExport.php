@@ -217,11 +217,11 @@ class ReleasedPayrollExport implements FromArray, WithHeadings, ShouldAutoSize, 
                 // Row 4 is empty for spacing
                 
                 // Set row heights
-                $sheet->getRowDimension(1)->setRowHeight(30);
+                /*$sheet->getRowDimension(1)->setRowHeight(30);
                 $sheet->getRowDimension(2)->setRowHeight(25);
                 $sheet->getRowDimension(3)->setRowHeight(25);
-                // $sheet->getRowDimension(4)->setRowHeight(15); // Empty spacing row
-                $sheet->getRowDimension(5)->setRowHeight(25); // Header row
+                $sheet->getRowDimension(4)->setRowHeight(15); // Empty spacing row
+                $sheet->getRowDimension(5)->setRowHeight(25); */// Header row
                 
                 // Apply header row styling (row 5) - ONLY the header row
                 $sheet->getStyle("A5:{$lastColumn}5")->applyFromArray([
