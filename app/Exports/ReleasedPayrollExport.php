@@ -200,7 +200,7 @@ class ReleasedPayrollExport implements FromArray, WithHeadings, ShouldAutoSize, 
                 $lastColumn = $sheet->getHighestColumn();
                 
                 // Insert title and company information rows at the top
-                $sheet->insertNewRowBefore(1, 4); // Insert 4 rows at the top
+                $sheet->insertNewRowBefore(1, 3); // Insert only 3 rows at the top (removed empty row)
                 
                 // Set title (row 1) - Updated title
                 $sheet->setCellValue('A1', "Salary Sheet for the month of {$this->companyInfo['month']} {$this->companyInfo['year']}");
@@ -214,17 +214,16 @@ class ReleasedPayrollExport implements FromArray, WithHeadings, ShouldAutoSize, 
                 $sheet->setCellValue('A3', "Sub Branch: {$this->companyInfo['subBranch']}");
                 $sheet->mergeCells("A3:{$lastColumn}3");
                 
-                // Row 4 is empty for spacing
+                // No empty row - header starts at row 4
                 
                 // Set row heights
-                /*$sheet->getRowDimension(1)->setRowHeight(30);
+                $sheet->getRowDimension(1)->setRowHeight(30);
                 $sheet->getRowDimension(2)->setRowHeight(25);
                 $sheet->getRowDimension(3)->setRowHeight(25);
-                $sheet->getRowDimension(4)->setRowHeight(15); // Empty spacing row
-                $sheet->getRowDimension(5)->setRowHeight(25); */// Header row
+                $sheet->getRowDimension(4)->setRowHeight(25); // Header row (moved up)
                 
-                // Apply header row styling (row 5) - ONLY the header row
-                $sheet->getStyle("A5:{$lastColumn}5")->applyFromArray([
+                // Apply header row styling (row 4) - ONLY the header row
+                $sheet->getStyle("A4:{$lastColumn}4")->applyFromArray([
                     'font' => [
                         'bold' => true,
                         'size' => 11,
@@ -240,8 +239,8 @@ class ReleasedPayrollExport implements FromArray, WithHeadings, ShouldAutoSize, 
                     ]
                 ]);
                 
-                // Get the range for data rows only (starting from row 6)
-                $dataStartRow = 6;
+                // Get the range for data rows only (starting from row 5)
+                $dataStartRow = 5;
                 $lastDataRow = $sheet->getHighestRow();
                 $totalsRow = $lastDataRow; // Last row is totals
                 
@@ -295,7 +294,7 @@ class ReleasedPayrollExport implements FromArray, WithHeadings, ShouldAutoSize, 
                 ]);
                 
                 // FOURTH: Apply borders to the entire table (header + data + totals)
-                $tableRange = "A5:{$lastColumn}{$lastDataRow}";
+                $tableRange = "A4:{$lastColumn}{$lastDataRow}";
                 $sheet->getStyle($tableRange)->applyFromArray([
                     'borders' => [
                         'allBorders' => [
@@ -371,7 +370,7 @@ class ReleasedPayrollExport implements FromArray, WithHeadings, ShouldAutoSize, 
                 }
                 
                 // Freeze the header row for easy scrolling
-                $sheet->freezePane('A6');
+                $sheet->freezePane('A5');
                 
                 // Auto-size all columns for better readability
                 foreach (range('A', $lastColumn) as $column) {
