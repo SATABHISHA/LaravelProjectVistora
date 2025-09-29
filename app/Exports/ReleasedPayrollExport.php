@@ -110,22 +110,6 @@ class ReleasedPayrollExport implements FromArray, WithHeadings, ShouldAutoSize, 
 
         $headers[] = 'Monthly Total Gross';
 
-        // Add dynamic allowance headers
-        foreach ($this->dynamicHeaders as $key => $header) {
-            if (strpos($key, 'allowance_') === 0) {
-                $headers[] = $header;
-            }
-        }
-
-        // Add dynamic benefit headers
-        foreach ($this->dynamicHeaders as $key => $header) {
-            if (strpos($key, 'benefit_') === 0) {
-                $headers[] = $header;
-            }
-        }
-
-        $headers[] = 'Monthly Total Benefits';
-
         // Add dynamic deduction headers
         foreach ($this->dynamicHeaders as $key => $header) {
             if (strpos($key, 'deduction_') === 0) {

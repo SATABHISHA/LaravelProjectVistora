@@ -674,28 +674,14 @@ class EmployeePayrollSalaryProcessApiController extends Controller
                 // Build full name using the helper method
                 $fullName = $this->getFullEmployeeName($employeeDetail);
 
-                // Parse JSON fields safely
+                // Parse JSON fields safely - REMOVED otherAllowances and otherBenefits
                 $grossList = $this->safeJsonDecode($record->grossList);
-                $otherAllowances = $this->safeJsonDecode($record->otherAllowances);
-                $otherBenefits = $this->safeJsonDecode($record->otherBenefits);
                 $recurringDeductions = $this->safeJsonDecode($record->recurringDeduction);
 
-                // Build dynamic headers using actual component names
+                // Build dynamic headers using actual component names - ONLY gross and deductions
                 foreach ($grossList as $item) {
                     $componentName = $item['componentName'] ?? 'Unknown Component';
                     $headerKey = 'gross_' . str_replace(' ', '_', strtolower($componentName));
-                    $dynamicHeaders[$headerKey] = $componentName;
-                }
-                
-                foreach ($otherAllowances as $item) {
-                    $componentName = $item['componentName'] ?? 'Unknown Component';
-                    $headerKey = 'allowance_' . str_replace(' ', '_', strtolower($componentName));
-                    $dynamicHeaders[$headerKey] = $componentName;
-                }
-                
-                foreach ($otherBenefits as $item) {
-                    $componentName = $item['componentName'] ?? 'Unknown Component';
-                    $headerKey = 'benefit_' . str_replace(' ', '_', strtolower($componentName));
                     $dynamicHeaders[$headerKey] = $componentName;
                 }
                 
@@ -705,76 +691,49 @@ class EmployeePayrollSalaryProcessApiController extends Controller
                     $dynamicHeaders[$headerKey] = $componentName;
                 }
 
-                // Calculate totals
+                // Calculate totals - REMOVED benefits calculation
                 $monthlyTotalGross = 0;
-                $monthlyTotalBenefits = 0;
                 $monthlyTotalDeductions = 0;
 
                 // Calculate gross total
                 foreach ($grossList as $item) {
-                    if (isset($item['calculatedValue'])) {
+                    if (isset($item['calculatedValue']) && is_numeric($item['calculatedValue'])) {
                         $monthlyTotalGross += (float)$item['calculatedValue'];
-                    }
-                }
-
-                // Calculate benefits total (allowances + benefits)
-                foreach ($otherAllowances as $item) {
-                    if (isset($item['calculatedValue'])) {
-                        $monthlyTotalBenefits += (float)$item['calculatedValue'];
-                    }
-                }
-                foreach ($otherBenefits as $item) {
-                    if (isset($item['calculatedValue'])) {
-                        $monthlyTotalBenefits += (float)$item['calculatedValue'];
                     }
                 }
 
                 // Calculate deductions total
                 foreach ($recurringDeductions as $item) {
-                    if (isset($item['calculatedValue'])) {
+                    if (isset($item['calculatedValue']) && is_numeric($item['calculatedValue'])) {
                         $monthlyTotalDeductions += (float)$item['calculatedValue'];
                     }
                 }
 
-                // Calculate net salary
-                $netTakeHomeMonthly = $monthlyTotalGross + $monthlyTotalBenefits - $monthlyTotalDeductions;
+                // Calculate net salary - REMOVED benefits from calculation
+                $netTakeHomeMonthly = $monthlyTotalGross - $monthlyTotalDeductions;
 
                 // Build row data as associative array (with serial number and paid days)
                 $row = [
                     'serialNo' => $serialNo++,
-                    'empCode' => $record->empCode,
+                    'empCode' => $record->empCode ?? '',
                     'empName' => $fullName ?: 'N/A',
                     'designation' => $employmentDetail->Designation ?? 'N/A',
                     'paidDays' => 0, // Currently set to 0 as attendance not calculated
                     'dateOfJoining' => $employmentDetail->dateOfJoining ?? 'N/A',
                     'monthlyTotalGross' => round($monthlyTotalGross, 2),
-                    'monthlyTotalBenefits' => round($monthlyTotalBenefits, 2),
                     'monthlyTotalRecurringDeductions' => round($monthlyTotalDeductions, 2),
                     'netTakeHomeMonthly' => round($netTakeHomeMonthly, 2),
                     'status' => $record->status, // Will always be 'Released'
                 ];
 
-                // Add dynamic values and calculate totals
+                // Add dynamic values and calculate totals - ONLY gross and deductions
                 foreach ($grossList as $item) {
                     $componentName = $item['componentName'] ?? 'Unknown Component';
                     $headerKey = 'gross_' . str_replace(' ', '_', strtolower($componentName));
-                    $value = (float)($item['calculatedValue'] ?? 0);
-                    $row[$headerKey] = $value;
-                    $totals[$headerKey] = ($totals[$headerKey] ?? 0) + $value;
-                }
-                
-                foreach ($otherAllowances as $item) {
-                    $componentName = $item['componentName'] ?? 'Unknown Component';
-                    $headerKey = 'allowance_' . str_replace(' ', '_', strtolower($componentName));
-                    $value = (float)($item['calculatedValue'] ?? 0);
-                    $row[$headerKey] = $value;
-                    $totals[$headerKey] = ($totals[$headerKey] ?? 0) + $value;
-                }
-                
-                foreach ($otherBenefits as $item) {
-                    $componentName = $item['componentName'] ?? 'Unknown Component';
-                    $headerKey = 'benefit_' . str_replace(' ', '_', strtolower($componentName));
-                    $value = (float)($item['calculatedValue'] ?? 0);
+                    $value = 0;
+                    if (isset($item['calculatedValue']) && is_numeric($item['calculatedValue'])) {
+                        $value = (float)$item['calculatedValue'];
+                    }
                     $row[$headerKey] = $value;
                     $totals[$headerKey] = ($totals[$headerKey] ?? 0) + $value;
                 }
@@ -782,19 +741,21 @@ class EmployeePayrollSalaryProcessApiController extends Controller
                 foreach ($recurringDeductions as $item) {
                     $componentName = $item['componentName'] ?? 'Unknown Component';
                     $headerKey = 'deduction_' . str_replace(' ', '_', strtolower($componentName));
-                    $value = (float)($item['calculatedValue'] ?? 0);
+                    $value = 0;
+                    if (isset($item['calculatedValue']) && is_numeric($item['calculatedValue'])) {
+                        $value = (float)$item['calculatedValue'];
+                    }
                     $row[$headerKey] = $value;
                     $totals[$headerKey] = ($totals[$headerKey] ?? 0) + $value;
                 }
 
                 // Add totals for summary columns
                 $totals['monthlyTotalGross'] = ($totals['monthlyTotalGross'] ?? 0) + $monthlyTotalGross;
-                $totals['monthlyTotalBenefits'] = ($totals['monthlyTotalBenefits'] ?? 0) + $monthlyTotalBenefits;
                 $totals['monthlyTotalRecurringDeductions'] = ($totals['monthlyTotalRecurringDeductions'] ?? 0) + $monthlyTotalDeductions;
                 $totals['netTakeHomeMonthly'] = ($totals['netTakeHomeMonthly'] ?? 0) + $netTakeHomeMonthly;
                 $totals['paidDays'] = ($totals['paidDays'] ?? 0) + 0; // Sum of paid days (0 for now)
 
-                // Initialize missing keys for dynamic headers in row
+                // Initialize missing keys for dynamic headers in row with 0 values
                 foreach ($dynamicHeaders as $key => $value) {
                     if (!isset($row[$key])) {
                         $row[$key] = 0;
@@ -813,13 +774,12 @@ class EmployeePayrollSalaryProcessApiController extends Controller
                 'paidDays' => round($totals['paidDays'] ?? 0, 0),
                 'dateOfJoining' => '',
                 'monthlyTotalGross' => round($totals['monthlyTotalGross'] ?? 0, 2),
-                'monthlyTotalBenefits' => round($totals['monthlyTotalBenefits'] ?? 0, 2),
                 'monthlyTotalRecurringDeductions' => round($totals['monthlyTotalRecurringDeductions'] ?? 0, 2),
                 'netTakeHomeMonthly' => round($totals['netTakeHomeMonthly'] ?? 0, 2),
                 'status' => '',
             ];
 
-            // Add dynamic totals
+            // Add dynamic totals with 0 default values
             foreach ($dynamicHeaders as $key => $value) {
                 $totalsRow[$key] = round($totals[$key] ?? 0, 2);
             }
