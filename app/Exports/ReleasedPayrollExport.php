@@ -232,11 +232,12 @@ class ReleasedPayrollExport implements FromArray, WithHeadings, ShouldAutoSize, 
                     'font' => [
                         'bold' => true,
                         'size' => 18,
-                        'color' => ['rgb' => 'FFFFFF']
+                        'color' => ['rgb' => '000000']
                     ],
                     'fill' => [
                         'fillType' => Fill::FILL_SOLID,
-                        'startColor' => ['rgb' => '1F4E79']
+                        // 'startColor' => ['rgb' => '1F4E79'],
+                        'startColor' => ['rgb' => 'FFFFFF']
                     ],
                     'alignment' => [
                         'horizontal' => Alignment::HORIZONTAL_CENTER,
@@ -249,11 +250,12 @@ class ReleasedPayrollExport implements FromArray, WithHeadings, ShouldAutoSize, 
                     'font' => [
                         'bold' => true,
                         'size' => 14,
-                        'color' => ['rgb' => 'FFFFFF']
+                        'color' => ['rgb' => '000000']
                     ],
                     'fill' => [
                         'fillType' => Fill::FILL_SOLID,
-                        'startColor' => ['rgb' => '4472C4']
+                        // 'startColor' => ['rgb' => '4472C4'],
+                        'startColor' => ['rgb' => 'FFFFFF']
                     ],
                     'alignment' => [
                         'horizontal' => Alignment::HORIZONTAL_CENTER,
@@ -266,11 +268,12 @@ class ReleasedPayrollExport implements FromArray, WithHeadings, ShouldAutoSize, 
                     'font' => [
                         'bold' => true,
                         'size' => 12,
-                        'color' => ['rgb' => 'FFFFFF']
+                        'color' => ['rgb' => '000000']
                     ],
                     'fill' => [
                         'fillType' => Fill::FILL_SOLID,
-                        'startColor' => ['rgb' => '9B59B6'] // Purple color for SubBranch
+                        'startColor' => ['rgb' => '9B59B6'], // Purple color for SubBranch
+                        'startColor' => ['rgb' => 'FFFFFF']
                     ],
                     'alignment' => [
                         'horizontal' => Alignment::HORIZONTAL_CENTER,
