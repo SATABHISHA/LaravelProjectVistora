@@ -35,36 +35,36 @@ class ReleasedPayrollExport implements FromArray, WithHeadings, ShouldAutoSize, 
         foreach ($this->data as $row) {
             $excelRow = [];
             
-            // Static columns first (including serial number)
-            $excelRow[] = $row['serialNo'] ?? ''; // Serial Number - this was missing the proper value
+            // Static columns first (including serial number) - keep as is
+            $excelRow[] = $row['serialNo'] ?? '';
             $excelRow[] = $row['empCode'] ?? '';
             $excelRow[] = $row['empName'] ?? '';
             $excelRow[] = $row['designation'] ?? '';
-            $excelRow[] = is_numeric($row['paidDays'] ?? null) ? ($row['paidDays'] ?? 0) : 0; // Paid Days - ensure numeric
+            $excelRow[] = $row['paidDays'] ?? 0;
             $excelRow[] = $row['dateOfJoining'] ?? '';
             
-            // Dynamic gross columns
+            // Dynamic gross columns - only put 0 if empty/null
             foreach ($this->dynamicHeaders as $key => $header) {
                 if (strpos($key, 'gross_') === 0) {
                     $value = $row[$key] ?? 0;
-                    $excelRow[] = is_numeric($value) ? (float)$value : 0;
+                    $excelRow[] = ($value === '' || $value === null) ? 0 : $value;
                 }
             }
             
-            $excelRow[] = is_numeric($row['monthlyTotalGross'] ?? null) ? (float)($row['monthlyTotalGross'] ?? 0) : 0;
+            $excelRow[] = $row['monthlyTotalGross'] ?? 0;
             
-            // Dynamic deduction columns
+            // Dynamic deduction columns - only put 0 if empty/null
             foreach ($this->dynamicHeaders as $key => $header) {
                 if (strpos($key, 'deduction_') === 0) {
                     $value = $row[$key] ?? 0;
-                    $excelRow[] = is_numeric($value) ? (float)$value : 0;
+                    $excelRow[] = ($value === '' || $value === null) ? 0 : $value;
                 }
             }
             
-            $excelRow[] = is_numeric($row['monthlyTotalRecurringDeductions'] ?? null) ? (float)($row['monthlyTotalRecurringDeductions'] ?? 0) : 0;
-            $excelRow[] = is_numeric($row['netTakeHomeMonthly'] ?? null) ? (float)($row['netTakeHomeMonthly'] ?? 0) : 0;
+            $excelRow[] = $row['monthlyTotalRecurringDeductions'] ?? 0;
+            $excelRow[] = $row['netTakeHomeMonthly'] ?? 0;
             
-            // Status column at the end (will always be 'Released')
+            // Status column at the end
             $excelRow[] = $row['status'] ?? 'Released';
             
             $excelRows[] = $excelRow;
