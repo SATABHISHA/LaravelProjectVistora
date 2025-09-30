@@ -29,47 +29,55 @@ class ReleasedPayrollExport implements FromArray, WithHeadings, ShouldAutoSize, 
 
     public function array(): array
     {
-        // Prepare data rows for Excel
         $excelRows = [];
-        
+
         foreach ($this->data as $row) {
             $excelRow = [];
-            
-            // Static columns first (including serial number) - keep as is
-            $excelRow[] = $row['serialNo'] ?? '';
-            $excelRow[] = $row['empCode'] ?? '';
-            $excelRow[] = $row['empName'] ?? '';
-            $excelRow[] = $row['designation'] ?? '';
-            $excelRow[] = $row['paidDays'] ?? 0;
+
+            // Static columns first (including serial number)
+            $excelRow[] = $row['serialNo'] ?? '';            // S.No.
+            $excelRow[] = $row['empCode'] ?? '';             // Employee Code
+            $excelRow[] = $row['empName'] ?? '';             // Employee Name
+            $excelRow[] = $row['designation'] ?? '';         // Designation
+
+            // Paid Days - ensure it's never left empty
+            $paidDays = $row['paidDays'] ?? null;
+            $excelRow[] = ($paidDays === null || $paidDays === '') ? '0' : $paidDays;
+
             $excelRow[] = $row['dateOfJoining'] ?? '';
-            
-            // Dynamic gross columns - Simply check if key exists and has value
+
+            // Dynamic gross columns - put '0' for truly empty values only
             foreach ($this->dynamicHeaders as $key => $header) {
                 if (strpos($key, 'gross_') === 0) {
-                    $value = isset($row[$key]) ? $row[$key] : 0;
-                    $excelRow[] = $value === '' ? 0 : $value;
+                    $value = array_key_exists($key, $row) ? $row[$key] : null;
+                    $excelRow[] = ($value === null || $value === '') ? '0' : $value;
                 }
             }
-            
-            $excelRow[] = $row['monthlyTotalGross'] ?? 0;
-            
-            // Dynamic deduction columns - Simply check if key exists and has value
+
+            // Monthly Total Gross
+            $mtg = array_key_exists('monthlyTotalGross', $row) ? $row['monthlyTotalGross'] : null;
+            $excelRow[] = ($mtg === null || $mtg === '') ? '0' : $mtg;
+
+            // Dynamic deduction columns - put '0' for truly empty values only
             foreach ($this->dynamicHeaders as $key => $header) {
                 if (strpos($key, 'deduction_') === 0) {
-                    $value = isset($row[$key]) ? $row[$key] : 0;
-                    $excelRow[] = $value === '' ? 0 : $value;
+                    $value = array_key_exists($key, $row) ? $row[$key] : null;
+                    $excelRow[] = ($value === null || $value === '') ? '0' : $value;
                 }
             }
-            
-            $excelRow[] = $row['monthlyTotalRecurringDeductions'] ?? 0;
-            $excelRow[] = $row['netTakeHomeMonthly'] ?? 0;
-            
-            // Status column at the end
+
+            $mtd = array_key_exists('monthlyTotalRecurringDeductions', $row) ? $row['monthlyTotalRecurringDeductions'] : null;
+            $excelRow[] = ($mtd === null || $mtd === '') ? '0' : $mtd;
+
+            $nth = array_key_exists('netTakeHomeMonthly', $row) ? $row['netTakeHomeMonthly'] : null;
+            $excelRow[] = ($nth === null || $nth === '') ? '0' : $nth;
+
+            // Status column
             $excelRow[] = $row['status'] ?? 'Released';
-            
+
             $excelRows[] = $excelRow;
         }
-        
+
         return $excelRows;
     }
 
