@@ -234,11 +234,11 @@ class ReleasedPayrollExport implements FromArray, WithHeadings, ShouldAutoSize, 
                     'font' => [
                         'bold' => true,
                         'size' => 12,
-                        'color' => ['rgb' => 'FFFFFF']
+                        'color' => ['rgb' => '000000']
                     ],
                     'fill' => [
                         'fillType' => Fill::FILL_SOLID,
-                        'startColor' => ['rgb' => '9B59B6'], // Purple color for SubBranch
+                        // 'startColor' => ['rgb' => '9B59B6'], // Purple color for SubBranch
                         'startColor' => ['rgb' => 'FFFFFF']
                     ],
                     'alignment' => [
