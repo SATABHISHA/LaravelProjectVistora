@@ -7,13 +7,14 @@ use Maatwebsite\Excel\Concerns\WithHeadings;
 use Maatwebsite\Excel\Concerns\ShouldAutoSize;
 use Maatwebsite\Excel\Concerns\WithStyles;
 use Maatwebsite\Excel\Concerns\WithEvents;
+use Maatwebsite\Excel\Concerns\WithColumnFormatting;
 use Maatwebsite\Excel\Events\AfterSheet;
 use PhpOffice\PhpSpreadsheet\Worksheet\Worksheet;
 use PhpOffice\PhpSpreadsheet\Style\Alignment;
 use PhpOffice\PhpSpreadsheet\Style\Fill;
 use PhpOffice\PhpSpreadsheet\Style\Color;
 
-class ReleasedPayrollExport implements FromArray, WithHeadings, ShouldAutoSize, WithStyles, WithEvents
+class ReleasedPayrollExport implements FromArray, WithHeadings, ShouldAutoSize, WithStyles, WithEvents, WithColumnFormatting
 {
     protected $data;
     protected $dynamicHeaders;
@@ -395,5 +396,49 @@ class ReleasedPayrollExport implements FromArray, WithHeadings, ShouldAutoSize, 
                 }
             }
         ];
+    }
+
+    public function columnFormats(): array
+    {
+        $formats = [];
+        
+        // Set number format for Paid Days (column E)
+        $formats['E'] = '0';
+        
+        // Set number format for all dynamic columns (starting from column G)
+        $columnIndex = 7; // Starting from column G
+        
+        // Dynamic gross columns
+        foreach ($this->dynamicHeaders as $key => $header) {
+            if (strpos($key, 'gross_') === 0) {
+                $columnLetter = chr(64 + $columnIndex); // Convert to column letter
+                $formats[$columnLetter] = '#,##0.00'; // Number format with 2 decimal places
+                $columnIndex++;
+            }
+        }
+        
+        // Monthly Total Gross
+        $columnLetter = chr(64 + $columnIndex);
+        $formats[$columnLetter] = '#,##0.00';
+        $columnIndex++;
+        
+        // Dynamic deduction columns
+        foreach ($this->dynamicHeaders as $key => $header) {
+            if (strpos($key, 'deduction_') === 0) {
+                $columnLetter = chr(64 + $columnIndex);
+                $formats[$columnLetter] = '#,##0.00';
+                $columnIndex++;
+            }
+        }
+        
+        // Monthly Total Deductions and Net Take Home
+        $columnLetter = chr(64 + $columnIndex);
+        $formats[$columnLetter] = '#,##0.00'; // Monthly Total Deductions
+        $columnIndex++;
+        
+        $columnLetter = chr(64 + $columnIndex);
+        $formats[$columnLetter] = '#,##0.00'; // Net Take Home
+        
+        return $formats;
     }
 }
