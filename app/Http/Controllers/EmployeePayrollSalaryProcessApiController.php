@@ -666,19 +666,12 @@ class EmployeePayrollSalaryProcessApiController extends Controller
             $totals = []; // For calculating column totals
             $serialNo = 1; // For serial number
 
+            // FIRST PASS: Collect ALL possible dynamic headers from ALL records
             foreach ($payrollRecords as $record) {
-                // Get employee details and employment details
-                $employeeDetail = $employeeDetails->get($record->empCode);
-                $employmentDetail = $employmentDetails->get($record->empCode);
-                
-                // Build full name using the helper method
-                $fullName = $this->getFullEmployeeName($employeeDetail);
-
-                // Parse JSON fields safely - REMOVED otherAllowances and otherBenefits
                 $grossList = $this->safeJsonDecode($record->grossList);
                 $recurringDeductions = $this->safeJsonDecode($record->recurringDeduction);
 
-                // Build dynamic headers using actual component names - ONLY gross and deductions
+                // Build complete list of dynamic headers from all records
                 foreach ($grossList as $item) {
                     $componentName = $item['componentName'] ?? 'Unknown Component';
                     $headerKey = 'gross_' . str_replace(' ', '_', strtolower($componentName));
@@ -690,6 +683,20 @@ class EmployeePayrollSalaryProcessApiController extends Controller
                     $headerKey = 'deduction_' . str_replace(' ', '_', strtolower($componentName));
                     $dynamicHeaders[$headerKey] = $componentName;
                 }
+            }
+
+            // SECOND PASS: Process each record and ensure all dynamic columns have values
+            foreach ($payrollRecords as $record) {
+                // Get employee details and employment details
+                $employeeDetail = $employeeDetails->get($record->empCode);
+                $employmentDetail = $employmentDetails->get($record->empCode);
+                
+                // Build full name using the helper method
+                $fullName = $this->getFullEmployeeName($employeeDetail);
+
+                // Parse JSON fields safely - REMOVED otherAllowances and otherBenefits
+                $grossList = $this->safeJsonDecode($record->grossList);
+                $recurringDeductions = $this->safeJsonDecode($record->recurringDeduction);
 
                 // Calculate totals - REMOVED ALL benefits calculation
                 $monthlyTotalGross = 0;
@@ -726,7 +733,15 @@ class EmployeePayrollSalaryProcessApiController extends Controller
                     'status' => $record->status, // Will always be 'Released'
                 ];
 
-                // Add dynamic values and calculate totals - ONLY gross and deductions
+                // Initialize ALL dynamic headers with 0 first
+                foreach ($dynamicHeaders as $headerKey => $headerName) {
+                    $row[$headerKey] = 0;
+                    if (!isset($totals[$headerKey])) {
+                        $totals[$headerKey] = 0;
+                    }
+                }
+
+                // Now populate actual values for gross components that exist
                 foreach ($grossList as $item) {
                     $componentName = $item['componentName'] ?? 'Unknown Component';
                     $headerKey = 'gross_' . str_replace(' ', '_', strtolower($componentName));
@@ -735,9 +750,10 @@ class EmployeePayrollSalaryProcessApiController extends Controller
                         $value = (float)$item['calculatedValue'];
                     }
                     $row[$headerKey] = $value;
-                    $totals[$headerKey] = ($totals[$headerKey] ?? 0) + $value;
+                    $totals[$headerKey] += $value;
                 }
                 
+                // Now populate actual values for deduction components that exist
                 foreach ($recurringDeductions as $item) {
                     $componentName = $item['componentName'] ?? 'Unknown Component';
                     $headerKey = 'deduction_' . str_replace(' ', '_', strtolower($componentName));
@@ -746,7 +762,7 @@ class EmployeePayrollSalaryProcessApiController extends Controller
                         $value = (float)$item['calculatedValue'];
                     }
                     $row[$headerKey] = $value;
-                    $totals[$headerKey] = ($totals[$headerKey] ?? 0) + $value;
+                    $totals[$headerKey] += $value;
                 }
 
                 // Add totals for summary columns - REMOVED all benefits-related totals
@@ -754,13 +770,6 @@ class EmployeePayrollSalaryProcessApiController extends Controller
                 $totals['monthlyTotalRecurringDeductions'] = ($totals['monthlyTotalRecurringDeductions'] ?? 0) + $monthlyTotalDeductions;
                 $totals['netTakeHomeMonthly'] = ($totals['netTakeHomeMonthly'] ?? 0) + $netTakeHomeMonthly;
                 $totals['paidDays'] = ($totals['paidDays'] ?? 0) + 0; // Sum of paid days (0 for now)
-
-                // Initialize missing keys for dynamic headers in row with 0 values
-                foreach ($dynamicHeaders as $key => $value) {
-                    if (!isset($row[$key])) {
-                        $row[$key] = 0;
-                    }
-                }
 
                 $excelData[] = $row;
             }
