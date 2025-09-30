@@ -43,21 +43,23 @@ class ReleasedPayrollExport implements FromArray, WithHeadings, ShouldAutoSize, 
             $excelRow[] = $row['paidDays'] ?? 0;
             $excelRow[] = $row['dateOfJoining'] ?? '';
             
-            // Dynamic gross columns - only put 0 if empty/null
+            // Dynamic gross columns - FORCE 0 for empty values
             foreach ($this->dynamicHeaders as $key => $header) {
                 if (strpos($key, 'gross_') === 0) {
                     $value = $row[$key] ?? 0;
-                    $excelRow[] = ($value === '' || $value === null) ? 0 : $value;
+                    // Force numeric zero for any falsy values
+                    $excelRow[] = (empty($value) && $value !== 0) ? 0 : $value;
                 }
             }
             
             $excelRow[] = $row['monthlyTotalGross'] ?? 0;
             
-            // Dynamic deduction columns - only put 0 if empty/null
+            // Dynamic deduction columns - FORCE 0 for empty values
             foreach ($this->dynamicHeaders as $key => $header) {
                 if (strpos($key, 'deduction_') === 0) {
                     $value = $row[$key] ?? 0;
-                    $excelRow[] = ($value === '' || $value === null) ? 0 : $value;
+                    // Force numeric zero for any falsy values
+                    $excelRow[] = (empty($value) && $value !== 0) ? 0 : $value;
                 }
             }
             
