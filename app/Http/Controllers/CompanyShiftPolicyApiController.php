@@ -10,6 +10,17 @@ use Illuminate\Database\QueryException;
 class CompanyShiftPolicyApiController extends Controller
 {
     /**
+     * Color pairs for companies
+     */
+    private $colorPairs = [
+        ['color1' => '#6366f1', 'color2' => '#8b5cf6'],
+        ['color1' => '#10b981', 'color2' => '#059669'],
+        ['color1' => '#f59e0b', 'color2' => '#d97706'],
+        ['color1' => '#ef4444', 'color2' => '#dc2626'],
+        ['color1' => '#3b82f6', 'color2' => '#1d4ed8'],
+    ];
+
+    /**
      * Add new company shift policy
      *
      * @param Request $request
@@ -204,28 +215,45 @@ class CompanyShiftPolicyApiController extends Controller
                 ]);
             }
 
-            // Fetch shift details for each company shift policy
-            $result = $companyShiftPolicies->map(function ($companyShiftPolicy) {
-                // Find shift policy details by matching corp_id and shift_code
-                $shiftPolicy = ShiftPolicy::where('corp_id', $companyShiftPolicy->corp_id)
-                    ->where('shift_code', $companyShiftPolicy->shift_code)
-                    ->first();
+            // Group by company_name to assign consistent colors per company
+            $groupedByCompany = $companyShiftPolicies->groupBy('company_name');
+            
+            // Shuffle color pairs for randomization
+            $shuffledColors = collect($this->colorPairs)->shuffle();
+            
+            $result = collect();
+            $colorIndex = 0;
 
-                return [
-                    'id' => $companyShiftPolicy->id,
-                    'corp_id' => $companyShiftPolicy->corp_id,
-                    'company_name' => $companyShiftPolicy->company_name,
-                    'shift_code' => $companyShiftPolicy->shift_code,
-                    'created_at' => $companyShiftPolicy->created_at,
-                    'updated_at' => $companyShiftPolicy->updated_at,
-                    'shift_details' => $shiftPolicy ? [
-                        'shift_name' => $shiftPolicy->shift_name,
-                        'shift_start_time' => $shiftPolicy->shift_start_time,
-                        'second_half' => $shiftPolicy->second_half,
-                        'puid' => $shiftPolicy->puid
-                    ] : null
-                ];
-            });
+            foreach ($groupedByCompany as $companyName => $companyPolicies) {
+                // Get color pair for this company (cycle through if more companies than colors)
+                $colorPair = $shuffledColors[$colorIndex % $shuffledColors->count()];
+                
+                foreach ($companyPolicies as $companyShiftPolicy) {
+                    // Find shift policy details by matching corp_id and shift_code
+                    $shiftPolicy = ShiftPolicy::where('corp_id', $companyShiftPolicy->corp_id)
+                        ->where('shift_code', $companyShiftPolicy->shift_code)
+                        ->first();
+
+                    $result->push([
+                        'id' => $companyShiftPolicy->id,
+                        'corp_id' => $companyShiftPolicy->corp_id,
+                        'company_name' => $companyShiftPolicy->company_name,
+                        'shift_code' => $companyShiftPolicy->shift_code,
+                        'color1' => $colorPair['color1'],
+                        'color2' => $colorPair['color2'],
+                        'created_at' => $companyShiftPolicy->created_at,
+                        'updated_at' => $companyShiftPolicy->updated_at,
+                        'shift_details' => $shiftPolicy ? [
+                            'shift_name' => $shiftPolicy->shift_name,
+                            'shift_start_time' => $shiftPolicy->shift_start_time,
+                            'second_half' => $shiftPolicy->second_half,
+                            'puid' => $shiftPolicy->puid
+                        ] : null
+                    ]);
+                }
+                
+                $colorIndex++;
+            }
 
             return response()->json([
                 'status' => true,
