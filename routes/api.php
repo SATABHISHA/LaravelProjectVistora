@@ -590,3 +590,7 @@ Route::post('/payroll-salary-process/release-salary-initiated-only', [EmployeePa
 Route::get('/payroll-salary-process/export-excel', [EmployeePayrollSalaryProcessApiController::class, 'exportPayrollExcel']);
 
 Route::get('/payroll/export-released-excel', [EmployeePayrollSalaryProcessApiController::class, 'exportReleasedPayrollExcel']);
+
+// Add these new routes for shift codes and shift names
+Route::get('/shift-policy/shift-codes/{corp_id}', [ShiftPolicyApiController::class, 'getShiftCodesByCorpId']);
+Route::get('/shift-policy/shift-names/{corp_id}/{shift_code}', [ShiftPolicyApiController::class, 'getShiftNamesByCodeAndCorpId']);

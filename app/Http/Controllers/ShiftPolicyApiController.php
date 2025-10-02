@@ -170,4 +170,123 @@ class ShiftPolicyApiController extends Controller
             ], 404);
         }
     }
+
+    /**
+     * Fetch all shift codes by corp_id
+     *
+     * @param string $corp_id
+     * @return \Illuminate\Http\JsonResponse
+     */
+    public function getShiftCodesByCorpId($corp_id)
+    {
+        try {
+            // Validate corp_id parameter
+            if (empty($corp_id)) {
+                return response()->json([
+                    'status' => false,
+                    'message' => 'Corp ID is required'
+                ], 400);
+            }
+
+            // Get distinct shift codes for the given corp_id
+            $shiftCodes = ShiftPolicy::where('corp_id', $corp_id)
+                ->distinct()
+                ->pluck('shift_code')
+                ->filter() // Remove null/empty values
+                ->values(); // Reset array keys
+
+            if ($shiftCodes->isEmpty()) {
+                return response()->json([
+                    'status' => false,
+                    'message' => 'No shift codes found for the given corp_id',
+                    'corp_id' => $corp_id,
+                    'data' => []
+                ], 404);
+            }
+
+            return response()->json([
+                'status' => true,
+                'message' => 'Shift codes retrieved successfully',
+                'corp_id' => $corp_id,
+                'count' => $shiftCodes->count(),
+                'data' => $shiftCodes
+            ]);
+
+        } catch (\Exception $e) {
+            return response()->json([
+                'status' => false,
+                'message' => 'Error retrieving shift codes: ' . $e->getMessage(),
+                'corp_id' => $corp_id
+            ], 500);
+        }
+    }
+
+    /**
+     * Fetch all shift names by shift_code and corp_id (can be multiple)
+     *
+     * @param string $corp_id
+     * @param string $shift_code
+     * @return \Illuminate\Http\JsonResponse
+     */
+    public function getShiftNamesByCodeAndCorpId($corp_id, $shift_code)
+    {
+        try {
+            // Validate parameters
+            if (empty($corp_id)) {
+                return response()->json([
+                    'status' => false,
+                    'message' => 'Corp ID is required'
+                ], 400);
+            }
+
+            if (empty($shift_code)) {
+                return response()->json([
+                    'status' => false,
+                    'message' => 'Shift code is required'
+                ], 400);
+            }
+
+            // Find all shift policies by corp_id and shift_code
+            $shiftPolicies = ShiftPolicy::where('corp_id', $corp_id)
+                ->where('shift_code', $shift_code)
+                ->select('puid', 'shift_name', 'shift_start_time', 'shift_code', 'corp_id')
+                ->get();
+
+            if ($shiftPolicies->isEmpty()) {
+                return response()->json([
+                    'status' => false,
+                    'message' => 'No shift policies found for the given corp_id and shift_code',
+                    'corp_id' => $corp_id,
+                    'shift_code' => $shift_code,
+                    'data' => []
+                ], 404);
+            }
+
+            // Format the data
+            $shiftNames = $shiftPolicies->map(function ($policy) {
+                return [
+                    'puid' => $policy->puid,
+                    'shift_name' => $policy->shift_name,
+                    'shift_start_time' => $policy->shift_start_time
+                ];
+            });
+
+            return response()->json([
+                'status' => true,
+                'message' => 'Shift names retrieved successfully',
+                'corp_id' => $corp_id,
+                'shift_code' => $shift_code,
+                'count' => $shiftNames->count(),
+                'data' => $shiftNames
+            ]);
+
+        } catch (\Exception $e) {
+            return response()->json([
+                'status' => false,
+                'message' => 'Error retrieving shift names: ' . $e->getMessage(),
+                'corp_id' => $corp_id,
+                'shift_code' => $shift_code
+            ], 500);
+        }
+    }
 }
