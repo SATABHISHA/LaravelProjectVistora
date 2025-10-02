@@ -77,6 +77,7 @@ use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\HolidayListApiController;
 use App\Http\Controllers\EmployeePayrollSalaryProcessApiController;
 use App\Http\Controllers\UtilityApiController;
+use App\Http\Controllers\CompanyShiftPolicyApiController;
 
 /*
 |--------------------------------------------------------------------------
@@ -594,3 +595,9 @@ Route::get('/payroll/export-released-excel', [EmployeePayrollSalaryProcessApiCon
 // Add these new routes for shift codes and shift names
 Route::get('/shift-policy/shift-codes/{corp_id}', [ShiftPolicyApiController::class, 'getShiftCodesByCorpId']);
 Route::get('/shift-policy/shift-names/{corp_id}/{shift_code}', [ShiftPolicyApiController::class, 'getShiftNamesByCodeAndCorpId']);
+
+// Company Shift Policy Routes
+Route::post('/company-shift-policy', [CompanyShiftPolicyApiController::class, 'store']);
+Route::delete('/company-shift-policy/{id}', [CompanyShiftPolicyApiController::class, 'delete']);
+Route::get('/company-shift-policy', [CompanyShiftPolicyApiController::class, 'fetchAll']);
+Route::get('/company-shift-policy/corp/{corp_id}', [CompanyShiftPolicyApiController::class, 'fetchByCorpId']);
