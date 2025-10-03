@@ -1,0 +1,111 @@
+<?php
+
+namespace App\Http\Controllers;
+
+use Illuminate\Http\Request;
+use App\Models\LeaveRequest;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Validator;
+use Carbon\Carbon;
+
+class LeaveRequestApiController extends Controller
+{
+    /**
+     * Store a newly created leave request in storage.
+     *
+     * @param  \Illuminate\Http\Request  $request
+     * @return \Illuminate\Http\JsonResponse
+     */
+    public function store(Request $request)
+    {
+        $validator = Validator::make($request->all(), [
+            'corp_id' => 'required|string',
+            'company_name' => 'required|string',
+            'empcode' => 'required|string',
+            'from_date' => 'required|date',
+            'to_date' => 'required|date|after_or_equal:from_date',
+            'reason' => 'nullable|string',
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json([
+                'status' => false,
+                'message' => 'Validation failed',
+                'errors' => $validator->errors()
+            ], 422);
+        }
+
+        try {
+            $corpId = $request->input('corp_id');
+            $empcode = $request->input('empcode');
+            $companyName = $request->input('company_name');
+
+            // 1. Fetch Designation from employment_details
+            $employmentDetails = DB::table('employment_details')
+                ->where('corp_id', $corpId)
+                ->where('EmpCode', $empcode)
+                ->where('company_name', $companyName)
+                ->first();
+
+            if (!$employmentDetails || !isset($employmentDetails->Designation)) {
+                return response()->json([
+                    'status' => false,
+                    'message' => 'Employment details or designation not found for the given employee.'
+                ], 404);
+            }
+            $designation = $employmentDetails->Designation;
+
+            // 2. Fetch Name parts from employee_details
+            $employeeDetails = DB::table('employee_details')
+                ->where('corp_id', $corpId)
+                ->where('EmpCode', $empcode)
+                ->first();
+
+            if (!$employeeDetails) {
+                return response()->json([
+                    'status' => false,
+                    'message' => 'Employee master details not found.'
+                ], 404);
+            }
+
+            // 3. Construct the full_name
+            $nameParts = array_filter([
+                $employeeDetails->FirstName,
+                $employeeDetails->MiddleName,
+                $employeeDetails->LastName
+            ]);
+            $employeeName = implode(' ', $nameParts);
+            $fullName = "{$empcode} {$designation} - {$employeeName}";
+
+            // 4. Prepare data for insertion
+            $leaveData = [
+                'puid' => uniqid('LR_', true), // Auto-generated PUID
+                'corp_id' => $corpId,
+                'company_name' => $companyName,
+                'empcode' => $empcode,
+                'full_name' => $fullName, // Auto-generated full_name
+                'emp_designation' => $designation, // Auto-inserted designation
+                'from_date' => Carbon::parse($request->input('from_date'))->format('d/m/Y'), // Format date
+                'to_date' => Carbon::parse($request->input('to_date'))->format('d/m/Y'), // Format date
+                'reason' => $request->input('reason'),
+                'status' => 'Pending', // Default status
+            ];
+
+            // 5. Create the leave request
+            $leaveRequest = LeaveRequest::create($leaveData);
+
+            return response()->json([
+                'status' => true,
+                'message' => 'Leave request submitted successfully.',
+                'data' => $leaveRequest
+            ], 201);
+
+        } catch (\Exception $e) {
+            return response()->json([
+                'status' => false,
+                'message' => 'An error occurred while processing your request.',
+                'error' => $e->getMessage()
+            ], 500);
+        }
+    }
+}

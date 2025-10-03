@@ -78,6 +78,7 @@ use App\Http\Controllers\HolidayListApiController;
 use App\Http\Controllers\EmployeePayrollSalaryProcessApiController;
 use App\Http\Controllers\UtilityApiController;
 use App\Http\Controllers\CompanyShiftPolicyApiController;
+use App\Http\Controllers\LeaveRequestApiController;
 
 /*
 |--------------------------------------------------------------------------
@@ -601,3 +602,6 @@ Route::post('/company-shift-policy', [CompanyShiftPolicyApiController::class, 's
 Route::delete('/company-shift-policy/{id}', [CompanyShiftPolicyApiController::class, 'delete']);
 Route::get('/company-shift-policy', [CompanyShiftPolicyApiController::class, 'fetchAll']);
 Route::get('/company-shift-policy/corp/{corp_id}', [CompanyShiftPolicyApiController::class, 'fetchByCorpId']);
+
+// Route for submitting a leave request
+Route::post('/leave-request', [LeaveRequestApiController::class, 'store']);
