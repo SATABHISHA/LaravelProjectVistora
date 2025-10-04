@@ -608,3 +608,6 @@ Route::post('/leave-request', [LeaveRequestApiController::class, 'store']);
 
 // Corrected route to fetch pending leave requests, requiring the empcode of the admin/supervisor
 Route::get('/leave-requests/pending/{corp_id}/{empcode}', [LeaveRequestApiController::class, 'fetchPendingForAdmin']);
+
+// New route to fetch approved leave requests for admins/supervisors
+Route::get('/leave-requests/approved/{corp_id}/{empcode}', [LeaveRequestApiController::class, 'fetchApprovedForAdmin']);
