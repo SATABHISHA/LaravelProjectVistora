@@ -114,12 +114,12 @@ class LeaveRequestApiController extends Controller
      * The status is passed as a dynamic URL parameter.
      *
      * @param  \Illuminate\Http\Request  $request
+     * @param  string  $status The desired status (e.g., 'Pending', 'Approved', 'Rejected').
      * @param  string  $corp_id
      * @param  string  $empcode The employee code of the user making the request.
-     * @param  string  $status The desired status (e.g., 'Pending', 'Approved', 'Rejected').
      * @return \Illuminate\Http\JsonResponse
      */
-    public function fetchRequestsByStatus(Request $request, $corp_id, $empcode, $status)
+    public function fetchRequestsByStatus(Request $request, $status, $corp_id, $empcode)
     {
         // Authorization Check: Verify if the specific user is an active admin or supervisor.
         $isAuthorized = DB::table('userlogin')
