@@ -108,4 +108,65 @@ class LeaveRequestApiController extends Controller
             ], 500);
         }
     }
+
+    /**
+     * Fetch pending leave requests for a specific admin/supervisor.
+     *
+     * @param  \Illuminate\Http\Request  $request
+     * @param  string  $corp_id
+     * @param  string  $empcode The employee code of the user making the request.
+     * @return \Illuminate\Http\JsonResponse
+     */
+    public function fetchPendingForAdmin(Request $request, $corp_id, $empcode)
+    {
+        // Authorization Check: Verify if the specific user is an active admin or supervisor.
+        $isAuthorized = DB::table('userlogin')
+            ->where('corp_id', $corp_id)
+            ->where('empcode', $empcode) // Check the specific user
+            ->where('active_yn', 1)
+            ->where(function ($query) {
+                $query->where('admin_yn', 1)
+                      ->orWhere('supervisor_yn', 1);
+            })
+            ->exists();
+
+        // If the user is not an authorized admin/supervisor, deny access.
+        if (!$isAuthorized) {
+            return response()->json([
+                'status' => false,
+                'message' => 'Access Denied. You do not have permission to view pending requests.'
+            ], 403);
+        }
+
+        try {
+            // Fetch paginated leave requests with status "Pending" for the given corp_id.
+            $perPage = $request->input('per_page', 15);
+
+            $leaveRequests = LeaveRequest::where('corp_id', $corp_id)
+                ->where('status', 'Pending')
+                ->orderBy('created_at', 'desc')
+                ->paginate($perPage);
+
+            if ($leaveRequests->isEmpty()) {
+                return response()->json([
+                    'status' => true,
+                    'message' => 'No pending leave requests found for this corporate ID.',
+                    'data' => []
+                ], 200);
+            }
+
+            return response()->json([
+                'status' => true,
+                'message' => 'Pending leave requests retrieved successfully.',
+                'data' => $leaveRequests
+            ], 200);
+
+        } catch (\Exception $e) {
+            return response()->json([
+                'status' => false,
+                'message' => 'An error occurred while fetching leave requests.',
+                'error' => $e->getMessage()
+            ], 500);
+        }
+    }
 }

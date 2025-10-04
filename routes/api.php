@@ -605,3 +605,6 @@ Route::get('/company-shift-policy/corp/{corp_id}', [CompanyShiftPolicyApiControl
 
 // Route for submitting a leave request
 Route::post('/leave-request', [LeaveRequestApiController::class, 'store']);
+
+// Corrected route to fetch pending leave requests, requiring the empcode of the admin/supervisor
+Route::get('/leave-requests/pending/{corp_id}/{empcode}', [LeaveRequestApiController::class, 'fetchPendingForAdmin']);
