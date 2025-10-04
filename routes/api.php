@@ -611,3 +611,6 @@ Route::get('/leave-requests/{status}/{corp_id}/{empcode}', [LeaveRequestApiContr
 
 // New route to update the status of a leave request
 Route::patch('/leave-request/{id}', [LeaveRequestApiController::class, 'updateStatus']);
+
+// New route to fetch all leave requests for a specific employee
+Route::get('/leave-requests/employee/{corp_id}/{company_name}/{empcode}', [LeaveRequestApiController::class, 'fetchForEmployee']);

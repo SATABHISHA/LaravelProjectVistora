@@ -247,4 +247,47 @@ class LeaveRequestApiController extends Controller
             return response()->json(['status' => false, 'message' => 'An error occurred while updating the request.', 'error' => $e->getMessage()], 500);
         }
     }
+
+    /**
+     * Fetch all leave requests for a specific employee.
+     *
+     * @param  \Illuminate\Http\Request  $request
+     * @param  string  $corp_id
+     * @param  string  $company_name
+     * @param  string  $empcode
+     * @return \Illuminate\Http\JsonResponse
+     */
+    public function fetchForEmployee(Request $request, $corp_id, $company_name, $empcode)
+    {
+        try {
+            $perPage = $request->input('per_page', 15);
+
+            $leaveRequests = LeaveRequest::where('corp_id', $corp_id)
+                ->where('company_name', $company_name)
+                ->where('empcode', $empcode)
+                ->orderBy('created_at', 'desc')
+                ->paginate($perPage);
+
+            if ($leaveRequests->isEmpty()) {
+                return response()->json([
+                    'status' => true,
+                    'message' => 'No leave requests found for this employee.',
+                    'data' => []
+                ], 200);
+            }
+
+            return response()->json([
+                'status' => true,
+                'message' => 'Employee leave requests retrieved successfully.',
+                'data' => $leaveRequests
+            ], 200);
+
+        } catch (\Exception $e) {
+            return response()->json([
+                'status' => false,
+                'message' => 'An error occurred while fetching leave requests.',
+                'error' => $e->getMessage()
+            ], 500);
+        }
+    }
 }
