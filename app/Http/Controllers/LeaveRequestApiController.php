@@ -174,4 +174,77 @@ class LeaveRequestApiController extends Controller
             ], 500);
         }
     }
+
+    /**
+     * Update the status of a specific leave request.
+     *
+     * @param  \Illuminate\Http\Request  $request
+     * @param  int  $id The ID of the leave request to update.
+     * @return \Illuminate\Http\JsonResponse
+     */
+    public function updateStatus(Request $request, $id)
+    {
+        $validator = Validator::make($request->all(), [
+            'corp_id' => 'required|string', // corp_id of the admin/supervisor
+            'empcode' => 'required|string', // empcode of the admin/supervisor
+            'status' => 'required|string|in:Approved,Rejected,Returned',
+            'reject_reason' => 'required_if:status,Rejected|nullable|string',
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json(['status' => false, 'message' => 'Validation failed', 'errors' => $validator->errors()], 422);
+        }
+
+        $adminCorpId = $request->input('corp_id');
+        $adminEmpcode = $request->input('empcode');
+
+        // 1. Authorization Check: Verify if the user making the request is an active admin or supervisor.
+        $isAuthorized = DB::table('userlogin')
+            ->where('corp_id', $adminCorpId)
+            ->where('empcode', $adminEmpcode)
+            ->where('active_yn', 1)
+            ->where(function ($query) {
+                $query->where('admin_yn', 1)->orWhere('supervisor_yn', 1);
+            })
+            ->exists();
+
+        if (!$isAuthorized) {
+            return response()->json(['status' => false, 'message' => 'Access Denied. You do not have permission to perform this action.'], 403);
+        }
+
+        try {
+            // 2. Find the leave request to be updated.
+            $leaveRequest = LeaveRequest::find($id);
+            if (!$leaveRequest) {
+                return response()->json(['status' => false, 'message' => 'Leave request not found.'], 404);
+            }
+
+            // 3. Construct the 'approved_reject_return_by' string for the admin/supervisor.
+            $adminEmployment = DB::table('employment_details')->where('corp_id', $adminCorpId)->where('EmpCode', $adminEmpcode)->first();
+            $adminDetails = DB::table('employee_details')->where('corp_id', $adminCorpId)->where('EmpCode', $adminEmpcode)->first();
+
+            if (!$adminEmployment || !$adminDetails) {
+                return response()->json(['status' => false, 'message' => 'Approver details not found.'], 404);
+            }
+
+            $adminNameParts = array_filter([$adminDetails->FirstName, $adminDetails->MiddleName, $adminDetails->LastName]);
+            $adminFullName = implode(' ', $adminNameParts);
+            $approvedByString = "{$adminEmployment->Designation} - {$adminFullName}";
+
+            // 4. Update the leave request fields.
+            $leaveRequest->status = $request->input('status');
+            $leaveRequest->approved_reject_return_by = $approvedByString;
+            $leaveRequest->reject_reason = $request->input('status') === 'Rejected' ? $request->input('reject_reason') : null;
+            $leaveRequest->save();
+
+            return response()->json([
+                'status' => true,
+                'message' => "Leave request has been successfully {$leaveRequest->status}.",
+                'data' => $leaveRequest
+            ], 200);
+
+        } catch (\Exception $e) {
+            return response()->json(['status' => false, 'message' => 'An error occurred while updating the request.', 'error' => $e->getMessage()], 500);
+        }
+    }
 }

@@ -606,5 +606,8 @@ Route::get('/company-shift-policy/corp/{corp_id}', [CompanyShiftPolicyApiControl
 // Route for submitting a leave request
 Route::post('/leave-request', [LeaveRequestApiController::class, 'store']);
 
-// New dynamic route to fetch leave requests by status (e.g., pending, approved)
+// Dynamic route to fetch leave requests by status
 Route::get('/leave-requests/{status}/{corp_id}/{empcode}', [LeaveRequestApiController::class, 'fetchRequestsByStatus']);
+
+// New route to update the status of a leave request
+Route::patch('/leave-request/{id}', [LeaveRequestApiController::class, 'updateStatus']);
