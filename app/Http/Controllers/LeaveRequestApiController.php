@@ -25,6 +25,7 @@ class LeaveRequestApiController extends Controller
             'from_date' => 'required|date',
             'to_date' => 'required|date|after_or_equal:from_date',
             'reason' => 'nullable|string',
+            'leave_reason_description' => 'nullable|string',
         ]);
 
         if ($validator->fails()) {
@@ -88,6 +89,7 @@ class LeaveRequestApiController extends Controller
                 'from_date' => Carbon::parse($request->input('from_date'))->format('d/m/Y'), // Format date
                 'to_date' => Carbon::parse($request->input('to_date'))->format('d/m/Y'), // Format date
                 'reason' => $request->input('reason'),
+                'leave_reason_description' => $request->input('leave_reason_description'),
                 'status' => 'Pending', // Default status
             ];
 
@@ -165,6 +167,18 @@ class LeaveRequestApiController extends Controller
                     'data' => []
                 ], 200);
             }
+
+            // Calculate totalNoDays for each leave request
+            $leaveRequests->getCollection()->transform(function ($leaveRequest) {
+                try {
+                    $fromDate = Carbon::createFromFormat('d/m/Y', $leaveRequest->from_date);
+                    $toDate = Carbon::createFromFormat('d/m/Y', $leaveRequest->to_date);
+                    $leaveRequest->totalNoDays = $fromDate->diffInDays($toDate) + 1; // +1 to include both start and end dates
+                } catch (\Exception $e) {
+                    $leaveRequest->totalNoDays = 1; // Default to 1 day if date parsing fails
+                }
+                return $leaveRequest;
+            });
 
             return response()->json([
                 'status' => true,
@@ -282,6 +296,18 @@ class LeaveRequestApiController extends Controller
                     'data' => []
                 ], 200);
             }
+
+            // Calculate totalNoDays for each leave request
+            $leaveRequests->getCollection()->transform(function ($leaveRequest) {
+                try {
+                    $fromDate = Carbon::createFromFormat('d/m/Y', $leaveRequest->from_date);
+                    $toDate = Carbon::createFromFormat('d/m/Y', $leaveRequest->to_date);
+                    $leaveRequest->totalNoDays = $fromDate->diffInDays($toDate) + 1; // +1 to include both start and end dates
+                } catch (\Exception $e) {
+                    $leaveRequest->totalNoDays = 1; // Default to 1 day if date parsing fails
+                }
+                return $leaveRequest;
+            });
 
             return response()->json([
                 'status' => true,

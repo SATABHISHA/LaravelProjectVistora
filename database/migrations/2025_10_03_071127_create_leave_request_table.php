@@ -22,6 +22,7 @@ return new class extends Migration
             $table->string('from_date');
             $table->string('to_date');
             $table->text('reason')->nullable();
+            $table->text('leave_reason_description')->nullable();
             $table->string('approved_reject_return_by')->nullable();
             $table->text('reject_reason')->nullable();
             $table->string('status');

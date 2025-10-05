@@ -31,6 +31,7 @@ class LeaveRequest extends Model
         'from_date',
         'to_date',
         'reason',
+        'leave_reason_description',
         'approved_reject_return_by',
         'reject_reason',
         'status',
