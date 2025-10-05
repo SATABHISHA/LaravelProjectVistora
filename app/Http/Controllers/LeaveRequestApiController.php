@@ -144,6 +144,11 @@ class LeaveRequestApiController extends Controller
             // Sanitize the status input (e.g., convert 'pending' to 'Pending')
             $formattedStatus = ucfirst(strtolower($status));
 
+            // Get total count for this specific status and corp_id
+            $totalCount = LeaveRequest::where('corp_id', $corp_id)
+                ->where('status', $formattedStatus)
+                ->count();
+
             // Fetch paginated leave requests with the dynamic status for the given corp_id.
             $perPage = $request->input('per_page', 15);
 
@@ -156,6 +161,7 @@ class LeaveRequestApiController extends Controller
                 return response()->json([
                     'status' => true,
                     'message' => "No {$formattedStatus} leave requests found for this corporate ID.",
+                    'total_count' => $totalCount,
                     'data' => []
                 ], 200);
             }
@@ -163,6 +169,7 @@ class LeaveRequestApiController extends Controller
             return response()->json([
                 'status' => true,
                 'message' => "{$formattedStatus} leave requests retrieved successfully.",
+                'total_count' => $totalCount,
                 'data' => $leaveRequests
             ], 200);
 
