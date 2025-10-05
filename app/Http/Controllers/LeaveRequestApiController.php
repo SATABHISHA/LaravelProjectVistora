@@ -168,7 +168,7 @@ class LeaveRequestApiController extends Controller
                 ], 200);
             }
 
-            // Calculate totalNoDays for each leave request
+            // Calculate totalNoDays and nameInitials for each leave request
             $leaveRequests->getCollection()->transform(function ($leaveRequest) {
                 try {
                     $fromDate = Carbon::createFromFormat('d/m/Y', $leaveRequest->from_date);
@@ -177,6 +177,25 @@ class LeaveRequestApiController extends Controller
                 } catch (\Exception $e) {
                     $leaveRequest->totalNoDays = 1; // Default to 1 day if date parsing fails
                 }
+
+                // Calculate nameInitials from employee details
+                try {
+                    $employeeDetails = DB::table('employee_details')
+                        ->where('corp_id', $leaveRequest->corp_id)
+                        ->where('EmpCode', $leaveRequest->empcode)
+                        ->first();
+                    
+                    if ($employeeDetails) {
+                        $firstInitial = $employeeDetails->FirstName ? strtoupper(substr($employeeDetails->FirstName, 0, 1)) : '';
+                        $lastInitial = $employeeDetails->LastName ? strtoupper(substr($employeeDetails->LastName, 0, 1)) : '';
+                        $leaveRequest->nameInitials = $firstInitial . $lastInitial;
+                    } else {
+                        $leaveRequest->nameInitials = 'NA';
+                    }
+                } catch (\Exception $e) {
+                    $leaveRequest->nameInitials = 'NA';
+                }
+
                 return $leaveRequest;
             });
 
@@ -297,7 +316,7 @@ class LeaveRequestApiController extends Controller
                 ], 200);
             }
 
-            // Calculate totalNoDays for each leave request
+            // Calculate totalNoDays and nameInitials for each leave request
             $leaveRequests->getCollection()->transform(function ($leaveRequest) {
                 try {
                     $fromDate = Carbon::createFromFormat('d/m/Y', $leaveRequest->from_date);
@@ -306,6 +325,25 @@ class LeaveRequestApiController extends Controller
                 } catch (\Exception $e) {
                     $leaveRequest->totalNoDays = 1; // Default to 1 day if date parsing fails
                 }
+
+                // Calculate nameInitials from employee details
+                try {
+                    $employeeDetails = DB::table('employee_details')
+                        ->where('corp_id', $leaveRequest->corp_id)
+                        ->where('EmpCode', $leaveRequest->empcode)
+                        ->first();
+                    
+                    if ($employeeDetails) {
+                        $firstInitial = $employeeDetails->FirstName ? strtoupper(substr($employeeDetails->FirstName, 0, 1)) : '';
+                        $lastInitial = $employeeDetails->LastName ? strtoupper(substr($employeeDetails->LastName, 0, 1)) : '';
+                        $leaveRequest->nameInitials = $firstInitial . $lastInitial;
+                    } else {
+                        $leaveRequest->nameInitials = 'NA';
+                    }
+                } catch (\Exception $e) {
+                    $leaveRequest->nameInitials = 'NA';
+                }
+
                 return $leaveRequest;
             });
 
