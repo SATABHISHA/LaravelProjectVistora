@@ -616,7 +616,5 @@ Route::patch('/leave-request/{id}', [LeaveRequestApiController::class, 'updateSt
 Route::get('/leave-requests/employee/{corp_id}/{company_name}/{empcode}', [LeaveRequestApiController::class, 'fetchForEmployee']);
 
 // Get people on leave today (Approved status)
-Route::get('/leave-requests/on-leave-today/{corp_id}/{empcode}', [LeaveRequestApiController::class, 'getPeopleOnLeaveToday']);
-
-// Get people on leave today by company (for regular employees)
-Route::get('/leave-requests/on-leave-today/company/{corp_id}/{company_name}/{empcode}', [LeaveRequestApiController::class, 'getPeopleOnLeaveTodayByCompany']);
+Route::get('/people-on-leave-today/{corp_id}/{empcode}', [LeaveRequestApiController::class, 'getPeopleOnLeaveToday']);
+Route::get('/people-on-leave-today/company/{corp_id}/{company_name}/{empcode}', [LeaveRequestApiController::class, 'getPeopleOnLeaveTodayByCompany']);
