@@ -361,4 +361,337 @@ class LeaveRequestApiController extends Controller
             ], 500);
         }
     }
+
+    /**
+     * Fetch people who are on leave today (Approved status)
+     * Shows employees whose leave dates include the current date
+     *
+     * @param  \Illuminate\Http\Request  $request
+     * @param  string  $corp_id
+     * @param  string  $empcode The employee code of the user making the request (for authorization)
+     * @return \Illuminate\Http\JsonResponse
+     */
+    public function getPeopleOnLeaveToday(Request $request, $corp_id, $empcode)
+    {
+        // Authorization Check: Verify if the specific user is an active admin or supervisor
+        $isAuthorized = DB::table('userlogin')
+            ->where('corp_id', $corp_id)
+            ->where('empcode', $empcode)
+            ->where('active_yn', 1)
+            ->where(function ($query) {
+                $query->where('admin_yn', 1)
+                      ->orWhere('supervisor_yn', 1);
+            })
+            ->exists();
+
+        if (!$isAuthorized) {
+            return response()->json([
+                'status' => false,
+                'message' => 'Access Denied. You do not have permission to view this information.'
+            ], 403);
+        }
+
+        try {
+            $today = Carbon::today()->format('d/m/Y');
+            $perPage = $request->input('per_page', 15);
+
+            // Query for approved leave requests where today falls between from_date and to_date
+            $query = LeaveRequest::where('corp_id', $corp_id)
+                ->where('status', 'Approved')
+                ->where(function ($dateQuery) use ($today) {
+                    // This handles the date range check for d/m/Y format
+                    $dateQuery->whereRaw("STR_TO_DATE(from_date, '%d/%m/%Y') <= STR_TO_DATE(?, '%d/%m/%Y')", [$today])
+                             ->whereRaw("STR_TO_DATE(to_date, '%d/%m/%Y') >= STR_TO_DATE(?, '%d/%m/%Y')", [$today]);
+                });
+
+            // Get total count before pagination
+            $totalCount = $query->count();
+
+            // Apply pagination
+            $leaveRequests = $query->orderBy('from_date', 'asc')
+                ->paginate($perPage);
+
+            if ($leaveRequests->isEmpty()) {
+                return response()->json([
+                    'status' => true,
+                    'message' => 'No employees are on approved leave today.',
+                    'today_date' => $today,
+                    'total_count' => 0,
+                    'data' => []
+                ], 200);
+            }
+
+            // Transform the data to include additional calculated fields
+            $leaveRequests->getCollection()->transform(function ($leaveRequest) use ($today) {
+                try {
+                    // Calculate total leave days
+                    $fromDate = Carbon::createFromFormat('d/m/Y', $leaveRequest->from_date);
+                    $toDate = Carbon::createFromFormat('d/m/Y', $leaveRequest->to_date);
+                    $leaveRequest->totalNoDays = $fromDate->diffInDays($toDate) + 1;
+
+                    // Calculate remaining days from today
+                    $todayCarbon = Carbon::createFromFormat('d/m/Y', $today);
+                    if ($todayCarbon->lte($toDate)) {
+                        $leaveRequest->remainingDays = $todayCarbon->diffInDays($toDate) + 1;
+                    } else {
+                        $leaveRequest->remainingDays = 0;
+                    }
+
+                    // Days completed so far
+                    if ($todayCarbon->gte($fromDate)) {
+                        $leaveRequest->daysCompleted = $fromDate->diffInDays($todayCarbon) + 1;
+                    } else {
+                        $leaveRequest->daysCompleted = 0;
+                    }
+
+                } catch (\Exception $e) {
+                    $leaveRequest->totalNoDays = 1;
+                    $leaveRequest->remainingDays = 0;
+                    $leaveRequest->daysCompleted = 1;
+                }
+
+                // Get employee details for name initials and additional info
+                try {
+                    $employeeDetails = DB::table('employee_details')
+                        ->where('corp_id', $leaveRequest->corp_id)
+                        ->where('EmpCode', $leaveRequest->empcode)
+                        ->first();
+                    
+                    if ($employeeDetails) {
+                        $firstInitial = $employeeDetails->FirstName ? strtoupper(substr($employeeDetails->FirstName, 0, 1)) : '';
+                        $lastInitial = $employeeDetails->LastName ? strtoupper(substr($employeeDetails->LastName, 0, 1)) : '';
+                        $leaveRequest->nameInitials = $firstInitial . $lastInitial;
+                        
+                        // Add full employee name (separate from full_name which includes designation)
+                        $nameParts = array_filter([
+                            $employeeDetails->FirstName,
+                            $employeeDetails->MiddleName,
+                            $employeeDetails->LastName
+                        ]);
+                        $leaveRequest->employee_name = implode(' ', $nameParts);
+                    } else {
+                        $leaveRequest->nameInitials = 'NA';
+                        $leaveRequest->employee_name = 'Unknown';
+                    }
+
+                    // Get employment details for department/additional info
+                    $employmentDetails = DB::table('employment_details')
+                        ->where('corp_id', $leaveRequest->corp_id)
+                        ->where('EmpCode', $leaveRequest->empcode)
+                        ->first();
+
+                    if ($employmentDetails) {
+                        $leaveRequest->department = $employmentDetails->Department ?? 'N/A';
+                        $leaveRequest->designation = $employmentDetails->Designation ?? 'N/A';
+                    } else {
+                        $leaveRequest->department = 'N/A';
+                        $leaveRequest->designation = 'N/A';
+                    }
+
+                } catch (\Exception $e) {
+                    $leaveRequest->nameInitials = 'NA';
+                    $leaveRequest->employee_name = 'Unknown';
+                    $leaveRequest->department = 'N/A';
+                    $leaveRequest->designation = 'N/A';
+                }
+
+                // Add leave status details
+                $leaveRequest->is_on_leave_today = true; // Since we're filtering for today
+                $leaveRequest->leave_type = $leaveRequest->reason ?: 'General Leave';
+
+                return $leaveRequest;
+            });
+
+            return response()->json([
+                'status' => true,
+                'message' => 'People on leave today retrieved successfully.',
+                'today_date' => $today,
+                'total_count' => $totalCount,
+                'data' => $leaveRequests
+            ], 200);
+
+        } catch (\Exception $e) {
+            return response()->json([
+                'status' => false,
+                'message' => 'An error occurred while fetching people on leave today.',
+                'error' => $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * Fetch people who are on leave today for a specific company
+     * Allows non-admin users to see people on leave in their company only
+     *
+     * @param  \Illuminate\Http\Request  $request
+     * @param  string  $corp_id
+     * @param  string  $company_name
+     * @param  string  $empcode The employee code of the user making the request
+     * @return \Illuminate\Http\JsonResponse
+     */
+    public function getPeopleOnLeaveTodayByCompany(Request $request, $corp_id, $company_name, $empcode)
+    {
+        // Basic authorization: Verify if the user exists and is active
+        $userExists = DB::table('userlogin')
+            ->where('corp_id', $corp_id)
+            ->where('empcode', $empcode)
+            ->where('active_yn', 1)
+            ->exists();
+
+        if (!$userExists) {
+            return response()->json([
+                'status' => false,
+                'message' => 'Access Denied. Invalid user credentials or inactive account.'
+            ], 403);
+        }
+
+        // Verify the user belongs to the requested company
+        $userCompany = DB::table('employment_details')
+            ->where('corp_id', $corp_id)
+            ->where('EmpCode', $empcode)
+            ->where('company_name', $company_name)
+            ->exists();
+
+        if (!$userCompany) {
+            return response()->json([
+                'status' => false,
+                'message' => 'Access Denied. You can only view leave information for your own company.'
+            ], 403);
+        }
+
+        try {
+            $today = Carbon::today()->format('d/m/Y');
+            $perPage = $request->input('per_page', 15);
+
+            // Query for approved leave requests where today falls between from_date and to_date
+            // AND filter by company_name
+            $query = LeaveRequest::where('corp_id', $corp_id)
+                ->where('company_name', $company_name) // Company filter
+                ->where('status', 'Approved')
+                ->where(function ($dateQuery) use ($today) {
+                    // This handles the date range check for d/m/Y format
+                    $dateQuery->whereRaw("STR_TO_DATE(from_date, '%d/%m/%Y') <= STR_TO_DATE(?, '%d/%m/%Y')", [$today])
+                             ->whereRaw("STR_TO_DATE(to_date, '%d/%m/%Y') >= STR_TO_DATE(?, '%d/%m/%Y')", [$today]);
+                });
+
+            // Get total count before pagination
+            $totalCount = $query->count();
+
+            // Apply pagination
+            $leaveRequests = $query->orderBy('from_date', 'asc')
+                ->paginate($perPage);
+
+            if ($leaveRequests->isEmpty()) {
+                return response()->json([
+                    'status' => true,
+                    'message' => "No employees from {$company_name} are on approved leave today.",
+                    'today_date' => $today,
+                    'company_name' => $company_name,
+                    'total_count' => 0,
+                    'data' => []
+                ], 200);
+            }
+
+            // Transform the data to include additional calculated fields
+            $leaveRequests->getCollection()->transform(function ($leaveRequest) use ($today) {
+                try {
+                    // Calculate total leave days
+                    $fromDate = Carbon::createFromFormat('d/m/Y', $leaveRequest->from_date);
+                    $toDate = Carbon::createFromFormat('d/m/Y', $leaveRequest->to_date);
+                    $leaveRequest->totalNoDays = $fromDate->diffInDays($toDate) + 1;
+
+                    // Calculate remaining days from today
+                    $todayCarbon = Carbon::createFromFormat('d/m/Y', $today);
+                    if ($todayCarbon->lte($toDate)) {
+                        $leaveRequest->remainingDays = $todayCarbon->diffInDays($toDate) + 1;
+                    } else {
+                        $leaveRequest->remainingDays = 0;
+                    }
+
+                    // Days completed so far
+                    if ($todayCarbon->gte($fromDate)) {
+                        $leaveRequest->daysCompleted = $fromDate->diffInDays($todayCarbon) + 1;
+                    } else {
+                        $leaveRequest->daysCompleted = 0;
+                    }
+
+                } catch (\Exception $e) {
+                    $leaveRequest->totalNoDays = 1;
+                    $leaveRequest->remainingDays = 0;
+                    $leaveRequest->daysCompleted = 1;
+                }
+
+                // Get employee details for name initials and additional info
+                try {
+                    $employeeDetails = DB::table('employee_details')
+                        ->where('corp_id', $leaveRequest->corp_id)
+                        ->where('EmpCode', $leaveRequest->empcode)
+                        ->first();
+                    
+                    if ($employeeDetails) {
+                        $firstInitial = $employeeDetails->FirstName ? strtoupper(substr($employeeDetails->FirstName, 0, 1)) : '';
+                        $lastInitial = $employeeDetails->LastName ? strtoupper(substr($employeeDetails->LastName, 0, 1)) : '';
+                        $leaveRequest->nameInitials = $firstInitial . $lastInitial;
+                        
+                        // Add full employee name (separate from full_name which includes designation)
+                        $nameParts = array_filter([
+                            $employeeDetails->FirstName,
+                            $employeeDetails->MiddleName,
+                            $employeeDetails->LastName
+                        ]);
+                        $leaveRequest->employee_name = implode(' ', $nameParts);
+                    } else {
+                        $leaveRequest->nameInitials = 'NA';
+                        $leaveRequest->employee_name = 'Unknown';
+                    }
+
+                    // Get employment details for department/additional info
+                    $employmentDetails = DB::table('employment_details')
+                        ->where('corp_id', $leaveRequest->corp_id)
+                        ->where('EmpCode', $leaveRequest->empcode)
+                        ->first();
+
+                    if ($employmentDetails) {
+                        $leaveRequest->department = $employmentDetails->Department ?? 'N/A';
+                        $leaveRequest->designation = $employmentDetails->Designation ?? 'N/A';
+                    } else {
+                        $leaveRequest->department = 'N/A';
+                        $leaveRequest->designation = 'N/A';
+                    }
+
+                } catch (\Exception $e) {
+                    $leaveRequest->nameInitials = 'NA';
+                    $leaveRequest->employee_name = 'Unknown';
+                    $leaveRequest->department = 'N/A';
+                    $leaveRequest->designation = 'N/A';
+                }
+
+                // Add leave status details
+                $leaveRequest->is_on_leave_today = true;
+                $leaveRequest->leave_type = $leaveRequest->reason ?: 'General Leave';
+                
+                // Privacy: Remove sensitive information for non-admin users
+                $leaveRequest->leave_reason_description = 'Private'; // Hide detailed reason
+                $leaveRequest->approved_reject_return_by = $leaveRequest->approved_reject_return_by; // Keep approver info
+
+                return $leaveRequest;
+            });
+
+            return response()->json([
+                'status' => true,
+                'message' => "People on leave today from {$company_name} retrieved successfully.",
+                'today_date' => $today,
+                'company_name' => $company_name,
+                'total_count' => $totalCount,
+                'data' => $leaveRequests
+            ], 200);
+
+        } catch (\Exception $e) {
+            return response()->json([
+                'status' => false,
+                'message' => 'An error occurred while fetching people on leave today.',
+                'error' => $e->getMessage()
+            ], 500);
+        }
+    }
 }
