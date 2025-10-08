@@ -20,6 +20,16 @@ yarn-error.log
 # Generated Excel files
 payroll_export.xlsx
 
+# Downloaded salary slips and PDF files (testing)
+SalarySlip_*.html
+SalarySlip_*.pdf
+SalarySlips_*.zip
+test_response.txt
+
+# Any temporary PDF/HTML files
+temp_*.pdf
+temp_*.html
+
 # macOS system files
 .DS_Store
 .DS_Store?
