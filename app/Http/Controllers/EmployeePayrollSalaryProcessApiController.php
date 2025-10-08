@@ -9,7 +9,7 @@ use App\Models\EmploymentDetail;
 use App\Exports\PayrollExport;
 use App\Exports\ReleasedPayrollExport;
 use Maatwebsite\Excel\Facades\Excel;
-use Barryvdh\DomPDF\Facade\Pdf;
+use Barryvdh\DomPDF\PDF;
 use ZipArchive;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Storage;
@@ -1291,8 +1291,9 @@ class EmployeePayrollSalaryProcessApiController extends Controller
             // Generate filename
             $filename = "SalarySlip_{$empCode}_{$month}_{$year}.pdf";
 
-            // Generate PDF using Laravel Dompdf facade
-            $pdf = Pdf::loadView('salary-slip-pdf', [
+            // Generate PDF using Laravel Dompdf class
+            $pdf = app(PDF::class);
+            $pdf->loadView('salary-slip-pdf', [
                 'data' => $pdfData,
                 'employeeDetails' => $employeeDetails,
                 'summary' => $formattedSummary
@@ -1426,8 +1427,9 @@ class EmployeePayrollSalaryProcessApiController extends Controller
                         ]
                     ];
 
-                    // Generate PDF using Laravel Dompdf facade
-                    $pdf = Pdf::loadView('salary-slip-pdf', [
+                    // Generate PDF using Laravel Dompdf class
+                    $pdf = app(PDF::class);
+                    $pdf->loadView('salary-slip-pdf', [
                         'data' => $pdfData,
                         'employeeDetails' => $empDetails,
                         'summary' => $formattedSummary
