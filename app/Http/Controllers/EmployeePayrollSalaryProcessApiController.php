@@ -1289,6 +1289,7 @@ class EmployeePayrollSalaryProcessApiController extends Controller
 
             // Return HTML view that browsers can print as PDF
             // Users can use Ctrl+P or Cmd+P to print/save as PDF
+            
             return view('salary-slip-pdf', [
                 'data' => $pdfData,
                 'employeeDetails' => $employeeDetails,
