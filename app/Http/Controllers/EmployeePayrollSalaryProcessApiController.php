@@ -887,8 +887,8 @@ class EmployeePayrollSalaryProcessApiController extends Controller
             }
         }
 
-        // Calculate net salary
-        $monthlyNetSalary = $monthlyGross + $monthlyAllowance - $monthlyDeduction;
+        // Calculate net salary (gross - deduction only, allowances are separate)
+        $monthlyNetSalary = $monthlyGross - $monthlyDeduction;
 
         // Calculate annual values
         $annualGross = $monthlyGross * 12;
