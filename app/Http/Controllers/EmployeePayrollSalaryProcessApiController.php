@@ -12,6 +12,8 @@ use Maatwebsite\Excel\Facades\Excel;
 use ZipArchive;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Storage;
+use Dompdf\Dompdf;
+use Illuminate\Support\Facades\Log;
 
 class EmployeePayrollSalaryProcessApiController extends Controller
 {
@@ -1427,7 +1429,7 @@ class EmployeePayrollSalaryProcessApiController extends Controller
                     ])->render();
 
                     // Create PDF with basic Dompdf instantiation
-                    $dompdf = new \Dompdf\Dompdf();
+                    $dompdf = new Dompdf();
                     $dompdf->loadHtml($html);
                     $dompdf->setPaper('A4', 'portrait');
                     $dompdf->render();
@@ -1441,7 +1443,7 @@ class EmployeePayrollSalaryProcessApiController extends Controller
                 } catch (\Exception $e) {
                     $errorCount++;
                     // Log error but continue with other files
-                    \Log::error("Error generating PDF for employee {$payroll->empCode}: " . $e->getMessage());
+                    Log::error("Error generating PDF for employee {$payroll->empCode}: " . $e->getMessage());
                 }
             }
 
