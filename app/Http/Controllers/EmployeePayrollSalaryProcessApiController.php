@@ -1292,11 +1292,14 @@ class EmployeePayrollSalaryProcessApiController extends Controller
             // Return HTML view that browsers can print as PDF
             // Users can use Ctrl+P or Cmd+P to print/save as PDF
             
-            return view('salary-slip-pdf', [
+            $html = view('salary-slip-pdf', [
                 'data' => $pdfData,
                 'employeeDetails' => $employeeDetails,
                 'summary' => $formattedSummary
-            ]);
+            ])->render();
+
+            return response($html, 200)
+                ->header('Content-Type', 'text/html');
 
         } catch (\Exception $e) {
             abort(500, 'Error generating salary slip PDF: ' . $e->getMessage());
@@ -1307,7 +1310,7 @@ class EmployeePayrollSalaryProcessApiController extends Controller
      * Generate and download salary slip PDFs for all employees in a ZIP file
      *
      * @param Request $request
-     * @return \Illuminate\Http\Response
+     * @return \Symfony\Component\HttpFoundation\BinaryFileResponse
      */
     public function downloadAllSalarySlipsPdf(Request $request)
     {
