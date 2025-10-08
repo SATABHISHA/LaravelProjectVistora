@@ -9,8 +9,7 @@ use App\Models\EmploymentDetail;
 use App\Exports\PayrollExport;
 use App\Exports\ReleasedPayrollExport;
 use Maatwebsite\Excel\Facades\Excel;
-use Dompdf\Dompdf;
-use Dompdf\Options;
+use Barryvdh\DomPDF\Facade\Pdf;
 use ZipArchive;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Storage;
@@ -1289,32 +1288,20 @@ class EmployeePayrollSalaryProcessApiController extends Controller
                 ]
             ];
 
-            // Generate PDF
-            $html = view('salary-slip-pdf', [
-                'data' => $pdfData,
-                'employeeDetails' => $employeeDetails,
-                'summary' => $formattedSummary
-            ])->render();
-
-            // Configure PDF options
-            $options = new Options();
-            $options->set('defaultFont', 'Arial');
-            $options->set('isRemoteEnabled', true);
-            $options->set('isHtml5ParserEnabled', true);
-
-            // Create PDF
-            $dompdf = new Dompdf($options);
-            $dompdf->loadHtml($html);
-            $dompdf->setPaper('A4', 'portrait');
-            $dompdf->render();
-
             // Generate filename
             $filename = "SalarySlip_{$empCode}_{$month}_{$year}.pdf";
 
+            // Generate PDF using Laravel Dompdf facade
+            $pdf = Pdf::loadView('salary-slip-pdf', [
+                'data' => $pdfData,
+                'employeeDetails' => $employeeDetails,
+                'summary' => $formattedSummary
+            ]);
+
+            $pdf->setPaper('A4', 'portrait');
+
             // Return PDF as download
-            return response($dompdf->output(), 200)
-                ->header('Content-Type', 'application/pdf')
-                ->header('Content-Disposition', 'attachment; filename="' . $filename . '"');
+            return $pdf->download($filename);
 
         } catch (\Exception $e) {
             abort(500, 'Error generating salary slip PDF: ' . $e->getMessage());
@@ -1373,12 +1360,6 @@ class EmployeePayrollSalaryProcessApiController extends Controller
                 ->where('corp_id', $request->corpId)
                 ->get()
                 ->keyBy('EmpCode');
-
-            // Configure PDF options
-            $options = new Options();
-            $options->set('defaultFont', 'Arial');
-            $options->set('isRemoteEnabled', true);
-            $options->set('isHtml5ParserEnabled', true);
 
             $generatedFiles = [];
             $errorCount = 0;
@@ -1445,23 +1426,19 @@ class EmployeePayrollSalaryProcessApiController extends Controller
                         ]
                     ];
 
-                    // Generate PDF
-                    $html = view('salary-slip-pdf', [
+                    // Generate PDF using Laravel Dompdf facade
+                    $pdf = Pdf::loadView('salary-slip-pdf', [
                         'data' => $pdfData,
                         'employeeDetails' => $empDetails,
                         'summary' => $formattedSummary
-                    ])->render();
+                    ]);
 
-                    // Create PDF
-                    $dompdf = new Dompdf($options);
-                    $dompdf->loadHtml($html);
-                    $dompdf->setPaper('A4', 'portrait');
-                    $dompdf->render();
+                    $pdf->setPaper('A4', 'portrait');
 
                     // Save PDF to temporary directory
                     $filename = "SalarySlip_{$payroll->empCode}_{$request->month}_{$request->year}.pdf";
                     $filePath = $tempDir . '/' . $filename;
-                    file_put_contents($filePath, $dompdf->output());
+                    file_put_contents($filePath, $pdf->output());
                     $generatedFiles[] = $filePath;
 
                 } catch (\Exception $e) {
