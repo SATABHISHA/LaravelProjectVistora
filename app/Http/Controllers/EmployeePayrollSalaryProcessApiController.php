@@ -1287,26 +1287,13 @@ class EmployeePayrollSalaryProcessApiController extends Controller
                 ]
             ];
 
-            // Generate HTML from view
-            $html = view('salary-slip-pdf', [
+            // Return HTML view that browsers can print as PDF
+            // Users can use Ctrl+P or Cmd+P to print/save as PDF
+            return view('salary-slip-pdf', [
                 'data' => $pdfData,
                 'employeeDetails' => $employeeDetails,
                 'summary' => $formattedSummary
-            ])->render();
-
-            // Create PDF with basic Dompdf instantiation
-            $dompdf = new \Dompdf\Dompdf();
-            $dompdf->loadHtml($html);
-            $dompdf->setPaper('A4', 'portrait');
-            $dompdf->render();
-
-            // Generate filename
-            $filename = "SalarySlip_{$empCode}_{$month}_{$year}.pdf";
-
-            // Return PDF as download
-            return response($dompdf->output(), 200)
-                ->header('Content-Type', 'application/pdf')
-                ->header('Content-Disposition', 'attachment; filename="' . $filename . '"');
+            ]);
 
         } catch (\Exception $e) {
             abort(500, 'Error generating salary slip PDF: ' . $e->getMessage());

@@ -88,6 +88,23 @@
             font-size: 10px;
             color: #666;
         }
+        
+        /* Print styles for PDF conversion */
+        @media print {
+            body {
+                margin: 0;
+                padding: 20px;
+            }
+            .no-print {
+                display: none;
+            }
+        }
+        
+        /* Additional styles for browser PDF generation */
+        @page {
+            size: A4;
+            margin: 1cm;
+        }
         .period-info {
             text-align: center;
             margin-bottom: 20px;
@@ -100,6 +117,11 @@
     </style>
 </head>
 <body>
+    <div class="no-print" style="background-color: #e7f3ff; padding: 10px; margin-bottom: 20px; border: 1px solid #b3d9ff; border-radius: 4px;">
+        <strong>📄 Salary Slip Ready!</strong><br>
+        <small>To save as PDF: Press <strong>Ctrl+P</strong> (Windows) or <strong>Cmd+P</strong> (Mac) and choose "Save as PDF"</small>
+    </div>
+
     <div class="header">
         <div class="company-name">{{ $data['companyName'] }}</div>
         <div class="document-title">SALARY SLIP</div>
