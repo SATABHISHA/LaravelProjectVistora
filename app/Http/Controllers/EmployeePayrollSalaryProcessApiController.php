@@ -1269,11 +1269,31 @@ class EmployeePayrollSalaryProcessApiController extends Controller
                 'otherBenefitsAllowances' => array_merge($otherBenefits, $otherAllowances),
             ];
 
+            // Format summary to match expected structure
+            $formattedSummary = [
+                'totalGross' => [
+                    'monthly' => $salarySummary['monthlyGross'],
+                    'annual' => $salarySummary['annualGross']
+                ],
+                'totalDeductions' => [
+                    'monthly' => $salarySummary['monthlyDeduction'],
+                    'annual' => $salarySummary['annualDeduction']
+                ],
+                'totalBenefits' => [
+                    'monthly' => $salarySummary['monthlyAllowance'],
+                    'annual' => $salarySummary['annualAllowance']
+                ],
+                'netSalary' => [
+                    'monthly' => $salarySummary['monthlyNetSalary'],
+                    'annual' => $salarySummary['annualNetSalary']
+                ]
+            ];
+
             // Generate PDF
             $html = view('salary-slip-pdf', [
                 'data' => $pdfData,
                 'employeeDetails' => $employeeDetails,
-                'summary' => $salarySummary
+                'summary' => $formattedSummary
             ])->render();
 
             // Configure PDF options
@@ -1405,11 +1425,31 @@ class EmployeePayrollSalaryProcessApiController extends Controller
                         'otherBenefitsAllowances' => array_merge($otherBenefits, $otherAllowances),
                     ];
 
+                    // Format summary to match expected structure
+                    $formattedSummary = [
+                        'totalGross' => [
+                            'monthly' => $salarySummary['monthlyGross'],
+                            'annual' => $salarySummary['annualGross']
+                        ],
+                        'totalDeductions' => [
+                            'monthly' => $salarySummary['monthlyDeduction'],
+                            'annual' => $salarySummary['annualDeduction']
+                        ],
+                        'totalBenefits' => [
+                            'monthly' => $salarySummary['monthlyAllowance'],
+                            'annual' => $salarySummary['annualAllowance']
+                        ],
+                        'netSalary' => [
+                            'monthly' => $salarySummary['monthlyNetSalary'],
+                            'annual' => $salarySummary['annualNetSalary']
+                        ]
+                    ];
+
                     // Generate PDF
                     $html = view('salary-slip-pdf', [
                         'data' => $pdfData,
                         'employeeDetails' => $empDetails,
-                        'summary' => $salarySummary
+                        'summary' => $formattedSummary
                     ])->render();
 
                     // Create PDF
