@@ -9,6 +9,11 @@ use App\Models\EmploymentDetail;
 use App\Exports\PayrollExport;
 use App\Exports\ReleasedPayrollExport;
 use Maatwebsite\Excel\Facades\Excel;
+use Dompdf\Dompdf;
+use Dompdf\Options;
+use ZipArchive;
+use Illuminate\Support\Facades\File;
+use Illuminate\Support\Facades\Storage;
 
 class EmployeePayrollSalaryProcessApiController extends Controller
 {
@@ -1184,6 +1189,280 @@ class EmployeePayrollSalaryProcessApiController extends Controller
                 'filter' => "corpId: {$request->corpId}, companyName: {$request->companyName}, year: {$request->year}, month: {$request->month}"
             ], 500);
             
+        }
+    }
+
+    /**
+     * Generate and download salary slip PDF for a specific employee
+     *
+     * @param Request $request
+     * @param string $corpId
+     * @param string $empCode
+     * @param string $year
+     * @param string $month
+     * @param string|null $companyName
+     * @return \Illuminate\Http\Response
+     */
+    public function downloadSalarySlipPdf($corpId, $empCode, $year, $month, $companyName = null)
+    {
+        try {
+            // Start building the query
+            $query = EmployeePayrollSalaryProcess::where('corpId', $corpId)
+                ->where('empCode', $empCode)
+                ->where('year', $year)
+                ->where('month', $month);
+            
+            // Add company name filter if provided
+            if ($companyName) {
+                $query->where('companyName', $companyName);
+            }
+            
+            // Get the payroll record
+            $payroll = $query->first();
+
+            if (!$payroll) {
+                abort(404, 'Payroll record not found for the specified employee and period');
+            }
+
+            // Parse JSON data from fields
+            $grossList = json_decode($payroll->grossList, true) ?: [];
+            $otherAllowances = json_decode($payroll->otherAllowances, true) ?: [];
+            $otherBenefits = json_decode($payroll->otherBenefits, true) ?: [];
+            $recurringDeduction = json_decode($payroll->recurringDeduction, true) ?: [];
+
+            // Calculate salary totals
+            $salarySummary = $this->calculateSalaryTotals(
+                $grossList,
+                $otherBenefits, 
+                $recurringDeduction,
+                $otherAllowances
+            );
+
+            // Get employee details
+            $employeeDetail = EmployeeDetail::where('corp_id', $corpId)
+                ->where('EmpCode', $empCode)
+                ->first();
+
+            $employmentDetail = EmploymentDetail::where('corp_id', $corpId)
+                ->where('EmpCode', $empCode)
+                ->first();
+
+            // Prepare employee details for PDF
+            $employeeDetails = [
+                'full_name' => $this->getFullEmployeeName($employeeDetail),
+                'designation' => $employmentDetail->Designation ?? 'N/A',
+                'date_of_joining' => $employmentDetail->dateOfJoining ?? 'N/A',
+                'department' => $employmentDetail->Department ?? 'N/A',
+            ];
+
+            // Prepare data for PDF
+            $pdfData = [
+                'id' => $payroll->id,
+                'corpId' => $payroll->corpId,
+                'empCode' => $payroll->empCode,
+                'companyName' => $payroll->companyName,
+                'year' => $payroll->year,
+                'month' => $payroll->month,
+                'status' => $payroll->status,
+                'gross' => $grossList,
+                'deductions' => $recurringDeduction,
+                'otherBenefitsAllowances' => array_merge($otherBenefits, $otherAllowances),
+            ];
+
+            // Generate PDF
+            $html = view('salary-slip-pdf', [
+                'data' => $pdfData,
+                'employeeDetails' => $employeeDetails,
+                'summary' => $salarySummary
+            ])->render();
+
+            // Configure PDF options
+            $options = new Options();
+            $options->set('defaultFont', 'Arial');
+            $options->set('isRemoteEnabled', true);
+            $options->set('isHtml5ParserEnabled', true);
+
+            // Create PDF
+            $dompdf = new Dompdf($options);
+            $dompdf->loadHtml($html);
+            $dompdf->setPaper('A4', 'portrait');
+            $dompdf->render();
+
+            // Generate filename
+            $filename = "SalarySlip_{$empCode}_{$month}_{$year}.pdf";
+
+            // Return PDF as download
+            return response($dompdf->output(), 200)
+                ->header('Content-Type', 'application/pdf')
+                ->header('Content-Disposition', 'attachment; filename="' . $filename . '"');
+
+        } catch (\Exception $e) {
+            abort(500, 'Error generating salary slip PDF: ' . $e->getMessage());
+        }
+    }
+
+    /**
+     * Generate and download salary slip PDFs for all employees in a ZIP file
+     *
+     * @param Request $request
+     * @return \Illuminate\Http\Response
+     */
+    public function downloadAllSalarySlipsPdf(Request $request)
+    {
+        // Validate required fields
+        $request->validate([
+            'corpId' => 'required|string|max:10',
+            'companyName' => 'required|string|max:100',
+            'year' => 'required|string|max:4',
+            'month' => 'required|string|max:50',
+            'status' => 'nullable|string', // Optional status filter
+        ]);
+
+        try {
+            // Get payroll records
+            $query = EmployeePayrollSalaryProcess::where('corpId', $request->corpId)
+                ->where('companyName', $request->companyName)
+                ->where('year', $request->year)
+                ->where('month', $request->month);
+
+            // Add status filter if provided
+            if ($request->has('status') && !empty($request->status)) {
+                $query->where('status', $request->status);
+            }
+
+            $payrollRecords = $query->get();
+
+            if ($payrollRecords->isEmpty()) {
+                abort(404, 'No payroll records found for the specified period and criteria');
+            }
+
+            // Create temporary directory for PDF files
+            $tempDir = storage_path('app/temp/salary_slips_' . time());
+            File::makeDirectory($tempDir, 0755, true);
+
+            // Get all employee codes
+            $empCodes = $payrollRecords->pluck('empCode')->unique()->toArray();
+            
+            // Fetch employee details in bulk
+            $employeeDetails = EmployeeDetail::whereIn('EmpCode', $empCodes)
+                ->where('corp_id', $request->corpId)
+                ->get()
+                ->keyBy('EmpCode');
+            
+            $employmentDetails = EmploymentDetail::whereIn('EmpCode', $empCodes)
+                ->where('corp_id', $request->corpId)
+                ->get()
+                ->keyBy('EmpCode');
+
+            // Configure PDF options
+            $options = new Options();
+            $options->set('defaultFont', 'Arial');
+            $options->set('isRemoteEnabled', true);
+            $options->set('isHtml5ParserEnabled', true);
+
+            $generatedFiles = [];
+            $errorCount = 0;
+
+            foreach ($payrollRecords as $payroll) {
+                try {
+                    // Parse JSON data from fields
+                    $grossList = json_decode($payroll->grossList, true) ?: [];
+                    $otherAllowances = json_decode($payroll->otherAllowances, true) ?: [];
+                    $otherBenefits = json_decode($payroll->otherBenefits, true) ?: [];
+                    $recurringDeduction = json_decode($payroll->recurringDeduction, true) ?: [];
+
+                    // Calculate salary totals
+                    $salarySummary = $this->calculateSalaryTotals(
+                        $grossList,
+                        $otherBenefits, 
+                        $recurringDeduction,
+                        $otherAllowances
+                    );
+
+                    // Get employee details
+                    $employeeDetail = $employeeDetails->get($payroll->empCode);
+                    $employmentDetail = $employmentDetails->get($payroll->empCode);
+
+                    // Prepare employee details for PDF
+                    $empDetails = [
+                        'full_name' => $this->getFullEmployeeName($employeeDetail),
+                        'designation' => $employmentDetail->Designation ?? 'N/A',
+                        'date_of_joining' => $employmentDetail->dateOfJoining ?? 'N/A',
+                        'department' => $employmentDetail->Department ?? 'N/A',
+                    ];
+
+                    // Prepare data for PDF
+                    $pdfData = [
+                        'id' => $payroll->id,
+                        'corpId' => $payroll->corpId,
+                        'empCode' => $payroll->empCode,
+                        'companyName' => $payroll->companyName,
+                        'year' => $payroll->year,
+                        'month' => $payroll->month,
+                        'status' => $payroll->status,
+                        'gross' => $grossList,
+                        'deductions' => $recurringDeduction,
+                        'otherBenefitsAllowances' => array_merge($otherBenefits, $otherAllowances),
+                    ];
+
+                    // Generate PDF
+                    $html = view('salary-slip-pdf', [
+                        'data' => $pdfData,
+                        'employeeDetails' => $empDetails,
+                        'summary' => $salarySummary
+                    ])->render();
+
+                    // Create PDF
+                    $dompdf = new Dompdf($options);
+                    $dompdf->loadHtml($html);
+                    $dompdf->setPaper('A4', 'portrait');
+                    $dompdf->render();
+
+                    // Save PDF to temporary directory
+                    $filename = "SalarySlip_{$payroll->empCode}_{$request->month}_{$request->year}.pdf";
+                    $filePath = $tempDir . '/' . $filename;
+                    file_put_contents($filePath, $dompdf->output());
+                    $generatedFiles[] = $filePath;
+
+                } catch (\Exception $e) {
+                    $errorCount++;
+                    // Log error but continue with other files
+                    \Log::error("Error generating PDF for employee {$payroll->empCode}: " . $e->getMessage());
+                }
+            }
+
+            if (empty($generatedFiles)) {
+                // Clean up temp directory
+                File::deleteDirectory($tempDir);
+                abort(500, 'Failed to generate any PDF files');
+            }
+
+            // Create ZIP file
+            $statusSuffix = $request->has('status') && !empty($request->status) ? "_{$request->status}" : '';
+            $zipFilename = "SalarySlips_{$request->companyName}_{$request->month}_{$request->year}{$statusSuffix}.zip";
+            $zipPath = $tempDir . '/' . $zipFilename;
+
+            $zip = new ZipArchive;
+            if ($zip->open($zipPath, ZipArchive::CREATE) === TRUE) {
+                foreach ($generatedFiles as $file) {
+                    $zip->addFile($file, basename($file));
+                }
+                $zip->close();
+            } else {
+                // Clean up temp directory
+                File::deleteDirectory($tempDir);
+                abort(500, 'Failed to create ZIP file');
+            }
+
+            // Return ZIP file as download and clean up
+            return response()->download($zipPath, $zipFilename)->deleteFileAfterSend(true);
+
+        } catch (\Exception $e) {
+            // Clean up temp directory if it exists
+            if (isset($tempDir) && File::exists($tempDir)) {
+                File::deleteDirectory($tempDir);
+            }
+            abort(500, 'Error generating salary slip PDFs: ' . $e->getMessage());
         }
     }
 }

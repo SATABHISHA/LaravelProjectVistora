@@ -593,6 +593,10 @@ Route::get('/payroll-salary-process/export-excel', [EmployeePayrollSalaryProcess
 
 Route::get('/payroll/export-released-excel', [EmployeePayrollSalaryProcessApiController::class, 'exportReleasedPayrollExcel']);
 
+// PDF Salary Slip Routes
+Route::get('/salary-slip/download-pdf/{corpId}/{empCode}/{year}/{month}/{companyName?}', [EmployeePayrollSalaryProcessApiController::class, 'downloadSalarySlipPdf']);
+Route::post('/salary-slips/download-all-pdf', [EmployeePayrollSalaryProcessApiController::class, 'downloadAllSalarySlipsPdf']);
+
 // Add these new routes for shift codes and shift names
 Route::get('/shift-policy/shift-codes/{corp_id}', [ShiftPolicyApiController::class, 'getShiftCodesByCorpId']);
 Route::get('/shift-policy/shift-names/{corp_id}/{shift_code}', [ShiftPolicyApiController::class, 'getShiftNamesByCodeAndCorpId']);
