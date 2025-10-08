@@ -321,27 +321,51 @@ class EmployeeAttendanceSummaryApiController extends Controller
     public function index(Request $request)
     {
         try {
+            // Validate input parameters
+            $validator = Validator::make($request->all(), [
+                'corpId' => 'sometimes|string|max:10',
+                'companyName' => 'sometimes|string|max:100',
+                'empCode' => 'sometimes|string|max:20',
+                'month' => 'sometimes|string|max:30',
+                'year' => 'sometimes|string|max:4',
+                'per_page' => 'sometimes|integer|min:1|max:100'
+            ]);
+
+            if ($validator->fails()) {
+                return response()->json([
+                    'status' => false,
+                    'message' => 'Validation failed',
+                    'errors' => $validator->errors()
+                ], 422);
+            }
+
             $query = EmployeeAttendanceSummary::query();
+            $appliedFilters = [];
 
             // Apply filters if provided
-            if ($request->has('corpId')) {
+            if ($request->filled('corpId')) {
                 $query->where('corpId', $request->corpId);
+                $appliedFilters['corpId'] = $request->corpId;
             }
 
-            if ($request->has('companyName')) {
+            if ($request->filled('companyName')) {
                 $query->where('companyName', $request->companyName);
+                $appliedFilters['companyName'] = $request->companyName;
             }
 
-            if ($request->has('empCode')) {
+            if ($request->filled('empCode')) {
                 $query->where('empCode', $request->empCode);
+                $appliedFilters['empCode'] = $request->empCode;
             }
 
-            if ($request->has('month')) {
+            if ($request->filled('month')) {
                 $query->where('month', $request->month);
+                $appliedFilters['month'] = $request->month;
             }
 
-            if ($request->has('year')) {
+            if ($request->filled('year')) {
                 $query->where('year', $request->year);
+                $appliedFilters['year'] = $request->year;
             }
 
             // Get paginated results
@@ -352,6 +376,7 @@ class EmployeeAttendanceSummaryApiController extends Controller
                 return response()->json([
                     'status' => true,
                     'message' => 'No attendance summary records found',
+                    'applied_filters' => $appliedFilters,
                     'data' => []
                 ]);
             }
@@ -359,6 +384,8 @@ class EmployeeAttendanceSummaryApiController extends Controller
             return response()->json([
                 'status' => true,
                 'message' => 'Attendance summaries retrieved successfully',
+                'applied_filters' => $appliedFilters,
+                'total_records' => $attendanceSummaries->total(),
                 'data' => $attendanceSummaries
             ]);
 
