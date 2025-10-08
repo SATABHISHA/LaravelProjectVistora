@@ -79,6 +79,7 @@ use App\Http\Controllers\EmployeePayrollSalaryProcessApiController;
 use App\Http\Controllers\UtilityApiController;
 use App\Http\Controllers\CompanyShiftPolicyApiController;
 use App\Http\Controllers\LeaveRequestApiController;
+use App\Http\Controllers\EmployeeAttendanceSummaryApiController;
 
 /*
 |--------------------------------------------------------------------------
@@ -622,3 +623,10 @@ Route::get('/leave-requests/employee/{corp_id}/{company_name}/{empcode}', [Leave
 // Get people on leave today (Approved status)
 Route::get('/people-on-leave-today/{corp_id}/{empcode}', [LeaveRequestApiController::class, 'getPeopleOnLeaveToday']);
 Route::get('/people-on-leave-today/company/{corp_id}/{company_name}/{empcode}', [LeaveRequestApiController::class, 'getPeopleOnLeaveTodayByCompany']);
+
+// Employee Attendance Summary Routes
+Route::post('/attendance-summary/bulk-insert', [EmployeeAttendanceSummaryApiController::class, 'bulkInsertAttendanceSummary']);
+Route::get('/attendance-summary', [EmployeeAttendanceSummaryApiController::class, 'index']);
+Route::get('/attendance-summary/{id}', [EmployeeAttendanceSummaryApiController::class, 'show']);
+Route::put('/attendance-summary/{id}', [EmployeeAttendanceSummaryApiController::class, 'update']);
+Route::delete('/attendance-summary/{id}', [EmployeeAttendanceSummaryApiController::class, 'destroy']);
