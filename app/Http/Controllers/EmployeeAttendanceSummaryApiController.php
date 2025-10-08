@@ -56,7 +56,7 @@ class EmployeeAttendanceSummaryApiController extends Controller
             }
 
             // Get all attendance data for the specified period
-            $attendanceData = DB::table('attendance')
+            $attendanceData = DB::table('attendances')
                 ->select('empCode', 'attendanceStatus', 'date')
                 ->where('companyName', $companyName)
                 ->where('corpId', $corpId)
@@ -94,7 +94,7 @@ class EmployeeAttendanceSummaryApiController extends Controller
             }
 
             // Get shift policy PUID
-            $shiftPolicy = DB::table('shift_policy')
+            $shiftPolicy = DB::table('shiftpolicy')
                 ->select('puid')
                 ->where('shift_code', $companyShiftPolicy->shift_code)
                 ->where('corp_id', $corpId)
@@ -107,11 +107,24 @@ class EmployeeAttendanceSummaryApiController extends Controller
                 ], 404);
             }
 
+            // Check if the month has 5 weeks
+            $firstDayOfMonth = Carbon::create($year, Carbon::parse($month)->month, 1);
+            $lastDayOfMonth = $firstDayOfMonth->copy()->endOfMonth();
+            $totalWeeks = $firstDayOfMonth->weekOfYear !== $lastDayOfMonth->weekOfYear ? 
+                         $lastDayOfMonth->weekOfMonth : $firstDayOfMonth->weekOfMonth;
+            $hasFiveWeeks = $totalWeeks >= 5;
+
             // Get weekly schedule and calculate week-off days
-            $weeklySchedule = DB::table('shift_policy_weekly_schedule')
-                ->select('time')
-                ->where('puid', $shiftPolicy->puid)
-                ->get();
+            $weeklyScheduleQuery = DB::table('shift_policy_weekly_schedule')
+                ->select('time', 'week_no')
+                ->where('puid', $shiftPolicy->puid);
+
+            // Exclude "Week 5" if the month doesn't have 5 weeks
+            if (!$hasFiveWeeks) {
+                $weeklyScheduleQuery->where('week_no', '!=', 'Week 5');
+            }
+
+            $weeklySchedule = $weeklyScheduleQuery->get();
 
             $weekOffCount = 0;
             foreach ($weeklySchedule as $schedule) {
