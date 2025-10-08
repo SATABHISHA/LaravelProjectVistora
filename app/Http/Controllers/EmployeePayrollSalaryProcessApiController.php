@@ -9,8 +9,6 @@ use App\Models\EmploymentDetail;
 use App\Exports\PayrollExport;
 use App\Exports\ReleasedPayrollExport;
 use Maatwebsite\Excel\Facades\Excel;
-use Dompdf\Dompdf;
-use Dompdf\Options;
 use ZipArchive;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Storage;
@@ -1296,14 +1294,8 @@ class EmployeePayrollSalaryProcessApiController extends Controller
                 'summary' => $formattedSummary
             ])->render();
 
-            // Configure PDF options
-            $options = new Options();
-            $options->set('defaultFont', 'DejaVu Sans');
-            $options->set('isRemoteEnabled', true);
-            $options->set('isHtml5ParserEnabled', true);
-
-            // Create PDF
-            $dompdf = new Dompdf($options);
+            // Create PDF with basic Dompdf instantiation
+            $dompdf = new \Dompdf\Dompdf();
             $dompdf->loadHtml($html);
             $dompdf->setPaper('A4', 'portrait');
             $dompdf->render();
@@ -1446,14 +1438,8 @@ class EmployeePayrollSalaryProcessApiController extends Controller
                         'summary' => $formattedSummary
                     ])->render();
 
-                    // Configure PDF options
-                    $options = new Options();
-                    $options->set('defaultFont', 'DejaVu Sans');
-                    $options->set('isRemoteEnabled', true);
-                    $options->set('isHtml5ParserEnabled', true);
-
-                    // Create PDF
-                    $dompdf = new Dompdf($options);
+                    // Create PDF with basic Dompdf instantiation
+                    $dompdf = new \Dompdf\Dompdf();
                     $dompdf->loadHtml($html);
                     $dompdf->setPaper('A4', 'portrait');
                     $dompdf->render();
