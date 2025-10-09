@@ -12,7 +12,8 @@ use Maatwebsite\Excel\Facades\Excel;
 use ZipArchive;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Storage;
-use Barryvdh\DomPDF\Facade\Pdf;
+use Dompdf\Dompdf;
+use Dompdf\Options;
 use Illuminate\Support\Facades\Log;
 
 class EmployeePayrollSalaryProcessApiController extends Controller
@@ -1468,15 +1469,21 @@ class EmployeePayrollSalaryProcessApiController extends Controller
                         throw new \Exception("Failed to generate view: " . $viewException->getMessage());
                     }
 
-                    // Create PDF with Laravel DomPDF facade
-                    $pdf = Pdf::loadHTML($html);
-                    $pdf->setPaper('A4', 'portrait');
+                    // Create PDF using raw Dompdf with proper configuration
+                    $options = new Options();
+                    $options->set('defaultFont', 'Arial');
+                    $options->set('isRemoteEnabled', true);
+                    
+                    $dompdf = new Dompdf($options);
+                    $dompdf->loadHtml($html);
+                    $dompdf->setPaper('A4', 'portrait');
+                    $dompdf->render();
 
                     // Save PDF to temporary directory
                     $filename = "SalarySlip_{$payroll->empCode}_{$request->month}_{$request->year}.pdf";
                     $filePath = $tempDir . '/' . $filename;
                     
-                    $pdfOutput = $pdf->output();
+                    $pdfOutput = $dompdf->output();
                     if (empty($pdfOutput)) {
                         throw new \Exception("PDF generation produced empty output");
                     }
