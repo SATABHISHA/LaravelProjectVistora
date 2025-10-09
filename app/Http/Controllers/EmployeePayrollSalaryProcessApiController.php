@@ -12,7 +12,7 @@ use Maatwebsite\Excel\Facades\Excel;
 use ZipArchive;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Storage;
-use Dompdf\Dompdf;
+use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Support\Facades\Log;
 
 class EmployeePayrollSalaryProcessApiController extends Controller
@@ -1468,17 +1468,15 @@ class EmployeePayrollSalaryProcessApiController extends Controller
                         throw new \Exception("Failed to generate view: " . $viewException->getMessage());
                     }
 
-                    // Create PDF with error handling
-                    $dompdf = new Dompdf();
-                    $dompdf->loadHtml($html);
-                    $dompdf->setPaper('A4', 'portrait');
-                    $dompdf->render();
+                    // Create PDF with Laravel DomPDF facade
+                    $pdf = Pdf::loadHTML($html);
+                    $pdf->setPaper('A4', 'portrait');
 
                     // Save PDF to temporary directory
                     $filename = "SalarySlip_{$payroll->empCode}_{$request->month}_{$request->year}.pdf";
                     $filePath = $tempDir . '/' . $filename;
                     
-                    $pdfOutput = $dompdf->output();
+                    $pdfOutput = $pdf->output();
                     if (empty($pdfOutput)) {
                         throw new \Exception("PDF generation produced empty output");
                     }
