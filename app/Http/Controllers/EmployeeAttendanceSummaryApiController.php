@@ -346,38 +346,56 @@ class EmployeeAttendanceSummaryApiController extends Controller
                 ], 422);
             }
 
-            $query = EmployeeAttendanceSummary::query();
+            // Join with employee_details to get employee name information
+            $query = DB::table('employee_attendance_summary as eas')
+                ->leftJoin('employee_details as ed', function($join) {
+                    $join->on('eas.empCode', '=', 'ed.EmpCode')
+                         ->on('eas.corpId', '=', 'ed.corp_id');
+                })
+                ->select(
+                    'eas.*',
+                    'ed.FirstName',
+                    'ed.MiddleName', 
+                    'ed.LastName',
+                    DB::raw("TRIM(CONCAT(COALESCE(ed.FirstName, ''), ' ', COALESCE(ed.MiddleName, ''), ' ', COALESCE(ed.LastName, ''))) as employeeFullName"),
+                    DB::raw("CONCAT(
+                        COALESCE(SUBSTRING(ed.FirstName, 1, 1), ''),
+                        COALESCE(SUBSTRING(ed.MiddleName, 1, 1), ''),
+                        COALESCE(SUBSTRING(ed.LastName, 1, 1), '')
+                    ) as nameInitials")
+                );
+
             $appliedFilters = [];
 
             // Apply filters if provided
             if ($request->filled('corpId')) {
-                $query->where('corpId', $request->corpId);
+                $query->where('eas.corpId', $request->corpId);
                 $appliedFilters['corpId'] = $request->corpId;
             }
 
             if ($request->filled('companyName')) {
-                $query->where('companyName', $request->companyName);
+                $query->where('eas.companyName', $request->companyName);
                 $appliedFilters['companyName'] = $request->companyName;
             }
 
             if ($request->filled('empCode')) {
-                $query->where('empCode', $request->empCode);
+                $query->where('eas.empCode', $request->empCode);
                 $appliedFilters['empCode'] = $request->empCode;
             }
 
             if ($request->filled('month')) {
-                $query->where('month', $request->month);
+                $query->where('eas.month', $request->month);
                 $appliedFilters['month'] = $request->month;
             }
 
             if ($request->filled('year')) {
-                $query->where('year', $request->year);
+                $query->where('eas.year', $request->year);
                 $appliedFilters['year'] = $request->year;
             }
 
             // Get paginated results
             $perPage = $request->input('per_page', 15);
-            $attendanceSummaries = $query->orderBy('created_at', 'desc')->paginate($perPage);
+            $attendanceSummaries = $query->orderBy('eas.created_at', 'desc')->paginate($perPage);
 
             if ($attendanceSummaries->isEmpty()) {
                 return response()->json([
