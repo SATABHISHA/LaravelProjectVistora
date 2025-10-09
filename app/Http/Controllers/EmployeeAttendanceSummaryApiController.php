@@ -150,6 +150,10 @@ class EmployeeAttendanceSummaryApiController extends Controller
                 
                 $totalPresent = $employeeAttendance->where('attendanceStatus', 'Present')->count();
                 $totalAbsent = $employeeAttendance->where('attendanceStatus', 'Absent')->count();
+                $totalLeave = $employeeAttendance->where('attendanceStatus', 'Leave')->count();
+                
+                // Count both 'Leave' and 'Absent' as leave for the summary
+                $totalLeaveIncludingAbsent = $totalLeave + $totalAbsent;
                 
                 // Calculate working days (total days in month - holidays - week-offs)
                 $totalDaysInMonth = Carbon::createFromFormat('F Y', $month . ' ' . $year)->daysInMonth;
@@ -163,7 +167,7 @@ class EmployeeAttendanceSummaryApiController extends Controller
                     'workingDays' => $workingDays,
                     'holidays' => $holidays,
                     'weekOff' => $weekOffCount,
-                    'leave' => $totalAbsent, // Absent days count as leave
+                    'leave' => $totalLeaveIncludingAbsent, // Both Leave and Absent days count as leave
                     'month' => $month,
                     'year' => $year,
                     'created_at' => now(),
@@ -551,6 +555,9 @@ class EmployeeAttendanceSummaryApiController extends Controller
                 $totalAbsent = $employeeAttendance->where('attendanceStatus', 'Absent')->count();
                 $totalLeave = $employeeAttendance->where('attendanceStatus', 'Leave')->count();
                 $totalHalfDay = $employeeAttendance->where('attendanceStatus', 'Half Day')->count();
+                
+                // Count both 'Leave' and 'Absent' as leave for the summary
+                $totalLeaveIncludingAbsent = $totalLeave + $totalAbsent;
 
                 // Calculate working days (total days in month - weekends - holidays)
                 $totalDaysInMonth = Carbon::createFromFormat('F Y', $month . ' ' . $year)->daysInMonth;
@@ -564,7 +571,7 @@ class EmployeeAttendanceSummaryApiController extends Controller
                     'workingDays' => $workingDays,
                     'holidays' => $holidays,
                     'weekOff' => $weekOffCount,
-                    'leave' => $totalLeave,
+                    'leave' => $totalLeaveIncludingAbsent,
                     'month' => $month,
                     'year' => $year,
                     'created_at' => now(),
