@@ -690,4 +690,36 @@ class EmployeeAttendanceSummaryApiController extends Controller
 
         return $weekOffCount;
     }
+
+    /**
+     * Check if attendance summary exists for given parameters (route-based)
+     *
+     * @param string $corpId
+     * @param string $companyName
+     * @param string $month
+     * @param string $year
+     * @return \Illuminate\Http\JsonResponse
+     */
+    public function checkAttendanceSummaryExistsByRoute($corpId, $companyName, $month, $year)
+    {
+        try {
+            // Check if attendance summary exists
+            $exists = EmployeeAttendanceSummary::where('corpId', $corpId)
+                ->where('companyName', $companyName)
+                ->where('month', $month)
+                ->where('year', $year)
+                ->exists();
+
+            return response()->json([
+                'status' => $exists
+            ]);
+
+        } catch (\Exception $e) {
+            return response()->json([
+                'status' => false,
+                'message' => 'An error occurred while checking attendance summary',
+                'error' => $e->getMessage()
+            ], 500);
+        }
+    }
 }

@@ -631,3 +631,6 @@ Route::get('/attendance-summary', [EmployeeAttendanceSummaryApiController::class
 Route::get('/attendance-summary/{id}', [EmployeeAttendanceSummaryApiController::class, 'show']);
 Route::put('/attendance-summary/{id}', [EmployeeAttendanceSummaryApiController::class, 'update']);
 Route::delete('/attendance-summary/{id}', [EmployeeAttendanceSummaryApiController::class, 'destroy']);
+
+// Check attendance summary existence (GET with route parameters)
+Route::get('/check-attendance-summary/check-exists/{corpId}/{companyName}/{month}/{year}', [EmployeeAttendanceSummaryApiController::class, 'checkAttendanceSummaryExistsByRoute']);
