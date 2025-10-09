@@ -433,4 +433,236 @@ class EmployeeAttendanceSummaryApiController extends Controller
             ], 500);
         }
     }
+
+    /**
+     * Bulk insert attendance summary with fallback for missing shift policy
+     * Uses Saturday/Sunday as default weekends when shift policy is not found
+     *
+     * @param Request $request
+     * @return \Illuminate\Http\JsonResponse
+     */
+    public function bulkInsertAttendanceSummaryWithFallback(Request $request)
+    {
+        // Validate required fields
+        $validator = Validator::make($request->all(), [
+            'corpId' => 'required|string|max:10',
+            'companyName' => 'required|string|max:100',
+            'month' => 'required|string|max:30',
+            'year' => 'required|string|max:4',
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json([
+                'status' => false,
+                'message' => 'Validation failed',
+                'errors' => $validator->errors()
+            ], 422);
+        }
+
+        try {
+            $corpId = $request->input('corpId');
+            $companyName = $request->input('companyName');
+            $month = $request->input('month');
+            $year = $request->input('year');
+
+            // Check if data already exists for this period
+            $existingRecords = EmployeeAttendanceSummary::where('corpId', $corpId)
+                ->where('companyName', $companyName)
+                ->where('month', $month)
+                ->where('year', $year)
+                ->count();
+
+            if ($existingRecords > 0) {
+                return response()->json([
+                    'status' => false,
+                    'message' => 'Attendance summary already exists for this period',
+                    'period' => $month . ' ' . $year,
+                    'company' => $companyName,
+                    'corpId' => $corpId,
+                    'existing_records' => $existingRecords
+                ], 409);
+            }
+
+            // Get all attendance data for the specified period
+            $attendanceData = DB::table('attendances')
+                ->select('empCode', 'attendanceStatus', 'date')
+                ->where('companyName', $companyName)
+                ->where('corpId', $corpId)
+                ->whereRaw("DATE_FORMAT(date, '%M') = ?", [$month])
+                ->whereRaw("YEAR(date) = ?", [$year])
+                ->get();
+
+            if ($attendanceData->isEmpty()) {
+                return response()->json([
+                    'status' => false,
+                    'message' => 'No attendance data found for the specified period'
+                ], 404);
+            }
+
+            // Get holiday dates for the month
+            $holidays = DB::table('holiday_lists')
+                ->select('holidayDate')
+                ->where('corpId', $corpId)
+                ->whereRaw("DATE_FORMAT(holidayDate, '%M') = ?", [$month])
+                ->whereRaw("YEAR(holidayDate) = ?", [$year])
+                ->count();
+
+            // Try to get company shift policy
+            $companyShiftPolicy = DB::table('company_shift_policy')
+                ->select('shift_code')
+                ->where('company_name', $companyName)
+                ->where('corp_id', $corpId)
+                ->first();
+
+            $weekOffCount = 0;
+            $usedFallback = false;
+
+            if (!$companyShiftPolicy) {
+                // Fallback: Use Saturday/Sunday as weekends
+                $usedFallback = true;
+                $weekOffCount = $this->calculateWeekendDaysWithFallback($month, $year);
+            } else {
+                // Try to get shift policy PUID
+                $shiftPolicy = DB::table('shiftpolicy')
+                    ->select('puid')
+                    ->where('shift_code', $companyShiftPolicy->shift_code)
+                    ->where('corp_id', $corpId)
+                    ->first();
+
+                if (!$shiftPolicy) {
+                    // Fallback: Use Saturday/Sunday as weekends
+                    $usedFallback = true;
+                    $weekOffCount = $this->calculateWeekendDaysWithFallback($month, $year);
+                } else {
+                    // Use shift policy logic
+                    $weekOffCount = $this->calculateWeekOffFromShiftPolicy($shiftPolicy->puid, $month, $year);
+                }
+            }
+
+            // Get unique employee codes from attendance data
+            $empCodes = $attendanceData->pluck('empCode')->unique();
+
+            $summaryData = [];
+            foreach ($empCodes as $empCode) {
+                // Calculate attendance statistics for this employee
+                $employeeAttendance = $attendanceData->where('empCode', $empCode);
+
+                $totalPresent = $employeeAttendance->where('attendanceStatus', 'Present')->count();
+                $totalAbsent = $employeeAttendance->where('attendanceStatus', 'Absent')->count();
+                $totalLeave = $employeeAttendance->where('attendanceStatus', 'Leave')->count();
+                $totalHalfDay = $employeeAttendance->where('attendanceStatus', 'Half Day')->count();
+
+                // Calculate working days (total days in month - weekends - holidays)
+                $totalDaysInMonth = Carbon::createFromFormat('F Y', $month . ' ' . $year)->daysInMonth;
+                $workingDays = $totalDaysInMonth - $weekOffCount - $holidays;
+
+                $summaryData[] = [
+                    'corpId' => $corpId,
+                    'empCode' => $empCode,
+                    'companyName' => $companyName,
+                    'totalPresent' => $totalPresent,
+                    'workingDays' => $workingDays,
+                    'holidays' => $holidays,
+                    'weekOff' => $weekOffCount,
+                    'leave' => $totalLeave,
+                    'month' => $month,
+                    'year' => $year,
+                    'created_at' => now(),
+                    'updated_at' => now(),
+                ];
+            }
+
+            // Bulk insert
+            EmployeeAttendanceSummary::insert($summaryData);
+
+            return response()->json([
+                'status' => true,
+                'message' => 'Attendance summary created successfully for all employees' . ($usedFallback ? ' (using fallback weekend logic)' : ''),
+                'summary' => [
+                    'total_employees_processed' => count($empCodes),
+                    'period' => $month . ' ' . $year,
+                    'company' => $companyName,
+                    'corpId' => $corpId,
+                    'holidays_in_period' => $holidays,
+                    'week_off_days' => $weekOffCount,
+                    'working_days_calculated' => $workingDays,
+                    'used_fallback_logic' => $usedFallback,
+                    'fallback_note' => $usedFallback ? 'Saturday and Sunday treated as weekends' : null
+                ]
+            ]);
+
+        } catch (\Exception $e) {
+            return response()->json([
+                'status' => false,
+                'message' => 'An error occurred while processing attendance summary',
+                'error' => $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * Calculate weekend days using Saturday/Sunday fallback logic
+     *
+     * @param string $month
+     * @param string $year
+     * @return int
+     */
+    private function calculateWeekendDaysWithFallback($month, $year)
+    {
+        $firstDay = Carbon::createFromFormat('F Y', $month . ' ' . $year)->startOfMonth();
+        $lastDay = $firstDay->copy()->endOfMonth();
+        
+        $weekendCount = 0;
+        $current = $firstDay->copy();
+        
+        while ($current->lte($lastDay)) {
+            if ($current->isSaturday() || $current->isSunday()) {
+                $weekendCount++;
+            }
+            $current->addDay();
+        }
+        
+        return $weekendCount;
+    }
+
+    /**
+     * Calculate week off from shift policy with Week 5 validation
+     *
+     * @param string $puid
+     * @param string $month
+     * @param string $year
+     * @return int
+     */
+    private function calculateWeekOffFromShiftPolicy($puid, $month, $year)
+    {
+        // Check if the month has 5 weeks
+        $firstDayOfMonth = Carbon::create($year, Carbon::parse($month)->month, 1);
+        $lastDayOfMonth = $firstDayOfMonth->copy()->endOfMonth();
+        $totalWeeks = $firstDayOfMonth->weekOfYear !== $lastDayOfMonth->weekOfYear ? 
+                     $lastDayOfMonth->weekOfMonth : $firstDayOfMonth->weekOfMonth;
+        $hasFiveWeeks = $totalWeeks >= 5;
+
+        // Get weekly schedule and calculate week-off days
+        $weeklyScheduleQuery = DB::table('shift_policy_weekly_schedule')
+            ->select('time', 'week_no')
+            ->where('puid', $puid);
+
+        // Exclude "Week 5" if the month doesn't have 5 weeks
+        if (!$hasFiveWeeks) {
+            $weeklyScheduleQuery->where('week_no', '!=', 'Week 5');
+        }
+
+        $weeklySchedule = $weeklyScheduleQuery->get();
+
+        $weekOffCount = 0;
+        foreach ($weeklySchedule as $schedule) {
+            if ($schedule->time === 'Full Day') {
+                $weekOffCount += 1;
+            } elseif ($schedule->time === 'Half Day') {
+                $weekOffCount += 0.5;
+            }
+        }
+
+        return $weekOffCount;
+    }
 }

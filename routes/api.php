@@ -626,6 +626,7 @@ Route::get('/people-on-leave-today/company/{corp_id}/{company_name}/{empcode}', 
 
 // Employee Attendance Summary Routes
 Route::post('/attendance-summary/bulk-insert', [EmployeeAttendanceSummaryApiController::class, 'bulkInsertAttendanceSummary']);
+Route::post('/attendance-summary/bulk-insert-with-fallback', [EmployeeAttendanceSummaryApiController::class, 'bulkInsertAttendanceSummaryWithFallback']);
 Route::get('/attendance-summary', [EmployeeAttendanceSummaryApiController::class, 'index']);
 Route::get('/attendance-summary/{id}', [EmployeeAttendanceSummaryApiController::class, 'show']);
 Route::put('/attendance-summary/{id}', [EmployeeAttendanceSummaryApiController::class, 'update']);
