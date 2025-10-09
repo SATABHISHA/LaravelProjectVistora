@@ -51,6 +51,9 @@ class EmployeeAttendanceSummaryApiController extends Controller
                 return response()->json([
                     'status' => false,
                     'message' => 'Attendance summary already exists for this period',
+                    'period' => $month . ' ' . $year,
+                    'company' => $companyName,
+                    'corpId' => $corpId,
                     'existing_records' => $existingRecords
                 ], 409);
             }
