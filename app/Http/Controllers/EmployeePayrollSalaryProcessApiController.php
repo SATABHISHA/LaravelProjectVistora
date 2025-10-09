@@ -1567,8 +1567,16 @@ class EmployeePayrollSalaryProcessApiController extends Controller
                 'year' => $request->year
             ]);
 
-            // Return ZIP file as download and clean up
-            return response()->download($zipPath, $zipFilename)->deleteFileAfterSend(true);
+            // Return ZIP file as direct download with comprehensive CORS headers
+            return response()->download($zipPath, $zipFilename, [
+                'Access-Control-Allow-Origin' => '*',
+                'Access-Control-Allow-Methods' => 'GET, POST, PUT, DELETE, OPTIONS',
+                'Access-Control-Allow-Headers' => 'Content-Type, Authorization, X-Requested-With, Accept, Origin, X-CSRF-Token',
+                'Access-Control-Expose-Headers' => 'Content-Disposition, Content-Type, Content-Length, X-Filename',
+                'Content-Type' => 'application/zip',
+                'Content-Disposition' => 'attachment; filename="' . $zipFilename . '"',
+                'X-Filename' => $zipFilename
+            ])->deleteFileAfterSend(true);
 
         } catch (\Exception $e) {
             // Clean up temp directory if it exists
@@ -1578,5 +1586,7 @@ class EmployeePayrollSalaryProcessApiController extends Controller
             abort(500, 'Error generating salary slip PDFs: ' . $e->getMessage());
         }
     }
+
+
 }
 

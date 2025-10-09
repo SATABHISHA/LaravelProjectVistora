@@ -19,3 +19,24 @@
     RewriteCond %{REQUEST_FILENAME} !-f
     RewriteRule ^ index.php [L]
 </IfModule>
+
+# CORS Headers for API and file downloads
+<IfModule mod_headers.c>
+    # Handle preflight OPTIONS requests
+    RewriteCond %{REQUEST_METHOD} OPTIONS
+    RewriteRule ^(.*)$ $1 [R=200,L]
+
+    # Set CORS headers for all API requests
+    SetEnvIf Request_URI "^/api/" is_api
+    Header always set Access-Control-Allow-Origin "*" env=is_api
+    Header always set Access-Control-Allow-Methods "GET, POST, PUT, DELETE, OPTIONS, PATCH" env=is_api
+    Header always set Access-Control-Allow-Headers "Content-Type, Authorization, X-Requested-With, Accept, Origin, X-CSRF-Token" env=is_api
+    Header always set Access-Control-Expose-Headers "Content-Disposition, Content-Type, Content-Length, X-Filename" env=is_api
+    Header always set Access-Control-Max-Age "86400" env=is_api
+
+    # Specific headers for file downloads
+    <FilesMatch "\.(zip|pdf|xlsx|xls|doc|docx)$">
+        Header always set Access-Control-Allow-Origin "*"
+        Header always set Access-Control-Expose-Headers "Content-Disposition, Content-Type, Content-Length, X-Filename"
+    </FilesMatch>
+</IfModule>

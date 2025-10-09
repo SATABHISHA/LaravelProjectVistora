@@ -1,0 +1,219 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Download Salary Slips</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 600px;
+            margin: 50px auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .form-container {
+            background: white;
+            padding: 30px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        .form-group {
+            margin-bottom: 20px;
+        }
+        label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+            color: #333;
+        }
+        input, select {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            box-sizing: border-box;
+        }
+        button {
+            background-color: #007bff;
+            color: white;
+            padding: 12px 30px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 16px;
+            width: 100%;
+        }
+        button:hover {
+            background-color: #0056b3;
+        }
+        button:disabled {
+            background-color: #6c757d;
+            cursor: not-allowed;
+        }
+        .loading {
+            display: none;
+            text-align: center;
+            margin-top: 20px;
+        }
+        .error {
+            color: #dc3545;
+            margin-top: 10px;
+            display: none;
+        }
+        .success {
+            color: #28a745;
+            margin-top: 10px;
+            display: none;
+        }
+    </style>
+</head>
+<body>
+    <div class="form-container">
+        <h2>Download Bulk Salary Slips</h2>
+        <form id="downloadForm" method="POST" action="http://vistora.sroy.es/public/api/salary-slips/download-all-pdf">
+            <div class="form-group">
+                <label for="corpId">Corporation ID:</label>
+                <input type="text" id="corpId" name="corpId" required maxlength="10">
+            </div>
+            
+            <div class="form-group">
+                <label for="companyName">Company Name:</label>
+                <input type="text" id="companyName" name="companyName" required maxlength="100">
+            </div>
+            
+            <div class="form-group">
+                <label for="year">Year:</label>
+                <input type="text" id="year" name="year" required maxlength="4" pattern="[0-9]{4}" placeholder="2024">
+            </div>
+            
+            <div class="form-group">
+                <label for="month">Month:</label>
+                <input type="text" id="month" name="month" required maxlength="50" placeholder="October">
+            </div>
+            
+            <div class="form-group">
+                <label for="status">Status (Optional):</label>
+                <select id="status" name="status">
+                    <option value="">All Statuses</option>
+                    <option value="draft">Draft</option>
+                    <option value="released">Released</option>
+                    <option value="processed">Processed</option>
+                </select>
+            </div>
+            
+            <button type="submit" id="submitBtn">Download Salary Slips</button>
+            
+            <div class="loading" id="loading">
+                <p>Generating salary slips... This may take a few minutes.</p>
+            </div>
+            
+            <div class="error" id="error">
+                <p id="errorMessage"></p>
+            </div>
+            
+            <div class="success" id="success">
+                <p>Download should start shortly. If it doesn't start automatically, please check your download folder.</p>
+            </div>
+        </form>
+    </div>
+
+    <script>
+        document.getElementById('downloadForm').addEventListener('submit', function(e) {
+            e.preventDefault();
+            
+            const form = this;
+            const submitBtn = document.getElementById('submitBtn');
+            const loading = document.getElementById('loading');
+            const error = document.getElementById('error');
+            const success = document.getElementById('success');
+            const errorMessage = document.getElementById('errorMessage');
+            
+            // Hide previous messages
+            error.style.display = 'none';
+            success.style.display = 'none';
+            
+            // Show loading
+            submitBtn.disabled = true;
+            loading.style.display = 'block';
+            submitBtn.textContent = 'Processing...';
+            
+            // Collect form data
+            const formData = new FormData(form);
+            const data = {};
+            formData.forEach((value, key) => {
+                if (value.trim() !== '') {
+                    data[key] = value.trim();
+                }
+            });
+            
+            // Make the API call
+            fetch(form.action, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Accept': 'application/zip, application/octet-stream',
+                },
+                body: JSON.stringify(data)
+            })
+            .then(response => {
+                if (response.ok) {
+                    // Check if response is a file download
+                    const contentType = response.headers.get('content-type');
+                    if (contentType && contentType.includes('application/zip')) {
+                        return response.blob().then(blob => {
+                            // Create download link
+                            const url = window.URL.createObjectURL(blob);
+                            const a = document.createElement('a');
+                            a.style.display = 'none';
+                            a.href = url;
+                            a.download = `SalarySlips_${data.companyName}_${data.month}_${data.year}.zip`;
+                            document.body.appendChild(a);
+                            a.click();
+                            window.URL.revokeObjectURL(url);
+                            document.body.removeChild(a);
+                            
+                            success.style.display = 'block';
+                        });
+                    } else {
+                        throw new Error('Unexpected response type');
+                    }
+                } else {
+                    return response.text().then(text => {
+                        throw new Error(`HTTP ${response.status}: ${text}`);
+                    });
+                }
+            })
+            .then(() => {
+                // Success handled above
+            })
+            .catch(err => {
+                console.error('Download error:', err);
+                errorMessage.textContent = 'Download failed: ' + err.message;
+                error.style.display = 'block';
+            })
+            .finally(() => {
+                // Reset form state
+                submitBtn.disabled = false;
+                loading.style.display = 'none';
+                submitBtn.textContent = 'Download Salary Slips';
+            });
+        });
+
+        // Auto-populate from URL parameters if provided
+        window.addEventListener('load', function() {
+            const urlParams = new URLSearchParams(window.location.search);
+            
+            ['corpId', 'companyName', 'year', 'month', 'status'].forEach(param => {
+                const value = urlParams.get(param);
+                if (value) {
+                    const element = document.getElementById(param);
+                    if (element) {
+                        element.value = value;
+                    }
+                }
+            });
+        });
+    </script>
+</body>
+</html>
