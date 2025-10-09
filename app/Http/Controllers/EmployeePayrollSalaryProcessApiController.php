@@ -856,40 +856,45 @@ class EmployeePayrollSalaryProcessApiController extends Controller
         $monthlyAllowance = 0.0;
         $monthlyDeduction = 0.0;
 
-        // Calculate gross total
-        if (is_array($grossList)) {
-            foreach ($grossList as $item) {
-                if (isset($item['calculatedValue'])) {
-                    $monthlyGross += (float)$item['calculatedValue'];
+        try {
+            // Calculate gross total with safe processing
+            if (is_array($grossList)) {
+                foreach ($grossList as $item) {
+                    if (is_array($item) && isset($item['calculatedValue']) && is_numeric($item['calculatedValue'])) {
+                        $monthlyGross += (float)$item['calculatedValue'];
+                    }
                 }
             }
-        }
 
-        // Calculate other benefits total
-        if (is_array($otherBenefits)) {
-            foreach ($otherBenefits as $item) {
-                if (isset($item['calculatedValue'])) {
-                    $monthlyAllowance += (float)$item['calculatedValue'];
+            // Calculate other benefits total with safe processing
+            if (is_array($otherBenefits)) {
+                foreach ($otherBenefits as $item) {
+                    if (is_array($item) && isset($item['calculatedValue']) && is_numeric($item['calculatedValue'])) {
+                        $monthlyAllowance += (float)$item['calculatedValue'];
+                    }
                 }
             }
-        }
 
-        // Calculate other allowances total (if provided separately)
-        if (is_array($otherAllowances)) {
-            foreach ($otherAllowances as $item) {
-                if (isset($item['calculatedValue'])) {
-                    $monthlyAllowance += (float)$item['calculatedValue'];
+            // Calculate other allowances total (if provided separately) with safe processing
+            if (is_array($otherAllowances)) {
+                foreach ($otherAllowances as $item) {
+                    if (is_array($item) && isset($item['calculatedValue']) && is_numeric($item['calculatedValue'])) {
+                        $monthlyAllowance += (float)$item['calculatedValue'];
+                    }
                 }
             }
-        }
 
-        // Calculate deductions total
-        if (is_array($recurringDeductions)) {
-            foreach ($recurringDeductions as $item) {
-                if (isset($item['calculatedValue'])) {
-                    $monthlyDeduction += (float)$item['calculatedValue'];
+            // Calculate deductions total with safe processing
+            if (is_array($recurringDeductions)) {
+                foreach ($recurringDeductions as $item) {
+                    if (is_array($item) && isset($item['calculatedValue']) && is_numeric($item['calculatedValue'])) {
+                        $monthlyDeduction += (float)$item['calculatedValue'];
+                    }
                 }
             }
+        } catch (\Exception $e) {
+            // Log calculation error but continue with whatever totals we have
+            Log::warning("Error in salary calculations: " . $e->getMessage());
         }
 
         // Calculate net salary (gross - deduction only, allowances are separate)
@@ -1324,6 +1329,11 @@ class EmployeePayrollSalaryProcessApiController extends Controller
         ]);
 
         try {
+            // Check if the view file exists before processing
+            if (!view()->exists('salary-slip-pdf')) {
+                abort(500, 'Salary slip PDF template not found');
+            }
+
             // Get payroll records
             $query = EmployeePayrollSalaryProcess::where('corpId', $request->corpId)
                 ->where('companyName', $request->companyName)
@@ -1361,14 +1371,32 @@ class EmployeePayrollSalaryProcessApiController extends Controller
 
             $generatedFiles = [];
             $errorCount = 0;
+            $skippedEmployees = [];
+            $totalEmployees = $payrollRecords->count();
 
             foreach ($payrollRecords as $payroll) {
                 try {
-                    // Parse JSON data from fields
-                    $grossList = json_decode($payroll->grossList, true) ?: [];
-                    $otherAllowances = json_decode($payroll->otherAllowances, true) ?: [];
-                    $otherBenefits = json_decode($payroll->otherBenefits, true) ?: [];
-                    $recurringDeduction = json_decode($payroll->recurringDeduction, true) ?: [];
+                    // Validate that we have minimum required data
+                    if (!$payroll->empCode) {
+                        throw new \Exception("Employee code is missing");
+                    }
+
+                    // Parse JSON data from fields with validation
+                    $grossList = json_decode($payroll->grossList, true);
+                    $otherAllowances = json_decode($payroll->otherAllowances, true);
+                    $otherBenefits = json_decode($payroll->otherBenefits, true);
+                    $recurringDeduction = json_decode($payroll->recurringDeduction, true);
+
+                    // Ensure arrays are valid (not null due to JSON decode failure)
+                    $grossList = is_array($grossList) ? $grossList : [];
+                    $otherAllowances = is_array($otherAllowances) ? $otherAllowances : [];
+                    $otherBenefits = is_array($otherBenefits) ? $otherBenefits : [];
+                    $recurringDeduction = is_array($recurringDeduction) ? $recurringDeduction : [];
+
+                    // Check if we have any salary data at all
+                    if (empty($grossList) && empty($otherAllowances) && empty($otherBenefits)) {
+                        throw new \Exception("No salary data found for employee");
+                    }
 
                     // Calculate salary totals
                     $salarySummary = $this->calculateSalaryTotals(
@@ -1378,11 +1406,16 @@ class EmployeePayrollSalaryProcessApiController extends Controller
                         $otherAllowances
                     );
 
-                    // Get employee details
+                    // Validate that we have meaningful salary data
+                    if ($salarySummary['monthlyGross'] <= 0 && $salarySummary['monthlyAllowance'] <= 0) {
+                        throw new \Exception("No valid salary amount found for employee");
+                    }
+
+                    // Get employee details with fallback handling
                     $employeeDetail = $employeeDetails->get($payroll->empCode);
                     $employmentDetail = $employmentDetails->get($payroll->empCode);
 
-                    // Prepare employee details for PDF
+                    // Prepare employee details for PDF with safe defaults
                     $empDetails = [
                         'full_name' => $this->getFullEmployeeName($employeeDetail),
                         'designation' => $employmentDetail->Designation ?? 'N/A',
@@ -1424,14 +1457,18 @@ class EmployeePayrollSalaryProcessApiController extends Controller
                         ]
                     ];
 
-                    // Generate HTML from view
-                    $html = view('salary-slip-pdf', [
-                        'data' => $pdfData,
-                        'employeeDetails' => $empDetails,
-                        'summary' => $formattedSummary
-                    ])->render();
+                    // Generate HTML from view with error handling
+                    try {
+                        $html = view('salary-slip-pdf', [
+                            'data' => $pdfData,
+                            'employeeDetails' => $empDetails,
+                            'summary' => $formattedSummary
+                        ])->render();
+                    } catch (\Exception $viewException) {
+                        throw new \Exception("Failed to generate view: " . $viewException->getMessage());
+                    }
 
-                    // Create PDF with basic Dompdf instantiation
+                    // Create PDF with error handling
                     $dompdf = new Dompdf();
                     $dompdf->loadHtml($html);
                     $dompdf->setPaper('A4', 'portrait');
@@ -1440,23 +1477,47 @@ class EmployeePayrollSalaryProcessApiController extends Controller
                     // Save PDF to temporary directory
                     $filename = "SalarySlip_{$payroll->empCode}_{$request->month}_{$request->year}.pdf";
                     $filePath = $tempDir . '/' . $filename;
-                    file_put_contents($filePath, $dompdf->output());
+                    
+                    $pdfOutput = $dompdf->output();
+                    if (empty($pdfOutput)) {
+                        throw new \Exception("PDF generation produced empty output");
+                    }
+                    
+                    file_put_contents($filePath, $pdfOutput);
                     $generatedFiles[] = $filePath;
 
                 } catch (\Exception $e) {
                     $errorCount++;
-                    // Log error but continue with other files
-                    Log::error("Error generating PDF for employee {$payroll->empCode}: " . $e->getMessage());
+                    $skippedEmployees[] = [
+                        'empCode' => $payroll->empCode ?? 'Unknown',
+                        'error' => $e->getMessage()
+                    ];
+                    
+                    // Log detailed error information
+                    Log::error("Error generating PDF for employee {$payroll->empCode}: " . $e->getMessage(), [
+                        'empCode' => $payroll->empCode,
+                        'corpId' => $payroll->corpId,
+                        'month' => $payroll->month,
+                        'year' => $payroll->year,
+                        'exception' => $e->getTraceAsString()
+                    ]);
                 }
             }
 
+            // Check if we have any files to zip
             if (empty($generatedFiles)) {
                 // Clean up temp directory
                 File::deleteDirectory($tempDir);
-                abort(500, 'Failed to generate any PDF files');
+                
+                $errorMessage = "Failed to generate any PDF files. ";
+                if (!empty($skippedEmployees)) {
+                    $errorMessage .= "Skipped employees: " . collect($skippedEmployees)->pluck('empCode')->join(', ');
+                }
+                
+                abort(500, $errorMessage);
             }
 
-            // Create ZIP file
+            // Create ZIP file with summary information
             $statusSuffix = $request->has('status') && !empty($request->status) ? "_{$request->status}" : '';
             $zipFilename = "SalarySlips_{$request->companyName}_{$request->month}_{$request->year}{$statusSuffix}.zip";
             $zipPath = $tempDir . '/' . $zipFilename;
@@ -1466,12 +1527,45 @@ class EmployeePayrollSalaryProcessApiController extends Controller
                 foreach ($generatedFiles as $file) {
                     $zip->addFile($file, basename($file));
                 }
+                
+                // Add summary file if there were any errors
+                if ($errorCount > 0) {
+                    $summaryContent = "Salary Slips Generation Summary\n";
+                    $summaryContent .= "=====================================\n\n";
+                    $summaryContent .= "Total employees processed: {$totalEmployees}\n";
+                    $summaryContent .= "Successfully generated: " . count($generatedFiles) . "\n";
+                    $summaryContent .= "Failed/Skipped: {$errorCount}\n\n";
+                    
+                    if (!empty($skippedEmployees)) {
+                        $summaryContent .= "Skipped Employees:\n";
+                        $summaryContent .= "==================\n";
+                        foreach ($skippedEmployees as $skipped) {
+                            $summaryContent .= "Employee Code: {$skipped['empCode']}\n";
+                            $summaryContent .= "Reason: {$skipped['error']}\n\n";
+                        }
+                    }
+                    
+                    $summaryPath = $tempDir . '/Generation_Summary.txt';
+                    file_put_contents($summaryPath, $summaryContent);
+                    $zip->addFile($summaryPath, 'Generation_Summary.txt');
+                }
+                
                 $zip->close();
             } else {
                 // Clean up temp directory
                 File::deleteDirectory($tempDir);
                 abort(500, 'Failed to create ZIP file');
             }
+
+            // Log success summary
+            Log::info("Salary slips generated successfully", [
+                'total_employees' => $totalEmployees,
+                'generated_files' => count($generatedFiles),
+                'errors' => $errorCount,
+                'corpId' => $request->corpId,
+                'month' => $request->month,
+                'year' => $request->year
+            ]);
 
             // Return ZIP file as download and clean up
             return response()->download($zipPath, $zipFilename)->deleteFileAfterSend(true);
