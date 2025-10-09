@@ -598,6 +598,9 @@ Route::get('/payroll/export-released-excel', [EmployeePayrollSalaryProcessApiCon
 Route::middleware(['cors'])->group(function () {
     Route::get('/salary-slip/download-pdf/{corpId}/{empCode}/{year}/{month}/{companyName?}', [EmployeePayrollSalaryProcessApiController::class, 'downloadSalarySlipPdf']);
     Route::post('/salary-slips/download-all-pdf', [EmployeePayrollSalaryProcessApiController::class, 'downloadAllSalarySlipsPdf']);
+    
+    // GET route for direct download (FlutterFlow compatibility)
+    Route::get('/salary-slips/download-all-pdf', [EmployeePayrollSalaryProcessApiController::class, 'downloadAllSalarySlipsPdfGet']);
 });
 
 // Add these new routes for shift codes and shift names

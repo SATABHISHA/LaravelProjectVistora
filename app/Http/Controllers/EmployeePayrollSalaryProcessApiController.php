@@ -1587,6 +1587,24 @@ class EmployeePayrollSalaryProcessApiController extends Controller
         }
     }
 
+    /**
+     * Download all salary slips as PDF (GET method for FlutterFlow compatibility)
+     */
+    public function downloadAllSalarySlipsPdfGet(Request $request)
+    {
+        // Validate required fields
+        $request->validate([
+            'corpId' => 'required|string|max:10',
+            'companyName' => 'required|string|max:100',
+            'year' => 'required|string|max:4',
+            'month' => 'required|string|max:50',
+            'status' => 'nullable|string', // Optional status filter
+        ]);
+
+        // Call the existing POST method logic
+        return $this->downloadAllSalarySlipsPdf($request);
+    }
+
 
 }
 
