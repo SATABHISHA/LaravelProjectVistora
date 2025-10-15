@@ -30,11 +30,53 @@ test_response.txt
 temp_*.pdf
 temp_*.html
 
+# Package lock files
+package-lock.json
+yarn.lock
+
+# Setup and documentation files
+setup_instructions.md
+setup.bat
+setup.ps1
+
+# Windows system files
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+*.cab
+*.msi
+*.msix
+*.msm
+*.msp
+*.lnk
+
+# Windows shortcuts
+*.url
+
+# Windows Installer files
+*.msi
+*.msm
+*.msp
+
+# Windows image file caches
+Thumbs.db
+ehthumbs.db
+
+# Folder config file
+[Dd]esktop.ini
+
+# Recycle Bin used on file shares
+$RECYCLE.BIN/
+
+# Windows thumbnail cache files
+Thumbs.db:encryptable
+ehthumbs.db
+ehthumbs_vista.db
+
 # macOS system files
 .DS_Store
 .DS_Store?
 ._*
 .Spotlight-V100
 .Trashes
-ehthumbs.db
-Thumbs.db
