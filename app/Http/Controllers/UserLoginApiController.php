@@ -346,9 +346,9 @@ class UserLoginApiController extends Controller
             }
 
             return [
-                'empcode_with_hyphen' => $employee->EmpCode . '-',
+                'empcode_with_hyphen' => $employee->EmpCode,
                 'full_name' => $fullName,
-                'formatted_display' => $employee->EmpCode . '- ' . $fullName,
+                'formatted_display' => $employee->EmpCode . '- ' .$fullName,
                 'company_name' => $employee->company_name ?? 'N/A'
             ];
         });
