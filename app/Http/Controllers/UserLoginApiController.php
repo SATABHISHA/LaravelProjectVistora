@@ -6,6 +6,8 @@ use Illuminate\Http\Request;
 use App\Models\UserLogin;
 use Illuminate\Support\Facades\Hash;
 use App\Models\CorporateId;
+use App\Models\EmployeeDetail;
+use App\Models\EmploymentDetail;
 
 class UserLoginApiController extends Controller
 {
@@ -278,6 +280,91 @@ class UserLoginApiController extends Controller
         return response()->json([
             'status' => true,
             'message' => 'All required user details (empcode, company_name, username) are present.'
+        ]);
+    }
+
+    /**
+     * Get empcode with hyphen and full name by concatenating firstname, middlename, lastname
+     * with optional company name filter
+     */
+    public function getEmpcodeWithFullName(Request $request)
+    {
+        $request->validate([
+            'corp_id' => 'required|string',
+            'company_name' => 'nullable|string',
+        ]);
+
+        $corp_id = $request->corp_id;
+        $company_name = $request->company_name;
+
+        // Build query to get employees with employment details
+        $query = EmployeeDetail::select(
+                'employee_details.EmpCode',
+                'employee_details.FirstName',
+                'employee_details.MiddleName',
+                'employee_details.LastName',
+                'employment_details.company_name'
+            )
+            ->leftJoin('employment_details', function($join) {
+                $join->on('employee_details.corp_id', '=', 'employment_details.corp_id')
+                     ->on('employee_details.EmpCode', '=', 'employment_details.EmpCode');
+            })
+            ->where('employee_details.corp_id', $corp_id);
+
+        // Add company name filter if provided
+        if ($company_name) {
+            $query->where('employment_details.company_name', $company_name);
+        }
+
+        $employees = $query->get();
+
+        if ($employees->isEmpty()) {
+            $message = $company_name 
+                ? "No employees found for the given corp_id and company_name."
+                : "No employees found for the given corp_id.";
+            
+            return response()->json([
+                'status' => false,
+                'message' => $message
+            ], 404);
+        }
+
+        // Format the data with empcode-hyphen and concatenated full name
+        $data = $employees->map(function ($employee) {
+            // Concatenate names, handling null/empty values
+            $nameParts = array_filter([
+                $employee->FirstName,
+                $employee->MiddleName,
+                $employee->LastName
+            ]);
+            
+            $fullName = implode(' ', $nameParts);
+            
+            // If no name parts, use 'N/A'
+            if (empty($fullName)) {
+                $fullName = 'N/A';
+            }
+
+            return [
+                'empcode_with_hyphen' => $employee->EmpCode . '-',
+                'full_name' => $fullName,
+                'formatted_display' => $employee->EmpCode . '- ' . $fullName,
+                'company_name' => $employee->company_name ?? 'N/A'
+            ];
+        });
+
+        $message = $company_name 
+            ? "Employee data retrieved successfully for company: {$company_name}."
+            : "Employee data retrieved successfully.";
+
+        return response()->json([
+            'status' => true,
+            'message' => $message,
+            'data' => $data,
+            'filters_applied' => [
+                'corp_id' => $corp_id,
+                'company_name' => $company_name ?? 'All companies'
+            ]
         ]);
     }
 }

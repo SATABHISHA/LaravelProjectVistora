@@ -103,6 +103,7 @@ Route::get('/userlogin/userslist', [UserLoginApiController::class, 'index']);
 Route::put('/users/update/{corp_id}/{email_id}', [UserLoginApiController::class, 'update']);
 Route::get('/users/{corp_id}/{email_id}', [UserLoginApiController::class, 'show']);
 Route::get('/user/check-details/{corp_id}/{email_id}', [UserLoginApiController::class, 'checkUserDetails']); // New route added
+Route::post('/userlogin/empcode-fullname', [UserLoginApiController::class, 'getEmpcodeWithFullName']); // New route for empcode with full name
 
 // Company Details Routes
 Route::post('/company/register_company_details', [CompanyDetailsApiController::class, 'register']);
