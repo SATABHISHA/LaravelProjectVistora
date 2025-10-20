@@ -587,6 +587,9 @@ Route::post('/employee-payroll/initiate-selected', [EmployeePayrollSalaryProcess
 // NEW: Get employee details with salary status
 Route::post('/employee-payroll/employee-status', [EmployeePayrollSalaryProcessApiController::class, 'getEmployeeDetailsWithStatus']);
 
+// NEW: Get employee salary status summary with breakdown
+Route::post('/employee-payroll/salary-summary', [EmployeePayrollSalaryProcessApiController::class, 'getEmployeeSalarySummary']);
+
 // Check if payroll is initiated for a specific period
 Route::get('/payroll-salary-process/check-initiated/{corpId}/{companyName}/{year}/{month}', [EmployeePayrollSalaryProcessApiController::class, 'checkPayrollInitiated']);
 

@@ -1776,6 +1776,9 @@ class EmployeePayrollSalaryProcessApiController extends Controller
                     'employee_details.FirstName',
                     'employee_details.MiddleName',
                     'employee_details.LastName',
+                    'employee_details.Mobile',
+                    'employee_details.WorkEmail',
+                    'employee_details.PersonalEmail',
                     'employment_details.company_name',
                     'employment_details.Designation',
                     'employment_details.Department'
@@ -1846,6 +1849,9 @@ class EmployeePayrollSalaryProcessApiController extends Controller
                     'serial_no' => $serialNo++,
                     'empcode' => $employee->EmpCode,
                     'employee_full_name' => trim($fullName) ?: 'N/A',
+                    'mobile_number' => $employee->Mobile ?? 'N/A',
+                    'work_email' => $employee->WorkEmail ?? 'N/A',
+                    'personal_email' => $employee->PersonalEmail ?? 'N/A',
                     'designation' => $employee->Designation ?? 'N/A',
                     'department' => $employee->Department ?? 'N/A',
                     'current_year' => $request->year,
@@ -1877,6 +1883,183 @@ class EmployeePayrollSalaryProcessApiController extends Controller
                 'status' => false,
                 'message' => 'Error retrieving employee details: ' . $e->getMessage(),
                 'filter' => "corpId: {$request->corpId}, companyName: {$request->companyName}",
+                'data' => []
+            ], 500);
+        }
+    }
+
+    /**
+     * Get employee salary status summary with detailed breakdown
+     *
+     * @param Request $request
+     * @return \Illuminate\Http\JsonResponse
+     */
+    public function getEmployeeSalarySummary(Request $request)
+    {
+        // Validate required fields
+        $request->validate([
+            'corpId' => 'required|string|max:10',
+            'companyName' => 'required|string|max:100',
+            'year' => 'required|string|max:4',
+            'month' => 'required|string|max:50',
+        ]);
+
+        try {
+            // Get all employee details with employment details for the company
+            $employeeQuery = EmployeeDetail::where('employee_details.corp_id', $request->corpId)
+                ->join('employment_details', function($join) use ($request) {
+                    $join->on('employee_details.EmpCode', '=', 'employment_details.EmpCode')
+                         ->where('employment_details.corp_id', $request->corpId)
+                         ->where('employment_details.company_name', $request->companyName);
+                })
+                ->select(
+                    'employee_details.EmpCode',
+                    'employee_details.FirstName',
+                    'employee_details.MiddleName',
+                    'employee_details.LastName'
+                );
+
+            $employees = $employeeQuery->get();
+
+            if ($employees->isEmpty()) {
+                return response()->json([
+                    'status' => false,
+                    'message' => 'No employees found for the specified company',
+                    'filter' => "corpId: {$request->corpId}, companyName: {$request->companyName}",
+                    'summary' => [
+                        'total_employees' => 0,
+                        'total_initiated' => 0,
+                        'total_not_initiated' => 0,
+                        'total_released' => 0,
+                        'total_on_hold' => 0,
+                        'total_pending' => 0
+                    ],
+                    'data' => []
+                ]);
+            }
+
+            // Get payroll status for all employees for the specified period
+            $empCodes = $employees->pluck('EmpCode')->toArray();
+            $payrollRecords = EmployeePayrollSalaryProcess::where('corpId', $request->corpId)
+                ->where('companyName', $request->companyName)
+                ->where('year', $request->year)
+                ->where('month', $request->month)
+                ->whereIn('empCode', $empCodes)
+                ->get();
+
+            // Create status mapping
+            $payrollStatuses = $payrollRecords->pluck('status', 'empCode')->toArray();
+
+            // Initialize counters and arrays
+            $totalEmployees = $employees->count();
+            $statusCounts = [
+                'Initiated' => 0,
+                'Not Initiated' => 0,
+                'Released' => 0,
+                'On Hold' => 0,
+                'Pending' => 0
+            ];
+
+            $employeesByStatus = [
+                'initiated_employees' => [],
+                'not_initiated_employees' => [],
+                'released_employees' => [],
+                'on_hold_employees' => [],
+                'pending_employees' => []
+            ];
+
+            // Process each employee
+            foreach ($employees as $employee) {
+                // Build full name
+                $firstName = $employee->FirstName ?? '';
+                $middleName = $employee->MiddleName ?? '';
+                $lastName = $employee->LastName ?? '';
+                
+                $fullName = $firstName;
+                if (!empty($middleName)) {
+                    $fullName .= ' ' . $middleName;
+                }
+                if (!empty($lastName)) {
+                    $fullName .= ' ' . $lastName;
+                }
+
+                $employeeInfo = [
+                    'empcode' => $employee->EmpCode,
+                    'employee_full_name' => trim($fullName) ?: 'N/A'
+                ];
+
+                // Determine status and categorize
+                if (isset($payrollStatuses[$employee->EmpCode])) {
+                    $payrollStatus = $payrollStatuses[$employee->EmpCode];
+                    switch ($payrollStatus) {
+                        case 'Initiated':
+                            $statusCounts['Initiated']++;
+                            $employeesByStatus['initiated_employees'][] = $employeeInfo;
+                            break;
+                        case 'Released':
+                            $statusCounts['Released']++;
+                            $employeesByStatus['released_employees'][] = $employeeInfo;
+                            break;
+                        case 'On Hold':
+                            $statusCounts['On Hold']++;
+                            $employeesByStatus['on_hold_employees'][] = $employeeInfo;
+                            break;
+                        case 'Pending':
+                            $statusCounts['Pending']++;
+                            $employeesByStatus['pending_employees'][] = $employeeInfo;
+                            break;
+                        default:
+                            // Any other status treated as initiated
+                            $statusCounts['Initiated']++;
+                            $employeesByStatus['initiated_employees'][] = $employeeInfo;
+                            break;
+                    }
+                } else {
+                    // No payroll record found
+                    $statusCounts['Not Initiated']++;
+                    $employeesByStatus['not_initiated_employees'][] = $employeeInfo;
+                }
+            }
+
+            // Extract empcode arrays for easy access
+            $empcodesByStatus = [
+                'initiated_empcodes' => collect($employeesByStatus['initiated_employees'])->pluck('empcode')->toArray(),
+                'not_initiated_empcodes' => collect($employeesByStatus['not_initiated_employees'])->pluck('empcode')->toArray(),
+                'released_empcodes' => collect($employeesByStatus['released_employees'])->pluck('empcode')->toArray(),
+                'on_hold_empcodes' => collect($employeesByStatus['on_hold_employees'])->pluck('empcode')->toArray(),
+                'pending_empcodes' => collect($employeesByStatus['pending_employees'])->pluck('empcode')->toArray()
+            ];
+
+            return response()->json([
+                'status' => true,
+                'message' => 'Employee salary summary retrieved successfully',
+                'filter' => "corpId: {$request->corpId}, companyName: {$request->companyName}, year: {$request->year}, month: {$request->month}",
+                'summary' => [
+                    'total_employees' => $totalEmployees,
+                    'total_initiated' => $statusCounts['Initiated'],
+                    'total_not_initiated' => $statusCounts['Not Initiated'],
+                    'total_released' => $statusCounts['Released'],
+                    'total_on_hold' => $statusCounts['On Hold'],
+                    'total_pending' => $statusCounts['Pending'],
+                    'percentage_completed' => $totalEmployees > 0 ? round((($statusCounts['Initiated'] + $statusCounts['Released']) / $totalEmployees) * 100, 2) : 0
+                ],
+                'employee_details' => $employeesByStatus,
+                'empcode_lists' => $empcodesByStatus
+            ]);
+
+        } catch (\Exception $e) {
+            return response()->json([
+                'status' => false,
+                'message' => 'Error retrieving employee salary summary: ' . $e->getMessage(),
+                'filter' => "corpId: {$request->corpId}, companyName: {$request->companyName}",
+                'summary' => [
+                    'total_employees' => 0,
+                    'total_initiated' => 0,
+                    'total_not_initiated' => 0,
+                    'total_released' => 0,
+                    'total_on_hold' => 0,
+                    'total_pending' => 0
+                ],
                 'data' => []
             ], 500);
         }
