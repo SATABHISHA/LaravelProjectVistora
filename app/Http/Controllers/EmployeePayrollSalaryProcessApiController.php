@@ -1610,6 +1610,278 @@ class EmployeePayrollSalaryProcessApiController extends Controller
         return $this->downloadAllSalarySlipsPdf($request);
     }
 
+    /**
+     * Initiate salary processing for specific employees using empcode list
+     *
+     * @param Request $request
+     * @return \Illuminate\Http\JsonResponse
+     */
+    public function initiateSelectedEmployeeSalary(Request $request)
+    {
+        // Validate required fields
+        $request->validate([
+            'corpId' => 'required|string|max:10',
+            'companyName' => 'required|string|max:100',
+            'year' => 'required|string|max:4',
+            'month' => 'required|string|max:50',
+            'empCodes' => 'required|array|min:1',
+            'empCodes.*' => 'required|string|max:20',
+            'status' => 'required|string',
+            'isShownToEmployeeYn' => 'required|integer',
+        ]);
+
+        try {
+            $successCount = 0;
+            $errorCount = 0;
+            $errors = [];
+            $skippedEmployees = [];
+            $processedEmployees = [];
+
+            // Check if any payroll already exists for this period and these employees
+            $existingPayrollQuery = EmployeePayrollSalaryProcess::where('corpId', $request->corpId)
+                ->where('companyName', $request->companyName)
+                ->where('year', $request->year)
+                ->where('month', $request->month)
+                ->whereIn('empCode', $request->empCodes);
+
+            $existingPayrolls = $existingPayrollQuery->get();
+
+            if ($existingPayrolls->isNotEmpty()) {
+                $existingEmpCodes = $existingPayrolls->pluck('empCode')->toArray();
+                return response()->json([
+                    'status' => false,
+                    'message' => 'Payroll for some employees has already been initiated for this period',
+                    'filter' => "corpId: {$request->corpId}, companyName: {$request->companyName}, year: {$request->year}, month: {$request->month}",
+                    'existing_employees' => $existingEmpCodes,
+                    'existing_records_count' => $existingPayrolls->count(),
+                    'duplicate_prevention' => true
+                ], 409);
+            }
+
+            // Get salary structures for the specified employees
+            $salaryStructures = \App\Models\EmployeeSalaryStructure::where('corpId', $request->corpId)
+                ->where('companyName', $request->companyName)
+                ->whereIn('empCode', $request->empCodes)
+                ->get();
+
+            if ($salaryStructures->isEmpty()) {
+                return response()->json([
+                    'status' => false,
+                    'message' => 'No salary structures found for the specified employees',
+                    'filter' => "corpId: {$request->corpId}, companyName: {$request->companyName}",
+                    'requested_employees' => $request->empCodes,
+                    'found_employees' => []
+                ], 404);
+            }
+
+            // Get list of employees found in salary structures
+            $foundEmpCodes = $salaryStructures->pluck('empCode')->toArray();
+            $notFoundEmpCodes = array_diff($request->empCodes, $foundEmpCodes);
+
+            // Process each salary structure
+            foreach ($salaryStructures as $structure) {
+                try {
+                    // Create payroll entry
+                    $payrollData = [
+                        'corpId' => $structure->corpId,
+                        'empCode' => $structure->empCode,
+                        'companyName' => $structure->companyName,
+                        'year' => $request->year,
+                        'month' => $request->month,
+                        'grossList' => $structure->grossList,
+                        'otherAllowances' => $structure->otherAlowances,
+                        'otherBenefits' => $structure->otherBenifits,
+                        'recurringDeduction' => $structure->recurringDeductions,
+                        'status' => $request->status,
+                        'isShownToEmployeeYn' => $request->isShownToEmployeeYn,
+                    ];
+
+                    EmployeePayrollSalaryProcess::create($payrollData);
+
+                    $processedEmployees[] = $structure->empCode;
+                    $successCount++;
+
+                } catch (\Exception $e) {
+                    $errorCount++;
+                    $errors[] = [
+                        'empCode' => $structure->empCode,
+                        'error' => $e->getMessage()
+                    ];
+                }
+            }
+
+            // Add not found employees to skipped list
+            foreach ($notFoundEmpCodes as $empCode) {
+                $skippedEmployees[] = [
+                    'empCode' => $empCode,
+                    'reason' => 'Salary structure not found'
+                ];
+            }
+
+            $filterDescription = "corpId: {$request->corpId}, companyName: {$request->companyName}";
+
+            $response = [
+                'status' => true,
+                'message' => "Successfully initiated salary for {$successCount} employees",
+                'filter' => $filterDescription,
+                'summary' => [
+                    'requested_employees' => count($request->empCodes),
+                    'salary_structures_found' => $salaryStructures->count(),
+                    'successfully_processed' => $successCount,
+                    'processing_errors' => $errorCount,
+                    'employees_not_found' => count($notFoundEmpCodes)
+                ],
+                'processed_employees' => $processedEmployees,
+                'skipped_employees' => $skippedEmployees,
+                'processing_errors' => $errors
+            ];
+
+            return response()->json($response);
+
+        } catch (\Exception $e) {
+            return response()->json([
+                'status' => false,
+                'message' => 'Error initiating selected employee salary: ' . $e->getMessage(),
+                'filter' => "corpId: {$request->corpId}, companyName: {$request->companyName}"
+            ], 500);
+        }
+    }
+
+    /**
+     * Get employee details with salary status for a specific period
+     *
+     * @param Request $request
+     * @return \Illuminate\Http\JsonResponse
+     */
+    public function getEmployeeDetailsWithStatus(Request $request)
+    {
+        // Validate required fields
+        $request->validate([
+            'corpId' => 'required|string|max:10',
+            'companyName' => 'required|string|max:100',
+            'year' => 'required|string|max:4',
+            'month' => 'required|string|max:50',
+        ]);
+
+        try {
+            // Get all employee details with employment details for the company
+            $employeeQuery = EmployeeDetail::where('employee_details.corp_id', $request->corpId)
+                ->join('employment_details', function($join) use ($request) {
+                    $join->on('employee_details.EmpCode', '=', 'employment_details.EmpCode')
+                         ->where('employment_details.corp_id', $request->corpId)
+                         ->where('employment_details.company_name', $request->companyName);
+                })
+                ->select(
+                    'employee_details.EmpCode',
+                    'employee_details.FirstName',
+                    'employee_details.MiddleName',
+                    'employee_details.LastName',
+                    'employment_details.company_name',
+                    'employment_details.Designation',
+                    'employment_details.Department'
+                );
+
+            $employees = $employeeQuery->get();
+
+            if ($employees->isEmpty()) {
+                return response()->json([
+                    'status' => false,
+                    'message' => 'No employees found for the specified company',
+                    'filter' => "corpId: {$request->corpId}, companyName: {$request->companyName}",
+                    'data' => []
+                ]);
+            }
+
+            // Get payroll status for all employees for the specified period
+            $empCodes = $employees->pluck('EmpCode')->toArray();
+            $payrollStatuses = EmployeePayrollSalaryProcess::where('corpId', $request->corpId)
+                ->where('companyName', $request->companyName)
+                ->where('year', $request->year)
+                ->where('month', $request->month)
+                ->whereIn('empCode', $empCodes)
+                ->pluck('status', 'empCode')
+                ->toArray();
+
+            // Format employee details with status
+            $formattedEmployees = [];
+            $serialNo = 1;
+
+            foreach ($employees as $employee) {
+                // Build full name
+                $firstName = $employee->FirstName ?? '';
+                $middleName = $employee->MiddleName ?? '';
+                $lastName = $employee->LastName ?? '';
+                
+                $fullName = $firstName;
+                if (!empty($middleName)) {
+                    $fullName .= ' ' . $middleName;
+                }
+                if (!empty($lastName)) {
+                    $fullName .= ' ' . $lastName;
+                }
+
+                // Determine status
+                $status = 'Not Initiated';
+                if (isset($payrollStatuses[$employee->EmpCode])) {
+                    $payrollStatus = $payrollStatuses[$employee->EmpCode];
+                    switch ($payrollStatus) {
+                        case 'Initiated':
+                            $status = 'Initiated';
+                            break;
+                        case 'On Hold':
+                            $status = 'On Hold';
+                            break;
+                        case 'Released':
+                            $status = 'Released';
+                            break;
+                        case 'Pending':
+                            $status = 'Pending';
+                            break;
+                        default:
+                            $status = $payrollStatus; // Use actual status if it's different
+                    }
+                }
+
+                $formattedEmployees[] = [
+                    'serial_no' => $serialNo++,
+                    'empcode' => $employee->EmpCode,
+                    'employee_full_name' => trim($fullName) ?: 'N/A',
+                    'designation' => $employee->Designation ?? 'N/A',
+                    'department' => $employee->Department ?? 'N/A',
+                    'current_year' => $request->year,
+                    'current_month' => $request->month,
+                    'status' => $status
+                ];
+            }
+
+            // Get status summary
+            $statusSummary = [];
+            foreach ($formattedEmployees as $emp) {
+                $status = $emp['status'];
+                $statusSummary[$status] = ($statusSummary[$status] ?? 0) + 1;
+            }
+
+            return response()->json([
+                'status' => true,
+                'message' => 'Employee details retrieved successfully',
+                'filter' => "corpId: {$request->corpId}, companyName: {$request->companyName}, year: {$request->year}, month: {$request->month}",
+                'summary' => [
+                    'total_employees' => count($formattedEmployees),
+                    'status_breakdown' => $statusSummary
+                ],
+                'data' => $formattedEmployees
+            ]);
+
+        } catch (\Exception $e) {
+            return response()->json([
+                'status' => false,
+                'message' => 'Error retrieving employee details: ' . $e->getMessage(),
+                'filter' => "corpId: {$request->corpId}, companyName: {$request->companyName}",
+                'data' => []
+            ], 500);
+        }
+    }
+
 
 }
 
