@@ -2065,6 +2065,452 @@ class EmployeePayrollSalaryProcessApiController extends Controller
         }
     }
 
+    /**
+     * Get detailed payroll information with branch details (JSON version of export)
+     *
+     * @param Request $request
+     * @return \Illuminate\Http\JsonResponse
+     */
+    public function getDetailedPayrollWithBranches(Request $request)
+    {
+        // Validate required fields
+        $request->validate([
+            'corpId' => 'required|string|max:10',
+            'companyName' => 'required|string|max:100',
+            'year' => 'nullable|string|max:4',
+            'month' => 'nullable|string|max:50',
+            'branch' => 'nullable|string|max:100',
+            'subBranch' => 'nullable|string|max:100',
+            'status' => 'nullable|string|in:Initiated,Released,On Hold,Pending',
+        ]);
+
+        try {
+            // Start building the payroll query
+            $payrollQuery = EmployeePayrollSalaryProcess::where('corpId', $request->corpId)
+                ->where('companyName', $request->companyName);
+
+            // Add optional filters
+            if ($request->has('year') && !empty($request->year)) {
+                $payrollQuery->where('year', $request->year);
+            }
+
+            if ($request->has('month') && !empty($request->month)) {
+                $payrollQuery->where('month', $request->month);
+            }
+
+            if ($request->has('status') && !empty($request->status)) {
+                $payrollQuery->where('status', $request->status);
+            }
+
+            $payrollRecords = $payrollQuery->get();
+
+            if ($payrollRecords->isEmpty()) {
+                return response()->json([
+                    'status' => false,
+                    'message' => 'No payroll records found for the specified criteria',
+                    'filter' => $this->buildFilterDescription($request),
+                    'data' => [],
+                    'summary' => [
+                        'total_records' => 0,
+                        'total_branches' => 0,
+                        'total_employees' => 0
+                    ]
+                ]);
+            }
+
+            // Get all employee codes from payroll records
+            $empCodes = $payrollRecords->pluck('empCode')->unique()->toArray();
+            
+            // Fetch employee details
+            $employeeDetails = EmployeeDetail::whereIn('EmpCode', $empCodes)
+                ->where('corp_id', $request->corpId)
+                ->get()
+                ->keyBy('EmpCode');
+            
+            // Build employment details query with branch filters
+            $employmentDetailsQuery = EmploymentDetail::whereIn('EmpCode', $empCodes)
+                ->where('corp_id', $request->corpId)
+                ->where('company_name', $request->companyName);
+            
+            // Apply branch filters if provided
+            if ($request->has('branch') && !empty($request->branch)) {
+                $employmentDetailsQuery->where('Branch', $request->branch);
+            }
+            
+            if ($request->has('subBranch') && !empty($request->subBranch)) {
+                $employmentDetailsQuery->where('SubBranch', $request->subBranch);
+            }
+            
+            $employmentDetails = $employmentDetailsQuery->get()->keyBy('EmpCode');
+
+            // Filter payroll records based on employment details (if branch filters applied)
+            if (($request->has('branch') && !empty($request->branch)) || 
+                ($request->has('subBranch') && !empty($request->subBranch))) {
+                $filteredEmpCodes = $employmentDetails->pluck('EmpCode')->toArray();
+                $payrollRecords = $payrollRecords->whereIn('empCode', $filteredEmpCodes);
+            }
+
+            if ($payrollRecords->isEmpty()) {
+                return response()->json([
+                    'status' => false,
+                    'message' => 'No payroll records found after applying branch filters',
+                    'filter' => $this->buildFilterDescription($request),
+                    'data' => [],
+                    'summary' => [
+                        'total_records' => 0,
+                        'total_branches' => 0,
+                        'total_employees' => 0
+                    ]
+                ]);
+            }
+
+            $detailedPayrollData = [];
+            $dynamicComponents = [];
+            $branchSummary = [];
+            $totalAmounts = [
+                'total_gross' => 0,
+                'total_benefits' => 0,
+                'total_deductions' => 0,
+                'total_net_salary' => 0
+            ];
+
+            // First pass: collect all dynamic component names
+            foreach ($payrollRecords as $record) {
+                $grossList = $this->safeJsonDecode($record->grossList);
+                $otherAllowances = $this->safeJsonDecode($record->otherAllowances);
+                $otherBenefits = $this->safeJsonDecode($record->otherBenefits);
+                $recurringDeductions = $this->safeJsonDecode($record->recurringDeduction);
+
+                foreach ($grossList as $item) {
+                    $componentName = $item['componentName'] ?? 'Unknown Component';
+                    $dynamicComponents['gross'][$componentName] = true;
+                }
+                foreach ($otherAllowances as $item) {
+                    $componentName = $item['componentName'] ?? 'Unknown Component';
+                    $dynamicComponents['allowances'][$componentName] = true;
+                }
+                foreach ($otherBenefits as $item) {
+                    $componentName = $item['componentName'] ?? 'Unknown Component';
+                    $dynamicComponents['benefits'][$componentName] = true;
+                }
+                foreach ($recurringDeductions as $item) {
+                    $componentName = $item['componentName'] ?? 'Unknown Component';
+                    $dynamicComponents['deductions'][$componentName] = true;
+                }
+            }
+
+            // Second pass: process each payroll record
+            $serialNo = 1;
+            foreach ($payrollRecords as $record) {
+                $employeeDetail = $employeeDetails->get($record->empCode);
+                $employmentDetail = $employmentDetails->get($record->empCode);
+
+                if (!$employmentDetail) {
+                    continue; // Skip if employment detail not found
+                }
+
+                // Get full name
+                $fullName = $this->getFullEmployeeName($employeeDetail);
+
+                // Parse JSON fields
+                $grossList = $this->safeJsonDecode($record->grossList);
+                $otherAllowances = $this->safeJsonDecode($record->otherAllowances);
+                $otherBenefits = $this->safeJsonDecode($record->otherBenefits);
+                $recurringDeductions = $this->safeJsonDecode($record->recurringDeduction);
+
+                // Calculate salary components
+                $salaryBreakdown = $this->calculateDetailedSalaryBreakdown(
+                    $grossList, 
+                    $otherAllowances, 
+                    $otherBenefits, 
+                    $recurringDeductions,
+                    $dynamicComponents
+                );
+
+                // Build branch summary
+                $branch = $employmentDetail->Branch ?? 'N/A';
+                $subBranch = $employmentDetail->SubBranch ?? 'N/A';
+                $branchKey = $branch . '|' . $subBranch;
+                
+                if (!isset($branchSummary[$branchKey])) {
+                    $branchSummary[$branchKey] = [
+                        'branch' => $branch,
+                        'sub_branch' => $subBranch,
+                        'employee_count' => 0,
+                        'total_gross' => 0,
+                        'total_net_salary' => 0
+                    ];
+                }
+                $branchSummary[$branchKey]['employee_count']++;
+                $branchSummary[$branchKey]['total_gross'] += $salaryBreakdown['monthly_gross_total'];
+                $branchSummary[$branchKey]['total_net_salary'] += $salaryBreakdown['monthly_net_salary'];
+
+                // Add to overall totals
+                $totalAmounts['total_gross'] += $salaryBreakdown['monthly_gross_total'];
+                $totalAmounts['total_benefits'] += $salaryBreakdown['monthly_benefits_total'];
+                $totalAmounts['total_deductions'] += $salaryBreakdown['monthly_deductions_total'];
+                $totalAmounts['total_net_salary'] += $salaryBreakdown['monthly_net_salary'];
+
+                // Build detailed record
+                $detailedRecord = [
+                    'serial_no' => $serialNo++,
+                    'employee_details' => [
+                        'empcode' => $record->empCode,
+                        'employee_full_name' => $fullName ?: 'N/A',
+                        'mobile_number' => $employeeDetail->Mobile ?? 'N/A',
+                        'work_email' => $employeeDetail->WorkEmail ?? 'N/A',
+                        'designation' => $employmentDetail->Designation ?? 'N/A',
+                        'department' => $employmentDetail->Department ?? 'N/A',
+                        'date_of_joining' => $employmentDetail->dateOfJoining ?? 'N/A',
+                        'branch' => $branch,
+                        'sub_branch' => $subBranch,
+                        'region' => $employmentDetail->Region ?? 'N/A',
+                        'business_unit' => $employmentDetail->BusinessUnit ?? 'N/A'
+                    ],
+                    'payroll_details' => [
+                        'corp_id' => $record->corpId,
+                        'company_name' => $record->companyName,
+                        'year' => $record->year,
+                        'month' => $record->month,
+                        'status' => $record->status,
+                        'is_shown_to_employee' => $record->isShownToEmployeeYn
+                    ],
+                    'salary_breakdown' => $salaryBreakdown,
+                    'salary_summary' => [
+                        'monthly_gross_total' => round($salaryBreakdown['monthly_gross_total'], 2),
+                        'monthly_benefits_total' => round($salaryBreakdown['monthly_benefits_total'], 2),
+                        'monthly_deductions_total' => round($salaryBreakdown['monthly_deductions_total'], 2),
+                        'monthly_net_salary' => round($salaryBreakdown['monthly_net_salary'], 2),
+                        'annual_gross_total' => round($salaryBreakdown['monthly_gross_total'] * 12, 2),
+                        'annual_net_salary' => round($salaryBreakdown['monthly_net_salary'] * 12, 2)
+                    ]
+                ];
+
+                $detailedPayrollData[] = $detailedRecord;
+            }
+
+            // Prepare branch list for filtering
+            $branchList = collect($branchSummary)->map(function($summary) {
+                return [
+                    'branch' => $summary['branch'],
+                    'sub_branch' => $summary['sub_branch'],
+                    'employee_count' => $summary['employee_count'],
+                    'total_gross' => round($summary['total_gross'], 2),
+                    'total_net_salary' => round($summary['total_net_salary'], 2)
+                ];
+            })->values()->toArray();
+
+            return response()->json([
+                'status' => true,
+                'message' => 'Detailed payroll information retrieved successfully',
+                'filter' => $this->buildFilterDescription($request),
+                'summary' => [
+                    'total_records' => count($detailedPayrollData),
+                    'total_branches' => count($branchSummary),
+                    'total_employees' => count($detailedPayrollData),
+                    'total_gross_amount' => round($totalAmounts['total_gross'], 2),
+                    'total_benefits_amount' => round($totalAmounts['total_benefits'], 2),
+                    'total_deductions_amount' => round($totalAmounts['total_deductions'], 2),
+                    'total_net_salary_amount' => round($totalAmounts['total_net_salary'], 2)
+                ],
+                'branch_summary' => $branchList,
+                'dynamic_components' => [
+                    'gross_components' => array_keys($dynamicComponents['gross'] ?? []),
+                    'allowance_components' => array_keys($dynamicComponents['allowances'] ?? []),
+                    'benefit_components' => array_keys($dynamicComponents['benefits'] ?? []),
+                    'deduction_components' => array_keys($dynamicComponents['deductions'] ?? [])
+                ],
+                'data' => $detailedPayrollData
+            ]);
+
+        } catch (\Exception $e) {
+            return response()->json([
+                'status' => false,
+                'message' => 'Error retrieving detailed payroll information: ' . $e->getMessage(),
+                'filter' => $this->buildFilterDescription($request),
+                'data' => []
+            ], 500);
+        }
+    }
+
+    /**
+     * Helper method to build filter description string
+     */
+    private function buildFilterDescription($request)
+    {
+        $filters = [];
+        $filters[] = "corpId: {$request->corpId}";
+        $filters[] = "companyName: {$request->companyName}";
+        
+        if ($request->has('year') && !empty($request->year)) {
+            $filters[] = "year: {$request->year}";
+        }
+        if ($request->has('month') && !empty($request->month)) {
+            $filters[] = "month: {$request->month}";
+        }
+        if ($request->has('branch') && !empty($request->branch)) {
+            $filters[] = "branch: {$request->branch}";
+        }
+        if ($request->has('subBranch') && !empty($request->subBranch)) {
+            $filters[] = "subBranch: {$request->subBranch}";
+        }
+        if ($request->has('status') && !empty($request->status)) {
+            $filters[] = "status: {$request->status}";
+        }
+        
+        return implode(', ', $filters);
+    }
+
+    /**
+     * Helper method to calculate detailed salary breakdown with dynamic components
+     */
+    private function calculateDetailedSalaryBreakdown($grossList, $otherAllowances, $otherBenefits, $recurringDeductions, $dynamicComponents)
+    {
+        $breakdown = [
+            'gross_components' => [],
+            'allowance_components' => [],
+            'benefit_components' => [],
+            'deduction_components' => [],
+            'monthly_gross_total' => 0,
+            'monthly_benefits_total' => 0,
+            'monthly_deductions_total' => 0,
+            'monthly_net_salary' => 0
+        ];
+
+        // Initialize all possible components with 0
+        foreach ($dynamicComponents['gross'] ?? [] as $componentName => $true) {
+            $breakdown['gross_components'][$componentName] = 0;
+        }
+        foreach ($dynamicComponents['allowances'] ?? [] as $componentName => $true) {
+            $breakdown['allowance_components'][$componentName] = 0;
+        }
+        foreach ($dynamicComponents['benefits'] ?? [] as $componentName => $true) {
+            $breakdown['benefit_components'][$componentName] = 0;
+        }
+        foreach ($dynamicComponents['deductions'] ?? [] as $componentName => $true) {
+            $breakdown['deduction_components'][$componentName] = 0;
+        }
+
+        // Process gross components
+        foreach ($grossList as $item) {
+            $componentName = $item['componentName'] ?? 'Unknown Component';
+            $value = (float)($item['calculatedValue'] ?? 0);
+            $breakdown['gross_components'][$componentName] = $value;
+            $breakdown['monthly_gross_total'] += $value;
+        }
+
+        // Process allowance components
+        foreach ($otherAllowances as $item) {
+            $componentName = $item['componentName'] ?? 'Unknown Component';
+            $value = (float)($item['calculatedValue'] ?? 0);
+            $breakdown['allowance_components'][$componentName] = $value;
+            $breakdown['monthly_benefits_total'] += $value;
+        }
+
+        // Process benefit components
+        foreach ($otherBenefits as $item) {
+            $componentName = $item['componentName'] ?? 'Unknown Component';
+            $value = (float)($item['calculatedValue'] ?? 0);
+            $breakdown['benefit_components'][$componentName] = $value;
+            $breakdown['monthly_benefits_total'] += $value;
+        }
+
+        // Process deduction components
+        foreach ($recurringDeductions as $item) {
+            $componentName = $item['componentName'] ?? 'Unknown Component';
+            $value = (float)($item['calculatedValue'] ?? 0);
+            $breakdown['deduction_components'][$componentName] = $value;
+            $breakdown['monthly_deductions_total'] += $value;
+        }
+
+        // Calculate net salary
+        $breakdown['monthly_net_salary'] = $breakdown['monthly_gross_total'] + $breakdown['monthly_benefits_total'] - $breakdown['monthly_deductions_total'];
+
+        return $breakdown;
+    }
+
+    /**
+     * Get list of all branches for a company (for filtering purposes)
+     *
+     * @param Request $request
+     * @return \Illuminate\Http\JsonResponse
+     */
+    public function getBranchList(Request $request)
+    {
+        // Validate required fields
+        $request->validate([
+            'corpId' => 'required|string|max:10',
+            'companyName' => 'required|string|max:100'
+        ]);
+
+        try {
+            // Get all unique branches and sub-branches for the company
+            $branches = EmploymentDetail::where('corp_id', $request->corpId)
+                ->where('company_name', $request->companyName)
+                ->select('Branch', 'SubBranch')
+                ->distinct()
+                ->whereNotNull('Branch')
+                ->orderBy('Branch')
+                ->orderBy('SubBranch')
+                ->get();
+
+            $branchList = [];
+            $branchSummary = [];
+
+            foreach ($branches as $branch) {
+                $branchName = $branch->Branch ?? 'N/A';
+                $subBranchName = $branch->SubBranch ?? 'N/A';
+
+                $branchList[] = [
+                    'branch' => $branchName,
+                    'sub_branch' => $subBranchName,
+                    'combined_name' => $branchName . ($subBranchName !== 'N/A' ? ' - ' . $subBranchName : '')
+                ];
+
+                // Count employees per branch
+                if (!isset($branchSummary[$branchName])) {
+                    $branchSummary[$branchName] = [
+                        'branch_name' => $branchName,
+                        'sub_branches' => [],
+                        'total_employees' => 0
+                    ];
+                }
+
+                $employeeCount = EmploymentDetail::where('corp_id', $request->corpId)
+                    ->where('company_name', $request->companyName)
+                    ->where('Branch', $branchName)
+                    ->where('SubBranch', $subBranchName)
+                    ->count();
+
+                $branchSummary[$branchName]['sub_branches'][] = [
+                    'sub_branch_name' => $subBranchName,
+                    'employee_count' => $employeeCount
+                ];
+                $branchSummary[$branchName]['total_employees'] += $employeeCount;
+            }
+
+            return response()->json([
+                'status' => true,
+                'message' => 'Branch list retrieved successfully',
+                'filter' => "corpId: {$request->corpId}, companyName: {$request->companyName}",
+                'data' => [
+                    'all_branches' => $branchList,
+                    'branch_summary' => array_values($branchSummary),
+                    'unique_branches' => array_unique(collect($branchList)->pluck('branch')->toArray()),
+                    'unique_sub_branches' => array_unique(collect($branchList)->pluck('sub_branch')->toArray())
+                ]
+            ]);
+
+        } catch (\Exception $e) {
+            return response()->json([
+                'status' => false,
+                'message' => 'Error retrieving branch list: ' . $e->getMessage(),
+                'filter' => "corpId: {$request->corpId}, companyName: {$request->companyName}",
+                'data' => []
+            ], 500);
+        }
+    }
+
 
 }
 

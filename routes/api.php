@@ -590,6 +590,12 @@ Route::post('/employee-payroll/employee-status', [EmployeePayrollSalaryProcessAp
 // NEW: Get employee salary status summary with breakdown
 Route::post('/employee-payroll/salary-summary', [EmployeePayrollSalaryProcessApiController::class, 'getEmployeeSalarySummary']);
 
+// NEW: Get detailed payroll information with branch details (JSON version of export)
+Route::post('/employee-payroll/detailed-payroll-with-branches', [EmployeePayrollSalaryProcessApiController::class, 'getDetailedPayrollWithBranches']);
+
+// NEW: Get list of all branches for filtering
+Route::post('/employee-payroll/branch-list', [EmployeePayrollSalaryProcessApiController::class, 'getBranchList']);
+
 // Check if payroll is initiated for a specific period
 Route::get('/payroll-salary-process/check-initiated/{corpId}/{companyName}/{year}/{month}', [EmployeePayrollSalaryProcessApiController::class, 'checkPayrollInitiated']);
 
