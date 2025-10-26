@@ -30,6 +30,7 @@ use App\Http\Controllers\SocialProfileAccessApiController;
 use App\Http\Controllers\EmploymentDetailApiController;
 use App\Http\Controllers\EmployeeDetailApiController;
 use App\Http\Controllers\EmployeeStatutoryDetailApiController;
+use App\Http\Controllers\ProfessionalTaxController;
 use App\Http\Controllers\FamilyDetailApiController;
 use App\Http\Controllers\ChildApiController;
 use App\Http\Controllers\EmployeeWorkExperienceApiController;
@@ -655,3 +656,14 @@ Route::delete('/attendance-summary/{id}', [EmployeeAttendanceSummaryApiControlle
 
 // Check attendance summary existence (GET with route parameters)
 Route::get('/check-attendance-summary/check-exists/{corpId}/{companyName}/{month}/{year}', [EmployeeAttendanceSummaryApiController::class, 'checkAttendanceSummaryExistsByRoute']);
+
+// Test Routes
+Route::get('/test-professional-tax', [App\Http\Controllers\ProfessionalTaxTestController::class, 'test']);
+Route::post('/test-professional-tax/add', [App\Http\Controllers\ProfessionalTaxTestController::class, 'addSimple']);
+
+// Professional Tax Routes
+Route::post('/professional-tax/add', [ProfessionalTaxController::class, 'addProfessionalTax']);
+Route::post('/professional-tax/get', [ProfessionalTaxController::class, 'getProfessionalTax']);
+Route::put('/professional-tax/edit/{id}', [ProfessionalTaxController::class, 'editProfessionalTax']);
+Route::delete('/professional-tax/delete/{id}', [ProfessionalTaxController::class, 'deleteProfessionalTax']);
+Route::get('/professional-tax/{id}', [ProfessionalTaxController::class, 'getProfessionalTaxById']);
