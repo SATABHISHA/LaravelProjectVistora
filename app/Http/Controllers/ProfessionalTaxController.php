@@ -72,35 +72,87 @@ class ProfessionalTaxController extends Controller
 
     /**
      * Get all professional tax records with optional filtering
+     * Supports filtering by corpId, companyName, state with various matching options
      */
     public function getProfessionalTax(Request $request)
     {
+        \Log::info('Professional Tax Get API called', $request->all());
+        
         try {
             $query = ProfessionalTax::query();
+            $appliedFilters = [];
 
-            // Apply filters if provided
-            if ($request->has('corpId') && $request->corpId) {
+            // Filter by corpId (exact match)
+            if ($request->has('corpId') && !empty($request->corpId)) {
                 $query->where('corpId', $request->corpId);
+                $appliedFilters['corpId'] = $request->corpId;
             }
 
-            if ($request->has('companyName') && $request->companyName) {
-                $query->where('companyName', 'like', '%' . $request->companyName . '%');
+            // Filter by companyName (supports both exact and partial match)
+            if ($request->has('companyName') && !empty($request->companyName)) {
+                $companyName = $request->companyName;
+                
+                // Check if exact match is requested
+                if ($request->has('exactMatch') && $request->exactMatch === true) {
+                    $query->where('companyName', $companyName);
+                    $appliedFilters['companyName'] = $companyName . ' (exact match)';
+                } else {
+                    // Default to partial match
+                    $query->where('companyName', 'like', '%' . $companyName . '%');
+                    $appliedFilters['companyName'] = $companyName . ' (partial match)';
+                }
             }
 
-            if ($request->has('state') && $request->state) {
+            // Filter by state (partial match)
+            if ($request->has('state') && !empty($request->state)) {
                 $query->where('state', 'like', '%' . $request->state . '%');
+                $appliedFilters['state'] = $request->state;
             }
 
+            // Filter by income ranges (optional)
+            if ($request->has('minIncomeFrom') && !empty($request->minIncomeFrom)) {
+                $query->where('minIncome', '>=', $request->minIncomeFrom);
+                $appliedFilters['minIncomeFrom'] = $request->minIncomeFrom;
+            }
+
+            if ($request->has('maxIncomeUpTo') && !empty($request->maxIncomeUpTo)) {
+                $query->where('maxIncome', '<=', $request->maxIncomeUpTo);
+                $appliedFilters['maxIncomeUpTo'] = $request->maxIncomeUpTo;
+            }
+
+            // Combined corpId AND companyName filter (when both provided)
+            if ($request->has('corpId') && $request->has('companyName') && 
+                !empty($request->corpId) && !empty($request->companyName)) {
+                \Log::info('Applying combined corpId and companyName filter', [
+                    'corpId' => $request->corpId,
+                    'companyName' => $request->companyName
+                ]);
+            }
+
+            // Execute query with ordering
             $professionalTaxRecords = $query->orderBy('created_at', 'desc')->get();
+
+            \Log::info('Professional Tax records retrieved', [
+                'count' => $professionalTaxRecords->count(),
+                'applied_filters' => $appliedFilters
+            ]);
 
             return response()->json([
                 'status' => true,
                 'message' => 'Professional tax records retrieved successfully',
                 'data' => $professionalTaxRecords,
-                'count' => $professionalTaxRecords->count()
+                'count' => $professionalTaxRecords->count(),
+                'applied_filters' => $appliedFilters,
+                'total_records' => ProfessionalTax::count()
             ], 200);
 
         } catch (\Exception $e) {
+            \Log::error('Error retrieving professional tax records', [
+                'error' => $e->getMessage(),
+                'file' => $e->getFile(),
+                'line' => $e->getLine()
+            ]);
+            
             return response()->json([
                 'status' => false,
                 'message' => 'Error retrieving professional tax records',
@@ -203,6 +255,58 @@ class ProfessionalTaxController extends Controller
             return response()->json([
                 'status' => false,
                 'message' => 'Error deleting professional tax record',
+                'error' => $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * Get professional tax records by corpId and companyName combination
+     */
+    public function getProfessionalTaxByCorpAndCompany(Request $request)
+    {
+        try {
+            // Validate required parameters
+            $validator = Validator::make($request->all(), [
+                'corpId' => 'required|string',
+                'companyName' => 'required|string',
+            ]);
+
+            if ($validator->fails()) {
+                return response()->json([
+                    'status' => false,
+                    'message' => 'Validation failed',
+                    'errors' => $validator->errors()
+                ], 400);
+            }
+
+            $query = ProfessionalTax::where('corpId', $request->corpId);
+            
+            // Support both exact and partial company name matching
+            if ($request->has('exactMatch') && $request->exactMatch === true) {
+                $query->where('companyName', $request->companyName);
+            } else {
+                $query->where('companyName', 'like', '%' . $request->companyName . '%');
+            }
+
+            $professionalTaxRecords = $query->orderBy('created_at', 'desc')->get();
+
+            return response()->json([
+                'status' => true,
+                'message' => 'Professional tax records retrieved successfully',
+                'data' => $professionalTaxRecords,
+                'count' => $professionalTaxRecords->count(),
+                'filters' => [
+                    'corpId' => $request->corpId,
+                    'companyName' => $request->companyName,
+                    'exactMatch' => $request->exactMatch ?? false
+                ]
+            ], 200);
+
+        } catch (\Exception $e) {
+            return response()->json([
+                'status' => false,
+                'message' => 'Error retrieving professional tax records',
                 'error' => $e->getMessage()
             ], 500);
         }

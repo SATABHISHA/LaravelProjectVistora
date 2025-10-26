@@ -664,6 +664,7 @@ Route::post('/test-professional-tax/add', [App\Http\Controllers\ProfessionalTaxT
 // Professional Tax Routes
 Route::post('/professional-tax/add', [ProfessionalTaxController::class, 'addProfessionalTax']);
 Route::post('/professional-tax/get', [ProfessionalTaxController::class, 'getProfessionalTax']);
+Route::post('/professional-tax/get-by-corp-company', [ProfessionalTaxController::class, 'getProfessionalTaxByCorpAndCompany']);
 Route::put('/professional-tax/edit/{id}', [ProfessionalTaxController::class, 'editProfessionalTax']);
 Route::delete('/professional-tax/delete/{id}', [ProfessionalTaxController::class, 'deleteProfessionalTax']);
 Route::get('/professional-tax/{id}', [ProfessionalTaxController::class, 'getProfessionalTaxById']);
