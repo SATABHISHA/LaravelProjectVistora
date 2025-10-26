@@ -18,11 +18,13 @@ class ProfessionalTax extends Model
         'minIncome',
         'maxIncome',
         'aboveIncome',
+        'taxAmount',
     ];
 
     protected $attributes = [
         'minIncome' => '0',
         'maxIncome' => '0',
         'aboveIncome' => '0',
+        'taxAmount' => '0',
     ];
 }

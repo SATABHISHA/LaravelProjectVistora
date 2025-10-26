@@ -25,6 +25,7 @@ class ProfessionalTaxController extends Controller
                 'minIncome' => 'nullable|string',
                 'maxIncome' => 'nullable|string',
                 'aboveIncome' => 'nullable|string',
+                'taxAmount' => 'nullable|string',
             ]);
 
             if ($validator->fails()) {
@@ -37,10 +38,11 @@ class ProfessionalTaxController extends Controller
             }
 
             // Set default values for null or empty income fields
-            $data = $request->only(['corpId', 'companyName', 'state', 'minIncome', 'maxIncome', 'aboveIncome']);
+            $data = $request->only(['corpId', 'companyName', 'state', 'minIncome', 'maxIncome', 'aboveIncome', 'taxAmount']);
             $data['minIncome'] = $data['minIncome'] ?? '0';
             $data['maxIncome'] = $data['maxIncome'] ?? '0';
             $data['aboveIncome'] = $data['aboveIncome'] ?? '0';
+            $data['taxAmount'] = $data['taxAmount'] ?? '0';
 
             \Log::info('Data to be inserted', $data);
 
@@ -175,6 +177,7 @@ class ProfessionalTaxController extends Controller
                 'minIncome' => 'nullable|string',
                 'maxIncome' => 'nullable|string',
                 'aboveIncome' => 'nullable|string',
+                'taxAmount' => 'nullable|string',
             ]);
 
             if ($validator->fails()) {
@@ -207,6 +210,9 @@ class ProfessionalTaxController extends Controller
             }
             if ($request->has('aboveIncome')) {
                 $updateData['aboveIncome'] = $request->aboveIncome ?: '0';
+            }
+            if ($request->has('taxAmount')) {
+                $updateData['taxAmount'] = $request->taxAmount ?: '0';
             }
 
             // Update the record
