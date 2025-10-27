@@ -31,6 +31,7 @@ use App\Http\Controllers\EmploymentDetailApiController;
 use App\Http\Controllers\EmployeeDetailApiController;
 use App\Http\Controllers\EmployeeStatutoryDetailApiController;
 use App\Http\Controllers\ProfessionalTaxController;
+use App\Http\Controllers\EsiController;
 use App\Http\Controllers\FamilyDetailApiController;
 use App\Http\Controllers\ChildApiController;
 use App\Http\Controllers\EmployeeWorkExperienceApiController;
@@ -668,3 +669,10 @@ Route::post('/professional-tax/get-by-corp-company', [ProfessionalTaxController:
 Route::put('/professional-tax/edit/{id}', [ProfessionalTaxController::class, 'editProfessionalTax']);
 Route::delete('/professional-tax/delete/{id}', [ProfessionalTaxController::class, 'deleteProfessionalTax']);
 Route::get('/professional-tax/{id}', [ProfessionalTaxController::class, 'getProfessionalTaxById']);
+
+// ESI Routes
+Route::post('/esi/add', [EsiController::class, 'addEsi']);
+Route::post('/esi/get', [EsiController::class, 'getEsi']);
+Route::put('/esi/edit/{id}', [EsiController::class, 'editEsi']);
+Route::delete('/esi/delete/{id}', [EsiController::class, 'deleteEsi']);
+Route::get('/esi/{id}', [EsiController::class, 'getEsiById']);
