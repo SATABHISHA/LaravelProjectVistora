@@ -24,6 +24,8 @@ class EmployeeSalaryStructureApiController extends Controller
                 'monthlyBasic' => 'required|string|max:20',
                 'leaveEnchashOnGross' => 'required|string|max:20',
                 'grossList' => 'required|string',
+                'year' => 'nullable|string|max:4',
+                'increment' => 'nullable|string|max:20',
             ]);
 
             $data = $request->all();
@@ -49,20 +51,37 @@ class EmployeeSalaryStructureApiController extends Controller
         }
     }
 
-    // Fetch by empCode, companyName, and corpId
-    public function fetchByEmpDetails($empCode, $companyName, $corpId)
+    // Fetch by empCode, companyName, corpId and optionally year
+    public function fetchByEmpDetails(Request $request, $empCode, $companyName, $corpId)
     {
         try {
-            $salaryStructure = EmployeeSalaryStructure::where('empCode', $empCode)
+            $query = EmployeeSalaryStructure::where('empCode', $empCode)
                 ->where('companyName', $companyName)
-                ->where('corpId', $corpId)
-                ->first();
+                ->where('corpId', $corpId);
+
+            // Add year filter if provided
+            if ($request->has('year') && !empty($request->year)) {
+                $query->where('year', $request->year);
+            }
+
+            $salaryStructure = $query->first();
 
             if (!$salaryStructure) {
+                $message = 'Employee salary structure not found';
+                if ($request->has('year') && !empty($request->year)) {
+                    $message .= ' for year ' . $request->year;
+                }
+                
                 return response()->json([
                     'status' => false,
-                    'message' => 'Employee salary structure not found',
-                    'data' => (object)[]
+                    'message' => $message,
+                    'data' => (object)[],
+                    'filters_applied' => [
+                        'empCode' => $empCode,
+                        'companyName' => $companyName,
+                        'corpId' => $corpId,
+                        'year' => $request->year ?? 'not specified'
+                    ]
                 ], 404);
             }
 
@@ -95,10 +114,21 @@ class EmployeeSalaryStructureApiController extends Controller
             $responseData['monthlyNetSalary'] = $calculations['monthlyNetSalary'];
             $responseData['annualNetSalary'] = $calculations['annualNetSalary'];
 
+            $message = 'Employee salary structure fetched successfully';
+            if ($request->has('year') && !empty($request->year)) {
+                $message .= ' for year ' . $request->year;
+            }
+
             return response()->json([
                 'status' => true,
-                'message' => 'Employee salary structure fetched successfully',
-                'data' => $responseData
+                'message' => $message,
+                'data' => $responseData,
+                'filters_applied' => [
+                    'empCode' => $empCode,
+                    'companyName' => $companyName,
+                    'corpId' => $corpId,
+                    'year' => $request->year ?? 'not specified'
+                ]
             ]);
 
         } catch (\Exception $e) {

@@ -26,7 +26,9 @@ class EmployeeSalaryStructure extends Model
         'otherAlowances',
         'otherBenifits',
         'recurringDeductions',
-        'aplb'
+        'aplb',
+        'year',
+        'increment'
     ];
 
     // Cast JSON fields to arrays for easier handling
