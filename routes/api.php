@@ -562,6 +562,9 @@ Route::get('/debug/formula-builder/{componentName?}', [PaygroupConfigurationApiC
 // New route for complete payroll breakdown
 Route::get('/paygroup/complete/{groupName}/{corpId}/{basicSalary}', [PaygroupConfigurationApiController::class, 'fetchCompletePayrollBreakdown']);
 
+// Enhanced payroll breakdown with statutory calculations
+Route::get('/paygroup/complete-with-statutory/{groupName}/{corpId}/{basicSalary}/{ctc}/{empCode}/{companyName}', [PaygroupConfigurationApiController::class, 'fetchCompletePayrollBreakdownWithStatutory']);
+
 // Holiday List API Routes
 Route::post('/holiday-list', [HolidayListApiController::class, 'storeOrUpdate']);
 Route::get('/holiday-list/puid/{puid}', [HolidayListApiController::class, 'fetchByPuid']);
@@ -676,3 +679,6 @@ Route::post('/esi/get', [EsiController::class, 'getEsi']);
 Route::put('/esi/edit/{id}', [EsiController::class, 'editEsi']);
 Route::delete('/esi/delete/{id}', [EsiController::class, 'deleteEsi']);
 Route::get('/esi/{id}', [EsiController::class, 'getEsiById']);
+
+// Debug statutory data
+Route::get('/debug/statutory/{corpId}/{empCode}/{companyName}', [PaygroupConfigurationApiController::class, 'debugStatutoryData']);
