@@ -838,25 +838,49 @@ class PaygroupConfigurationApiController extends Controller
             $esiPercentage = 0;
 
             if ($empStateInsurance == 1) {
+                Log::info("🔍 ESI Calculation Started:", [
+                    'corpId' => $corpId,
+                    'companyName' => $companyName,
+                    'ctc' => $ctc,
+                    'basicSalary' => $basicSalary
+                ]);
+                
                 $esiData = null;
                 $esiCorpIdVariations = ['corpId', 'corp_id', 'CorpId', 'CORP_ID'];
                 $esiCompanyVariations = ['companyName', 'company_name', 'CompanyName', 'COMPANY_NAME'];
                 
-                foreach ($esiCorpIdVariations as $esiCorpCol) {
-                    foreach ($esiCompanyVariations as $esiCompCol) {
-                        try {
-                            $esiData = DB::table('esi')
-                                ->whereRaw("$esiCorpCol = ?", [$corpId])
-                                ->whereRaw("$esiCompCol = ?", [$companyName])
-                                ->where('incomeRange', '<=', $ctc)
-                                ->orderBy('incomeRange', 'desc')
-                                ->first();
-                            
-                            if ($esiData) break 2;
-                        } catch (\Exception $e) {
-                            continue;
-                        }
+                // Simplified query - use direct column names from migration
+                try {
+                    // First try exact match
+                    $esiData = DB::table('esi')
+                        ->where('corpId', $corpId)
+                        ->where('companyName', $companyName)
+                        ->where('incomeRange', '>=', $ctc)
+                        ->orderBy('incomeRange', 'asc')
+                        ->first();
+                    
+                    // If not found, try with LIKE (handles trailing spaces/dots)
+                    if (!$esiData) {
+                        $esiData = DB::table('esi')
+                            ->where('corpId', $corpId)
+                            ->where('companyName', 'LIKE', trim($companyName) . '%')
+                            ->where('incomeRange', '>=', $ctc)
+                            ->orderBy('incomeRange', 'asc')
+                            ->first();
                     }
+                    
+                    Log::info("ESI Query Result:", [
+                        'corpId' => $corpId,
+                        'companyName' => $companyName,
+                        'ctc' => $ctc,
+                        'incomeRangeCondition' => 'incomeRange >= ' . $ctc,
+                        'found' => $esiData ? 'YES' : 'NO',
+                        'data' => $esiData
+                    ]);
+                } catch (\Exception $e) {
+                    Log::error("ESI Query Error:", [
+                        'error' => $e->getMessage()
+                    ]);
                 }
 
                 if ($esiData && isset($esiData->esiAmount) && $esiData->esiAmount > 0) {
@@ -865,8 +889,15 @@ class PaygroupConfigurationApiController extends Controller
                     $esiFormula = "{$esiPercentage}% of Basic";
                     
                     Log::info("✅ ESI Calculated:", [
+                        'esiData' => $esiData,
                         'percentage' => $esiPercentage,
                         'amount' => $esiAmount
+                    ]);
+                } else {
+                    Log::warning("❌ ESI NOT Calculated:", [
+                        'esiDataFound' => $esiData ? 'YES' : 'NO',
+                        'esiAmount' => $esiData->esiAmount ?? 'N/A',
+                        'reason' => !$esiData ? 'No ESI data found in table' : 'ESI amount is 0 or invalid'
                     ]);
                 }
             }
