@@ -565,6 +565,9 @@ Route::get('/paygroup/complete/{groupName}/{corpId}/{basicSalary}', [PaygroupCon
 // Enhanced payroll breakdown with statutory calculations
 Route::get('/paygroup/complete-with-statutory/{groupName}/{corpId}/{basicSalary}/{ctc}/{empCode}/{companyName}', [PaygroupConfigurationApiController::class, 'fetchCompletePayrollBreakdownWithStatutory']);
 
+// ✅ NEW: Improved payroll breakdown with NO DUPLICATES - properly filters statutory components
+Route::get('/paygroup/complete-improved/{groupName}/{corpId}/{basicSalary}/{ctc}/{empCode}/{companyName}', [PaygroupConfigurationApiController::class, 'fetchCompletePayrollBreakdownImproved']);
+
 // Holiday List API Routes
 Route::post('/holiday-list', [HolidayListApiController::class, 'storeOrUpdate']);
 Route::get('/holiday-list/puid/{puid}', [HolidayListApiController::class, 'fetchByPuid']);
