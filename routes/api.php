@@ -539,6 +539,7 @@ Route::post('/payroll-data/save', [PaygroupConfigurationApiController::class, 's
 Route::post('/employee-salary-structure/add-or-update', [EmployeeSalaryStructureApiController::class, 'storeOrUpdate']);
 Route::get('/employee-salary-structure/{empCode}/{companyName}/{corpId}', [EmployeeSalaryStructureApiController::class, 'fetchByEmpDetails']);
 Route::delete('/employee-salary-structure/delete/{puid}', [EmployeeSalaryStructureApiController::class, 'destroy']);
+Route::post('/employee-salary-structure/salary-revision', [EmployeeSalaryStructureApiController::class, 'salaryRevisionProcess']);
 
 // Attendance Routes
 Route::post('/attendance/check', [AttendanceApiController::class, 'checkInOrOut']);

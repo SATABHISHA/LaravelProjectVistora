@@ -239,4 +239,254 @@ class EmployeeSalaryStructureApiController extends Controller
             'annualNetSalary' => round($annualNetSalary, 2)
         ];
     }
+
+    /**
+     * ✅ Salary Revision Process API
+     * Fetches previous year data, distributes increment proportionally, and creates new salary structure
+     */
+    public function salaryRevisionProcess(Request $request)
+    {
+        try {
+            // Validate request
+            $request->validate([
+                'corpId' => 'required|string|max:10',
+                'companyName' => 'required|string|max:100',
+                'empCode' => 'required|string|max:20',
+                'year' => 'required|string|max:4',
+                'salaryRevisionMonth' => 'required|string|max:11',
+                'arrearWithEffectFrom' => 'required|string|max:11',
+                'increment' => 'required|numeric|min:0'
+            ]);
+
+            $corpId = $request->corpId;
+            $companyName = $request->companyName;
+            $empCode = $request->empCode;
+            $currentYear = $request->year;
+            $salaryRevisionMonth = $request->salaryRevisionMonth;
+            $arrearWithEffectFrom = $request->arrearWithEffectFrom;
+            $incrementAmount = (float)$request->increment;
+
+            // Calculate previous year
+            $previousYear = (int)$currentYear - 1;
+
+            // Fetch previous year salary structure
+            $previousSalary = EmployeeSalaryStructure::where('corpId', $corpId)
+                ->where('companyName', $companyName)
+                ->where('empCode', $empCode)
+                ->where('year', (string)$previousYear)
+                ->first();
+
+            if (!$previousSalary) {
+                return response()->json([
+                    'status' => false,
+                    'message' => "No salary structure found for employee {$empCode} in year {$previousYear}",
+                    'data' => []
+                ], 404);
+            }
+
+            // Parse JSON fields from previous year
+            $previousGrossList = $this->parseJsonField($previousSalary->grossList);
+            $previousOtherBenefits = $this->parseJsonField($previousSalary->otherBenifits);
+            $previousRecurringDeductions = $this->parseJsonField($previousSalary->recurringDeductions);
+
+            // Calculate previous totals
+            $previousTotals = $this->calculateSalaryTotals(
+                $previousGrossList,
+                $previousOtherBenefits,
+                $previousRecurringDeductions
+            );
+
+            // Get previous basic salary
+            $previousBasicSalary = (float)$previousSalary->monthlyBasic;
+            $previousCTC = (float)$previousSalary->ctc;
+
+            // Calculate new values
+            $newBasicSalary = $previousBasicSalary + $incrementAmount;
+            $incrementPercentage = ($incrementAmount / $previousBasicSalary) * 100;
+
+            // Distribute increment proportionally across all components
+            $newGrossList = $this->distributeIncrementToComponents(
+                $previousGrossList, 
+                $previousBasicSalary, 
+                $newBasicSalary,
+                'gross'
+            );
+
+            $newOtherBenefits = $this->distributeIncrementToComponents(
+                $previousOtherBenefits, 
+                $previousBasicSalary, 
+                $newBasicSalary,
+                'benefits'
+            );
+
+            $newRecurringDeductions = $this->distributeIncrementToComponents(
+                $previousRecurringDeductions, 
+                $previousBasicSalary, 
+                $newBasicSalary,
+                'deductions'
+            );
+
+            // Calculate new totals
+            $newTotals = $this->calculateSalaryTotals(
+                $newGrossList,
+                $newOtherBenefits,
+                $newRecurringDeductions
+            );
+
+            // Calculate new CTC
+            $newCTC = $newTotals['monthlyGross'] + $newTotals['monthlyAllowance'];
+            $newCTCYearly = $newCTC * 12;
+
+            // Generate new PUID
+            $newPuid = $this->generatePuid($corpId, $empCode, $currentYear);
+
+            // Prepare new salary structure data
+            $newSalaryData = [
+                'corpId' => $corpId,
+                'puid' => $newPuid,
+                'empCode' => $empCode,
+                'companyName' => $companyName,
+                'salaryRevisionMonth' => $salaryRevisionMonth,
+                'arrearWithEffectFrom' => $arrearWithEffectFrom,
+                'payGroup' => $previousSalary->payGroup,
+                'ctc' => round($newCTC, 0),
+                'ctcYearly' => round($newCTCYearly, 0),
+                'monthlyBasic' => round($newBasicSalary, 0),
+                'leaveEnchashOnGross' => $previousSalary->leaveEnchashOnGross,
+                'grossList' => json_encode($newGrossList),
+                'otherBenifits' => json_encode($newOtherBenefits),
+                'recurringDeductions' => json_encode($newRecurringDeductions),
+                'year' => $currentYear,
+                'increment' => round($incrementAmount, 0)
+            ];
+
+            // Insert new salary structure
+            $newSalaryStructure = EmployeeSalaryStructure::create($newSalaryData);
+
+            // Prepare detailed response
+            return response()->json([
+                'status' => true,
+                'message' => 'Salary revision processed successfully',
+                'data' => [
+                    'previousYear' => $previousYear,
+                    'currentYear' => $currentYear,
+                    'previousSalary' => [
+                        'basicSalary' => $previousBasicSalary,
+                        'ctc' => $previousCTC,
+                        'monthlyGross' => $previousTotals['monthlyGross'],
+                        'annualGross' => $previousTotals['annualGross']
+                    ],
+                    'revision' => [
+                        'incrementAmount' => $incrementAmount,
+                        'incrementPercentage' => round($incrementPercentage, 2),
+                        'revisionMonth' => $salaryRevisionMonth,
+                        'effectiveFrom' => $arrearWithEffectFrom
+                    ],
+                    'newSalary' => [
+                        'puid' => $newPuid,
+                        'basicSalary' => round($newBasicSalary, 0),
+                        'ctc' => round($newCTC, 0),
+                        'ctcYearly' => round($newCTCYearly, 0),
+                        'monthlyGross' => $newTotals['monthlyGross'],
+                        'annualGross' => $newTotals['annualGross'],
+                        'monthlyDeductions' => $newTotals['monthlyDeduction'],
+                        'annualDeductions' => $newTotals['annualDeduction'],
+                        'monthlyAllowances' => $newTotals['monthlyAllowance'],
+                        'annualAllowances' => $newTotals['annualAllowance'],
+                        'monthlyNetSalary' => $newTotals['monthlyNetSalary'],
+                        'annualNetSalary' => $newTotals['annualNetSalary'],
+                        'grossList' => $newGrossList,
+                        'otherBenefits' => $newOtherBenefits,
+                        'recurringDeductions' => $newRecurringDeductions
+                    ],
+                    'savedRecord' => $newSalaryStructure
+                ]
+            ]);
+
+        } catch (\Illuminate\Validation\ValidationException $e) {
+            return response()->json([
+                'status' => false,
+                'message' => 'Validation error',
+                'errors' => $e->errors()
+            ], 422);
+        } catch (\Exception $e) {
+            return response()->json([
+                'status' => false,
+                'message' => 'Error processing salary revision: ' . $e->getMessage(),
+                'trace' => $e->getTraceAsString()
+            ], 500);
+        }
+    }
+
+    /**
+     * Distribute increment to components based on formulas
+     */
+    private function distributeIncrementToComponents($componentList, $oldBasic, $newBasic, $type)
+    {
+        if (!is_array($componentList) || empty($componentList)) {
+            return [];
+        }
+
+        $newComponents = [];
+
+        foreach ($componentList as $component) {
+            $newComponent = $component;
+            $componentName = $component['componentName'] ?? '';
+            $formula = $component['formula'] ?? '';
+            $oldValue = (float)($component['calculatedValue'] ?? 0);
+
+            // Parse formula and recalculate based on new basic
+            if (strpos(strtolower($formula), '% of basic') !== false) {
+                // Extract percentage from formula
+                preg_match('/(\d+\.?\d*)%/', $formula, $matches);
+                if (isset($matches[1])) {
+                    $percentage = (float)$matches[1];
+                    $newValue = round(($newBasic * $percentage) / 100, 0);
+                    $newComponent['calculatedValue'] = $newValue;
+                    $newComponent['annualCalculatedValue'] = $newValue * 12;
+                }
+            } elseif (strtolower($componentName) === 'basic' || strtolower($formula) === 'basic') {
+                // Update Basic directly
+                $newComponent['calculatedValue'] = round($newBasic, 0);
+                $newComponent['annualCalculatedValue'] = round($newBasic * 12, 0);
+            } elseif (strpos(strtolower($formula), 'fixed') !== false) {
+                // Fixed amounts - apply proportional increment
+                if ($oldBasic > 0) {
+                    $incrementRatio = $newBasic / $oldBasic;
+                    $newValue = round($oldValue * $incrementRatio, 0);
+                    $newComponent['calculatedValue'] = $newValue;
+                    $newComponent['annualCalculatedValue'] = $newValue * 12;
+                }
+            } elseif (strtolower($formula) === 'n/a' || strtolower($formula) === 'not applicable' || $formula === 'Manual Entry' || $formula === 'Variable') {
+                // Keep manual entry / variable / N/A values as is (no change)
+                $newComponent['calculatedValue'] = $oldValue;
+                $newComponent['annualCalculatedValue'] = $oldValue * 12;
+            } else {
+                // For other formulas, apply proportional increment
+                if ($oldBasic > 0 && $oldValue > 0) {
+                    $incrementRatio = $newBasic / $oldBasic;
+                    $newValue = round($oldValue * $incrementRatio, 0);
+                    $newComponent['calculatedValue'] = $newValue;
+                    $newComponent['annualCalculatedValue'] = $newValue * 12;
+                } else {
+                    $newComponent['calculatedValue'] = $oldValue;
+                    $newComponent['annualCalculatedValue'] = $oldValue * 12;
+                }
+            }
+
+            $newComponents[] = $newComponent;
+        }
+
+        return $newComponents;
+    }
+
+    /**
+     * Generate unique PUID
+     */
+    private function generatePuid($corpId, $empCode, $year)
+    {
+        $timestamp = time();
+        $random = mt_rand(1000, 9999);
+        return strtoupper($corpId) . '_' . $empCode . '_' . $year . '_' . $timestamp . '_' . $random;
+    }
 }
