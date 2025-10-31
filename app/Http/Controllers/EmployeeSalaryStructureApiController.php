@@ -24,14 +24,21 @@ class EmployeeSalaryStructureApiController extends Controller
                 'monthlyBasic' => 'required|string|max:20',
                 'leaveEnchashOnGross' => 'required|string|max:20',
                 'grossList' => 'required|string',
-                'year' => 'nullable|string|max:4',
+                'year' => 'required|string|max:4',
                 'increment' => 'nullable|string|max:20',
             ]);
 
             $data = $request->all();
 
+            // Use corpId, empCode, companyName, and year as unique identifier
+            // This allows multiple salary structures for the same employee across different years
             $salaryStructure = EmployeeSalaryStructure::updateOrCreate(
-                ['corpId' => $data['corpId'], 'puid' => $data['puid']],
+                [
+                    'corpId' => $data['corpId'], 
+                    'empCode' => $data['empCode'],
+                    'companyName' => $data['companyName'],
+                    'year' => $data['year']
+                ],
                 $data
             );
 
@@ -39,7 +46,7 @@ class EmployeeSalaryStructureApiController extends Controller
 
             return response()->json([
                 'status' => true,
-                'message' => "Employee salary structure {$status} successfully",
+                'message' => "Employee salary structure {$status} successfully for year {$data['year']}",
                 'data' => $salaryStructure
             ]);
 
