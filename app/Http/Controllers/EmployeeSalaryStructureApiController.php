@@ -296,34 +296,49 @@ class EmployeeSalaryStructureApiController extends Controller
                 $previousRecurringDeductions
             );
 
-            // Get previous basic salary
+            // Get previous basic salary and CTC
             $previousBasicSalary = (float)$previousSalary->monthlyBasic;
             $previousCTC = (float)$previousSalary->ctc;
 
-            // Calculate new values
-            $newBasicSalary = $previousBasicSalary + $incrementAmount;
-            $incrementPercentage = ($incrementAmount / $previousBasicSalary) * 100;
+            // Calculate new CTC (add increment to previous CTC)
+            $newCTC = $previousCTC + $incrementAmount;
+            $incrementPercentage = ($incrementAmount / $previousCTC) * 100;
 
-            // Distribute increment proportionally across all components
-            $newGrossList = $this->distributeIncrementToComponents(
-                $previousGrossList, 
-                $previousBasicSalary, 
-                $newBasicSalary,
-                'gross'
+            // Calculate the proportion of each component in old CTC
+            $componentProportions = $this->calculateComponentProportions(
+                $previousGrossList,
+                $previousOtherBenefits,
+                $previousCTC
             );
 
-            $newOtherBenefits = $this->distributeIncrementToComponents(
-                $previousOtherBenefits, 
-                $previousBasicSalary, 
-                $newBasicSalary,
-                'benefits'
+            // Distribute new CTC proportionally to gross components
+            $newGrossList = $this->distributeCtcToGrossComponents(
+                $previousGrossList,
+                $componentProportions,
+                $newCTC
             );
 
-            $newRecurringDeductions = $this->distributeIncrementToComponents(
-                $previousRecurringDeductions, 
-                $previousBasicSalary, 
+            // Calculate new basic salary from gross list
+            $newBasicSalary = 0;
+            foreach ($newGrossList as $component) {
+                if (strtolower($component['componentName']) === 'basic') {
+                    $newBasicSalary = $component['calculatedValue'];
+                    break;
+                }
+            }
+
+            // Recalculate benefits and deductions based on new basic salary
+            $newOtherBenefits = $this->recalculateBenefits(
+                $previousOtherBenefits,
+                $previousBasicSalary,
                 $newBasicSalary,
-                'deductions'
+                $componentProportions
+            );
+
+            $newRecurringDeductions = $this->recalculateDeductions(
+                $previousRecurringDeductions,
+                $previousBasicSalary,
+                $newBasicSalary
             );
 
             // Calculate new totals
@@ -333,8 +348,7 @@ class EmployeeSalaryStructureApiController extends Controller
                 $newRecurringDeductions
             );
 
-            // Calculate new CTC
-            $newCTC = $newTotals['monthlyGross'] + $newTotals['monthlyAllowance'];
+            // Calculate new CTC Yearly
             $newCTCYearly = $newCTC * 12;
 
             // Generate new PUID
@@ -419,23 +433,102 @@ class EmployeeSalaryStructureApiController extends Controller
     }
 
     /**
-     * Distribute increment to components based on formulas
+     * Calculate proportion of each component in CTC
      */
-    private function distributeIncrementToComponents($componentList, $oldBasic, $newBasic, $type)
+    private function calculateComponentProportions($grossList, $otherBenefits, $ctc)
     {
-        if (!is_array($componentList) || empty($componentList)) {
-            return [];
+        $proportions = [];
+        
+        if ($ctc <= 0) {
+            return $proportions;
         }
 
-        $newComponents = [];
+        // Calculate proportions for gross components
+        foreach ($grossList as $component) {
+            $componentName = $component['componentName'] ?? '';
+            $value = (float)($component['calculatedValue'] ?? 0);
+            $proportions[$componentName] = $value / $ctc;
+        }
 
-        foreach ($componentList as $component) {
+        // Calculate proportions for benefits that are part of CTC
+        foreach ($otherBenefits as $component) {
+            $componentName = $component['componentName'] ?? '';
+            $value = (float)($component['calculatedValue'] ?? 0);
+            $isPartOfCtc = $component['isPartOfCtcYn'] ?? 0;
+            
+            if ($isPartOfCtc == 1) {
+                $proportions[$componentName] = $value / $ctc;
+            }
+        }
+
+        return $proportions;
+    }
+
+    /**
+     * Distribute new CTC to gross components proportionally
+     */
+    private function distributeCtcToGrossComponents($grossList, $proportions, $newCTC)
+    {
+        $newGrossList = [];
+        
+        foreach ($grossList as $component) {
+            $newComponent = $component;
+            $componentName = $component['componentName'] ?? '';
+            $formula = $component['formula'] ?? '';
+            
+            // First pass: distribute CTC proportionally to get initial values
+            if (isset($proportions[$componentName])) {
+                $newValue = round($newCTC * $proportions[$componentName], 0);
+                $newComponent['calculatedValue'] = $newValue;
+                $newComponent['annualCalculatedValue'] = $newValue * 12;
+            }
+            
+            $newGrossList[] = $newComponent;
+        }
+
+        // Second pass: recalculate formula-based components based on new Basic
+        $newBasic = 0;
+        foreach ($newGrossList as $component) {
+            if (strtolower($component['componentName']) === 'basic') {
+                $newBasic = $component['calculatedValue'];
+                break;
+            }
+        }
+
+        if ($newBasic > 0) {
+            foreach ($newGrossList as $index => $component) {
+                $formula = $component['formula'] ?? '';
+                
+                // Recalculate percentage-based formulas
+                if (strpos(strtolower($formula), '% of basic') !== false) {
+                    preg_match('/(\d+\.?\d*)%/', $formula, $matches);
+                    if (isset($matches[1])) {
+                        $percentage = (float)$matches[1];
+                        $newValue = round(($newBasic * $percentage) / 100, 0);
+                        $newGrossList[$index]['calculatedValue'] = $newValue;
+                        $newGrossList[$index]['annualCalculatedValue'] = $newValue * 12;
+                    }
+                }
+            }
+        }
+
+        return $newGrossList;
+    }
+
+    /**
+     * Recalculate benefits based on new basic salary
+     */
+    private function recalculateBenefits($benefitsList, $oldBasic, $newBasic, $proportions)
+    {
+        $newBenefits = [];
+
+        foreach ($benefitsList as $component) {
             $newComponent = $component;
             $componentName = $component['componentName'] ?? '';
             $formula = $component['formula'] ?? '';
             $oldValue = (float)($component['calculatedValue'] ?? 0);
 
-            // Parse formula and recalculate based on new basic
+            // Recalculate based on formula
             if (strpos(strtolower($formula), '% of basic') !== false) {
                 // Extract percentage from formula
                 preg_match('/(\d+\.?\d*)%/', $formula, $matches);
@@ -445,39 +538,75 @@ class EmployeeSalaryStructureApiController extends Controller
                     $newComponent['calculatedValue'] = $newValue;
                     $newComponent['annualCalculatedValue'] = $newValue * 12;
                 }
-            } elseif (strtolower($componentName) === 'basic' || strtolower($formula) === 'basic') {
-                // Update Basic directly
-                $newComponent['calculatedValue'] = round($newBasic, 0);
-                $newComponent['annualCalculatedValue'] = round($newBasic * 12, 0);
-            } elseif (strpos(strtolower($formula), 'fixed') !== false) {
-                // Fixed amounts - apply proportional increment
-                if ($oldBasic > 0) {
-                    $incrementRatio = $newBasic / $oldBasic;
-                    $newValue = round($oldValue * $incrementRatio, 0);
-                    $newComponent['calculatedValue'] = $newValue;
-                    $newComponent['annualCalculatedValue'] = $newValue * 12;
-                }
-            } elseif (strtolower($formula) === 'n/a' || strtolower($formula) === 'not applicable' || $formula === 'Manual Entry' || $formula === 'Variable') {
-                // Keep manual entry / variable / N/A values as is (no change)
-                $newComponent['calculatedValue'] = $oldValue;
-                $newComponent['annualCalculatedValue'] = $oldValue * 12;
-            } else {
-                // For other formulas, apply proportional increment
+            } elseif (strtolower($formula) === 'n/a' || strtolower($formula) === 'not applicable' || $formula === 'Manual Entry') {
+                // For N/A or Manual Entry, keep proportional to CTC increase
                 if ($oldBasic > 0 && $oldValue > 0) {
                     $incrementRatio = $newBasic / $oldBasic;
                     $newValue = round($oldValue * $incrementRatio, 0);
                     $newComponent['calculatedValue'] = $newValue;
                     $newComponent['annualCalculatedValue'] = $newValue * 12;
-                } else {
-                    $newComponent['calculatedValue'] = $oldValue;
-                    $newComponent['annualCalculatedValue'] = $oldValue * 12;
+                }
+            } else {
+                // For other formulas, keep the value proportional
+                if ($oldBasic > 0 && $oldValue > 0) {
+                    $incrementRatio = $newBasic / $oldBasic;
+                    $newValue = round($oldValue * $incrementRatio, 0);
+                    $newComponent['calculatedValue'] = $newValue;
+                    $newComponent['annualCalculatedValue'] = $newValue * 12;
                 }
             }
 
-            $newComponents[] = $newComponent;
+            $newBenefits[] = $newComponent;
         }
 
-        return $newComponents;
+        return $newBenefits;
+    }
+
+    /**
+     * Recalculate deductions based on new basic salary
+     */
+    private function recalculateDeductions($deductionsList, $oldBasic, $newBasic)
+    {
+        $newDeductions = [];
+
+        foreach ($deductionsList as $component) {
+            $newComponent = $component;
+            $componentName = $component['componentName'] ?? '';
+            $formula = $component['formula'] ?? '';
+            $oldValue = (float)($component['calculatedValue'] ?? 0);
+
+            // Recalculate based on formula
+            if (strpos(strtolower($formula), '% of basic') !== false) {
+                // Extract percentage from formula
+                preg_match('/(\d+\.?\d*)%/', $formula, $matches);
+                if (isset($matches[1])) {
+                    $percentage = (float)$matches[1];
+                    $newValue = round(($newBasic * $percentage) / 100, 0);
+                    $newComponent['calculatedValue'] = $newValue;
+                    $newComponent['annualCalculatedValue'] = $newValue * 12;
+                }
+            } elseif (strtolower($formula) === 'n/a' || strtolower($formula) === 'not applicable' || $formula === 'Manual Entry') {
+                // For statutory deductions with N/A formula, recalculate proportionally
+                if ($oldBasic > 0 && $oldValue > 0) {
+                    $incrementRatio = $newBasic / $oldBasic;
+                    $newValue = round($oldValue * $incrementRatio, 0);
+                    $newComponent['calculatedValue'] = $newValue;
+                    $newComponent['annualCalculatedValue'] = $newValue * 12;
+                }
+            } else {
+                // For other formulas, keep proportional
+                if ($oldBasic > 0 && $oldValue > 0) {
+                    $incrementRatio = $newBasic / $oldBasic;
+                    $newValue = round($oldValue * $incrementRatio, 0);
+                    $newComponent['calculatedValue'] = $newValue;
+                    $newComponent['annualCalculatedValue'] = $newValue * 12;
+                }
+            }
+
+            $newDeductions[] = $newComponent;
+        }
+
+        return $newDeductions;
     }
 
     /**
