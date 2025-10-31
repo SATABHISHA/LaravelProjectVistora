@@ -548,6 +548,42 @@ class AttendanceApiController extends Controller
             // Get attendance records
             $attendanceRecords = $query->orderBy('date', 'asc')->get();
             
+            // Get leave requests for the period to update attendance status
+            $leaveQuery = \App\Models\LeaveRequest::where('corp_id', $request->corpId);
+            
+            if ($request->empCode) {
+                $leaveQuery->where('empcode', $request->empCode);
+            }
+            
+            if ($request->companyName) {
+                $leaveQuery->where('company_name', $request->companyName);
+            }
+            
+            // Get leave requests that overlap with this month
+            $leaveRequests = $leaveQuery->where(function($query) use ($startDate, $endDate) {
+                $query->whereBetween('from_date', [$startDate, $endDate])
+                      ->orWhereBetween('to_date', [$startDate, $endDate])
+                      ->orWhere(function($q) use ($startDate, $endDate) {
+                          $q->where('from_date', '<=', $startDate)
+                            ->where('to_date', '>=', $endDate);
+                      });
+            })->get();
+            
+            // Create a map of leave requests by empCode and date
+            $leavesByEmpCodeAndDate = [];
+            foreach ($leaveRequests as $leave) {
+                $fromDate = Carbon::parse($leave->from_date);
+                $toDate = Carbon::parse($leave->to_date);
+                
+                // Iterate through each date in the leave period
+                for ($date = $fromDate->copy(); $date->lte($toDate); $date->addDay()) {
+                    $dateKey = $date->format('Y-m-d');
+                    if ($date->gte(Carbon::parse($startDate)) && $date->lte(Carbon::parse($endDate))) {
+                        $leavesByEmpCodeAndDate[$leave->empcode][$dateKey] = $leave->status;
+                    }
+                }
+            }
+            
             // Create calendar array with all days in month
             $calendar = [];
             
@@ -556,13 +592,28 @@ class AttendanceApiController extends Controller
             foreach ($attendanceRecords as $record) {
                 $recordDate = Carbon::parse($record->date);
                 $dateKey = $recordDate->format('Y-m-d');
+                
+                // Check if there's a leave request for this employee on this date
+                $leaveStatus = $leavesByEmpCodeAndDate[$record->empCode][$dateKey] ?? null;
+                
+                // Update attendance status based on leave request status
+                $attendanceStatus = $record->attendanceStatus;
+                if ($leaveStatus !== null) {
+                    if ($leaveStatus === 'Approved') {
+                        $attendanceStatus = 'Leave';
+                    } elseif (in_array($leaveStatus, ['Pending', 'Rejected', 'Returned'])) {
+                        $attendanceStatus = 'Absent';
+                    }
+                }
+                
                 $attendanceByDate[$dateKey] = [
                     'id' => $record->id,
                     'puid' => $record->puid,
                     'checkIn' => $record->checkIn,
                     'checkOut' => $record->checkOut,
                     'status' => $record->status,
-                    'attendanceStatus' => $record->attendanceStatus,
+                    'attendanceStatus' => $attendanceStatus,
+                    'leaveStatus' => $leaveStatus, // Include leave status for reference
                     'totalHrsForTheDay' => $record->totalHrsForTheDay,
                     'dayName' => $recordDate->format('D'), // Short day name (Mon, Tue, etc.)
                     'dateOnly' => $recordDate->format('d'), // Day number only (01-31)

@@ -138,6 +138,39 @@ class EmployeeAttendanceSummaryApiController extends Controller
                 }
             }
 
+            // Get leave requests for the period
+            $monthNumber = Carbon::parse($month)->month;
+            $startDate = Carbon::create($year, $monthNumber, 1)->format('Y-m-d');
+            $endDate = Carbon::create($year, $monthNumber, 1)->endOfMonth()->format('Y-m-d');
+            
+            $leaveRequests = DB::table('leave_request')
+                ->select('empcode', 'from_date', 'to_date', 'status')
+                ->where('corp_id', $corpId)
+                ->where('company_name', $companyName)
+                ->where(function($query) use ($startDate, $endDate) {
+                    $query->whereBetween('from_date', [$startDate, $endDate])
+                          ->orWhereBetween('to_date', [$startDate, $endDate])
+                          ->orWhere(function($q) use ($startDate, $endDate) {
+                              $q->where('from_date', '<=', $startDate)
+                                ->where('to_date', '>=', $endDate);
+                          });
+                })
+                ->get();
+            
+            // Create a map of leave status by empCode and date
+            $leaveStatusMap = [];
+            foreach ($leaveRequests as $leave) {
+                $fromDate = Carbon::parse($leave->from_date);
+                $toDate = Carbon::parse($leave->to_date);
+                
+                for ($date = $fromDate->copy(); $date->lte($toDate); $date->addDay()) {
+                    $dateKey = $date->format('Y-m-d');
+                    if ($date->gte(Carbon::parse($startDate)) && $date->lte(Carbon::parse($endDate))) {
+                        $leaveStatusMap[$leave->empcode][$dateKey] = $leave->status;
+                    }
+                }
+            }
+
             // Get unique employee codes from attendance data
             $empCodes = $attendanceData->pluck('empCode')->unique();
 
@@ -148,16 +181,39 @@ class EmployeeAttendanceSummaryApiController extends Controller
                 // Calculate attendance statistics for this employee
                 $employeeAttendance = $attendanceData->where('empCode', $empCode);
                 
-                $totalPresent = $employeeAttendance->where('attendanceStatus', 'Present')->count();
-                $totalAbsent = $employeeAttendance->where('attendanceStatus', 'Absent')->count();
-                $totalLeave = $employeeAttendance->where('attendanceStatus', 'Leave')->count();
+                $totalPresent = 0;
+                $totalLeave = 0;
+                $totalAbsent = 0;
                 
-                // Count both 'Leave' and 'Absent' as leave for the summary
-                $totalLeaveIncludingAbsent = $totalLeave + $totalAbsent;
+                foreach ($employeeAttendance as $attendance) {
+                    $attendanceDate = Carbon::parse($attendance->date)->format('Y-m-d');
+                    $leaveStatus = $leaveStatusMap[$empCode][$attendanceDate] ?? null;
+                    
+                    // Determine the status based on leave request
+                    if ($leaveStatus === 'Approved') {
+                        // Approved leave counts as Leave
+                        $totalLeave++;
+                    } elseif (in_array($leaveStatus, ['Pending', 'Rejected', 'Returned'])) {
+                        // Pending/Rejected/Returned leave counts as Absent
+                        $totalAbsent++;
+                    } elseif ($attendance->attendanceStatus === 'Present') {
+                        // No leave request or attendance is Present
+                        $totalPresent++;
+                    } elseif ($attendance->attendanceStatus === 'Leave') {
+                        // Direct leave entry in attendance
+                        $totalLeave++;
+                    } else {
+                        // Other cases count as Absent
+                        $totalAbsent++;
+                    }
+                }
                 
                 // Calculate working days (total days in month - holidays - week-offs)
                 $totalDaysInMonth = Carbon::createFromFormat('F Y', $month . ' ' . $year)->daysInMonth;
                 $workingDays = $totalDaysInMonth - $holidays - $weekOffCount;
+                
+                // Calculate paid days: working days - absent
+                $paidDays = $workingDays - $totalAbsent;
 
                 $summaryData[] = [
                     'corpId' => $corpId,
@@ -167,7 +223,9 @@ class EmployeeAttendanceSummaryApiController extends Controller
                     'workingDays' => $workingDays,
                     'holidays' => $holidays,
                     'weekOff' => $weekOffCount,
-                    'leave' => $totalLeaveIncludingAbsent, // Both Leave and Absent days count as leave
+                    'leave' => $totalLeave,
+                    'paidDays' => $paidDays,
+                    'absent' => $totalAbsent,
                     'month' => $month,
                     'year' => $year,
                     'created_at' => now(),
@@ -561,6 +619,39 @@ class EmployeeAttendanceSummaryApiController extends Controller
                 }
             }
 
+            // Get leave requests for the period
+            $monthNumber = Carbon::parse($month)->month;
+            $startDate = Carbon::create($year, $monthNumber, 1)->format('Y-m-d');
+            $endDate = Carbon::create($year, $monthNumber, 1)->endOfMonth()->format('Y-m-d');
+            
+            $leaveRequests = DB::table('leave_request')
+                ->select('empcode', 'from_date', 'to_date', 'status')
+                ->where('corp_id', $corpId)
+                ->where('company_name', $companyName)
+                ->where(function($query) use ($startDate, $endDate) {
+                    $query->whereBetween('from_date', [$startDate, $endDate])
+                          ->orWhereBetween('to_date', [$startDate, $endDate])
+                          ->orWhere(function($q) use ($startDate, $endDate) {
+                              $q->where('from_date', '<=', $startDate)
+                                ->where('to_date', '>=', $endDate);
+                          });
+                })
+                ->get();
+            
+            // Create a map of leave status by empCode and date
+            $leaveStatusMap = [];
+            foreach ($leaveRequests as $leave) {
+                $fromDate = Carbon::parse($leave->from_date);
+                $toDate = Carbon::parse($leave->to_date);
+                
+                for ($date = $fromDate->copy(); $date->lte($toDate); $date->addDay()) {
+                    $dateKey = $date->format('Y-m-d');
+                    if ($date->gte(Carbon::parse($startDate)) && $date->lte(Carbon::parse($endDate))) {
+                        $leaveStatusMap[$leave->empcode][$dateKey] = $leave->status;
+                    }
+                }
+            }
+
             // Get unique employee codes from attendance data
             $empCodes = $attendanceData->pluck('empCode')->unique();
 
@@ -569,17 +660,39 @@ class EmployeeAttendanceSummaryApiController extends Controller
                 // Calculate attendance statistics for this employee
                 $employeeAttendance = $attendanceData->where('empCode', $empCode);
 
-                $totalPresent = $employeeAttendance->where('attendanceStatus', 'Present')->count();
-                $totalAbsent = $employeeAttendance->where('attendanceStatus', 'Absent')->count();
-                $totalLeave = $employeeAttendance->where('attendanceStatus', 'Leave')->count();
-                $totalHalfDay = $employeeAttendance->where('attendanceStatus', 'Half Day')->count();
+                $totalPresent = 0;
+                $totalLeave = 0;
+                $totalAbsent = 0;
                 
-                // Count both 'Leave' and 'Absent' as leave for the summary
-                $totalLeaveIncludingAbsent = $totalLeave + $totalAbsent;
+                foreach ($employeeAttendance as $attendance) {
+                    $attendanceDate = Carbon::parse($attendance->date)->format('Y-m-d');
+                    $leaveStatus = $leaveStatusMap[$empCode][$attendanceDate] ?? null;
+                    
+                    // Determine the status based on leave request
+                    if ($leaveStatus === 'Approved') {
+                        // Approved leave counts as Leave
+                        $totalLeave++;
+                    } elseif (in_array($leaveStatus, ['Pending', 'Rejected', 'Returned'])) {
+                        // Pending/Rejected/Returned leave counts as Absent
+                        $totalAbsent++;
+                    } elseif ($attendance->attendanceStatus === 'Present') {
+                        // No leave request or attendance is Present
+                        $totalPresent++;
+                    } elseif ($attendance->attendanceStatus === 'Leave') {
+                        // Direct leave entry in attendance
+                        $totalLeave++;
+                    } else {
+                        // Other cases count as Absent
+                        $totalAbsent++;
+                    }
+                }
 
                 // Calculate working days (total days in month - weekends - holidays)
                 $totalDaysInMonth = Carbon::createFromFormat('F Y', $month . ' ' . $year)->daysInMonth;
                 $workingDays = $totalDaysInMonth - $weekOffCount - $holidays;
+                
+                // Calculate paid days: working days - absent
+                $paidDays = $workingDays - $totalAbsent;
 
                 $summaryData[] = [
                     'corpId' => $corpId,
@@ -589,7 +702,9 @@ class EmployeeAttendanceSummaryApiController extends Controller
                     'workingDays' => $workingDays,
                     'holidays' => $holidays,
                     'weekOff' => $weekOffCount,
-                    'leave' => $totalLeaveIncludingAbsent,
+                    'leave' => $totalLeave,
+                    'paidDays' => $paidDays,
+                    'absent' => $totalAbsent,
                     'month' => $month,
                     'year' => $year,
                     'created_at' => now(),

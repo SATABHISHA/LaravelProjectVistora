@@ -30,6 +30,8 @@ class EmployeeAttendanceSummary extends Model
         'holidays',
         'weekOff',
         'leave',
+        'paidDays',
+        'absent',
         'month',
         'year',
     ];
@@ -45,5 +47,7 @@ class EmployeeAttendanceSummary extends Model
         'holidays' => 'integer',
         'weekOff' => 'integer',
         'leave' => 'double',
+        'paidDays' => 'double',
+        'absent' => 'integer',
     ];
 }
