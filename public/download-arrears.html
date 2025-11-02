@@ -125,13 +125,25 @@
                         <td>Sub Branch:</td>
                         <td id="subBranchCell">All SubBranches</td>
                     </tr>
+                    <tr id="statsRow" style="display:none;">
+                        <td>Total Employees:</td>
+                        <td id="totalEmployeesCell">-</td>
+                    </tr>
+                    <tr id="arrearsRow" style="display:none;">
+                        <td>Employees with Arrears:</td>
+                        <td id="employeesWithArrearsCell">-</td>
+                    </tr>
+                    <tr id="arrearsMonthsRow" style="display:none;">
+                        <td>Arrears Period:</td>
+                        <td id="arrearsMonthsCell">-</td>
+                    </tr>
                     <tr>
                         <td>Export Format:</td>
                         <td>Excel (.xlsx)</td>
                     </tr>
                     <tr>
                         <td>Status:</td>
-                        <td><span class="status ready">READY TO DOWNLOAD</span></td>
+                        <td><span class="status ready" id="statusBadge">CHECKING...</span></td>
                     </tr>
                 </table>
             </div>
@@ -140,6 +152,7 @@
         <div class="error-box" id="errorMessage">
             <strong>❌ Error:</strong>
             <p id="errorText"></p>
+            <div id="errorDetailsJson" style="margin-top: 10px; padding: 10px; background-color: #f4f4f4; border-radius: 4px; font-family: monospace; font-size: 12px; max-height: 300px; overflow-y: auto; display: none;"></div>
         </div>
 
         <div style="text-align: center; margin: 30px 0;">
@@ -201,6 +214,98 @@
             
             // Update "What's in the Excel file" description
             document.getElementById('currentMonthDesc').textContent = `${month} ${year}`;
+            
+            // Check data availability
+            checkDataAvailability();
+        }
+
+        // Check if data is available and get statistics
+        function checkDataAvailability() {
+            const corpId = getUrlParameter('corpId');
+            const companyName = getUrlParameter('companyName');
+            const year = getUrlParameter('year');
+            const month = getUrlParameter('month');
+            const subBranch = getUrlParameter('subBranch');
+
+            if (!corpId || !companyName || !year || !month) {
+                showError('Missing required parameters. Please check the URL.');
+                document.getElementById('statusBadge').textContent = 'ERROR';
+                document.getElementById('statusBadge').classList.remove('ready');
+                return;
+            }
+
+            // Construct API URL
+            let apiUrl = `https://vistora.sroy.es/public/api/payroll/export-with-arrears?corpId=${encodeURIComponent(corpId)}&companyName=${encodeURIComponent(companyName)}&year=${encodeURIComponent(year)}&month=${encodeURIComponent(month)}`;
+
+            if (subBranch) {
+                apiUrl += `&subBranch=${encodeURIComponent(subBranch)}`;
+            }
+
+            // Fetch data to check availability
+            fetch(apiUrl, { method: 'HEAD' })
+                .then(response => {
+                    if (!response.ok) {
+                        // If HEAD fails, try GET to get the error message
+                        return fetch(apiUrl)
+                            .then(res => {
+                                const contentType = res.headers.get('content-type');
+                                if (contentType && contentType.includes('application/json')) {
+                                    return res.json().then(data => {
+                                        throw new Error(JSON.stringify(data, null, 2));
+                                    });
+                                } else if (!res.ok) {
+                                    return res.text().then(text => {
+                                        throw new Error(text || `Server returned ${res.status}`);
+                                    });
+                                }
+                                // If successful Excel response, update status
+                                updateStatusSuccess();
+                            });
+                    } else {
+                        // HEAD request successful
+                        updateStatusSuccess();
+                    }
+                })
+                .catch(error => {
+                    let errorMessage = error.message;
+                    let jsonData = null;
+                    
+                    // Try to parse JSON error
+                    try {
+                        jsonData = JSON.parse(errorMessage);
+                        if (jsonData.message) {
+                            errorMessage = jsonData.message;
+                        }
+                        if (jsonData.details) {
+                            // Show additional details
+                            const detailsDiv = document.getElementById('errorDetailsJson');
+                            detailsDiv.textContent = JSON.stringify(jsonData.details, null, 2);
+                            detailsDiv.style.display = 'block';
+                        }
+                    } catch (e) {
+                        // Not JSON, use as is
+                    }
+                    
+                    showError(errorMessage);
+                    document.getElementById('statusBadge').textContent = 'NOT AVAILABLE';
+                    document.getElementById('statusBadge').classList.remove('ready');
+                    document.getElementById('statusBadge').style.backgroundColor = '#dc3545';
+                    
+                    // Disable download button
+                    document.getElementById('downloadBtn').disabled = true;
+                    document.getElementById('downloadBtn').style.cursor = 'not-allowed';
+                });
+        }
+
+        // Update status to success
+        function updateStatusSuccess() {
+            document.getElementById('statusBadge').textContent = 'READY TO DOWNLOAD';
+            document.getElementById('statusBadge').classList.add('ready');
+            
+            // Note: We can't get exact statistics without downloading the file
+            // But we can show the rows once data is confirmed available
+            document.getElementById('statsRow').style.display = 'table-row';
+            document.getElementById('totalEmployeesCell').textContent = 'Available (download to see details)';
         }
 
         // Start download function
@@ -231,19 +336,108 @@
             // Hide previous errors
             document.getElementById('errorMessage').style.display = 'none';
 
-            // Create a temporary link and trigger download
-            const link = document.createElement('a');
-            link.href = apiUrl;
-            link.download = `SalarySheet_WithArrears_${companyName}_${month}_${year}.xlsx`;
-            document.body.appendChild(link);
-            link.click();
-            document.body.removeChild(link);
-
-            // Reset button after a delay
-            setTimeout(() => {
-                button.textContent = '⬇ Download Excel File';
-                button.disabled = false;
-            }, 3000);
+            // Try to download and handle errors
+            fetch(apiUrl)
+                .then(response => {
+                    const contentType = response.headers.get('content-type');
+                    
+                    if (!response.ok) {
+                        // Check if it's JSON error
+                        if (contentType && contentType.includes('application/json')) {
+                            return response.json().then(data => {
+                                // Open error in new window
+                                const errorWindow = window.open('', '_blank');
+                                errorWindow.document.write(`
+                                    <!DOCTYPE html>
+                                    <html>
+                                    <head>
+                                        <title>Error - Arrears Export</title>
+                                        <style>
+                                            body { font-family: Arial, sans-serif; padding: 40px; background-color: #f5f5f5; }
+                                            .error-container { background: white; padding: 30px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); max-width: 800px; margin: 0 auto; }
+                                            h1 { color: #dc3545; border-bottom: 3px solid #dc3545; padding-bottom: 10px; }
+                                            .message { font-size: 16px; margin: 20px 0; padding: 15px; background-color: #f8d7da; border-left: 4px solid #dc3545; }
+                                            pre { background-color: #f4f4f4; padding: 15px; border-radius: 4px; overflow-x: auto; font-family: monospace; font-size: 14px; }
+                                            .back-btn { background-color: #007bff; color: white; padding: 10px 20px; text-decoration: none; border-radius: 4px; display: inline-block; margin-top: 20px; }
+                                            .back-btn:hover { background-color: #0056b3; }
+                                        </style>
+                                    </head>
+                                    <body>
+                                        <div class="error-container">
+                                            <h1>❌ Error: Unable to Export Arrears</h1>
+                                            <div class="message">
+                                                <strong>Message:</strong> ${data.message || 'Unknown error occurred'}
+                                            </div>
+                                            ${data.details ? `
+                                                <h3>Details:</h3>
+                                                <pre>${JSON.stringify(data.details, null, 2)}</pre>
+                                            ` : ''}
+                                            <h3>Full Response:</h3>
+                                            <pre>${JSON.stringify(data, null, 2)}</pre>
+                                            <a href="javascript:window.close()" class="back-btn">Close Window</a>
+                                        </div>
+                                    </body>
+                                    </html>
+                                `);
+                                throw new Error(data.message || 'Server returned an error');
+                            });
+                        } else {
+                            return response.text().then(text => {
+                                // Open text error in new window
+                                const errorWindow = window.open('', '_blank');
+                                errorWindow.document.write(`
+                                    <!DOCTYPE html>
+                                    <html>
+                                    <head>
+                                        <title>Error - Arrears Export</title>
+                                        <style>
+                                            body { font-family: Arial, sans-serif; padding: 40px; background-color: #f5f5f5; }
+                                            .error-container { background: white; padding: 30px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+                                            h1 { color: #dc3545; }
+                                            pre { background-color: #f4f4f4; padding: 15px; border-radius: 4px; overflow-x: auto; }
+                                        </style>
+                                    </head>
+                                    <body>
+                                        <div class="error-container">
+                                            <h1>❌ Server Error</h1>
+                                            <pre>${text}</pre>
+                                        </div>
+                                    </body>
+                                    </html>
+                                `);
+                                throw new Error(text || `Server returned ${response.status}`);
+                            });
+                        }
+                    }
+                    
+                    // Check if response is Excel (success)
+                    if (contentType && contentType.includes('spreadsheet')) {
+                        return response.blob();
+                    } else {
+                        throw new Error('Unexpected response type');
+                    }
+                })
+                .then(blob => {
+                    if (blob) {
+                        // Create download link
+                        const url = window.URL.createObjectURL(blob);
+                        const link = document.createElement('a');
+                        link.href = url;
+                        link.download = `SalarySheet_WithArrears_${companyName}_${month}_${year}.xlsx`;
+                        document.body.appendChild(link);
+                        link.click();
+                        document.body.removeChild(link);
+                        window.URL.revokeObjectURL(url);
+                    }
+                })
+                .catch(error => {
+                    showError(error.message);
+                })
+                .finally(() => {
+                    // Reset button
+                    button.textContent = '⬇ Download Excel File';
+                    button.disabled = false;
+                });
 
             console.log('Download initiated for:', apiUrl);
         }
@@ -254,6 +448,9 @@
             const errorText = document.getElementById('errorText');
             errorText.textContent = message;
             errorDiv.style.display = 'block';
+            
+            // Scroll to error
+            errorDiv.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
         }
 
         // Initialize page
