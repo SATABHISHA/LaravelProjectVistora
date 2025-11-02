@@ -273,23 +273,25 @@ class EmployeeSalaryStructureApiController extends Controller
             $arrearWithEffectFrom = $request->arrearWithEffectFrom;
             $incrementAmount = (float)$request->increment;
 
-            // Calculate previous year
-            $previousYear = (int)$currentYear - 1;
-
-            // Fetch previous year salary structure
-            $previousSalary = EmployeeSalaryStructure::where('corpId', $corpId)
+            // Find the last revision year (maximum year less than current year)
+            $previousYearRecord = EmployeeSalaryStructure::where('corpId', $corpId)
                 ->where('companyName', $companyName)
                 ->where('empCode', $empCode)
-                ->where('year', (string)$previousYear)
+                ->where('year', '<', $currentYear)
+                ->orderBy('year', 'desc')
                 ->first();
 
-            if (!$previousSalary) {
+            if (!$previousYearRecord) {
+                $previousYear = (int)$currentYear - 1;
                 return response()->json([
                     'status' => false,
                     'message' => "No salary structure found for employee {$empCode} in year {$previousYear}",
                     'data' => []
                 ], 404);
             }
+
+            $previousYear = $previousYearRecord->year;
+            $previousSalary = $previousYearRecord;
 
             // Parse JSON fields from previous year
             $previousGrossList = $this->parseJsonField($previousSalary->grossList);
