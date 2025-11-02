@@ -241,7 +241,7 @@
                 apiUrl += `&subBranch=${encodeURIComponent(subBranch)}`;
             }
 
-            // Fetch data to check availability
+            // Fetch data to check availability and get statistics
             fetch(apiUrl, { method: 'HEAD' })
                 .then(response => {
                     if (!response.ok) {
@@ -258,12 +258,12 @@
                                         throw new Error(text || `Server returned ${res.status}`);
                                     });
                                 }
-                                // If successful Excel response, update status
-                                updateStatusSuccess();
+                                // If successful Excel response, extract statistics from headers
+                                updateStatusSuccess(res);
                             });
                     } else {
-                        // HEAD request successful
-                        updateStatusSuccess();
+                        // HEAD request successful, extract statistics from headers
+                        updateStatusSuccess(response);
                     }
                 })
                 .catch(error => {
@@ -297,15 +297,34 @@
                 });
         }
 
-        // Update status to success
-        function updateStatusSuccess() {
+        // Update status to success and display statistics
+        function updateStatusSuccess(response) {
             document.getElementById('statusBadge').textContent = 'READY TO DOWNLOAD';
             document.getElementById('statusBadge').classList.add('ready');
             
-            // Note: We can't get exact statistics without downloading the file
-            // But we can show the rows once data is confirmed available
-            document.getElementById('statsRow').style.display = 'table-row';
-            document.getElementById('totalEmployeesCell').textContent = 'Available (download to see details)';
+            // Extract statistics from response headers
+            const totalEmployees = response.headers.get('X-Total-Employees');
+            const employeesWithArrears = response.headers.get('X-Employees-With-Arrears');
+            const arrearsMonths = response.headers.get('X-Arrears-Months');
+            
+            // Show statistics
+            if (totalEmployees) {
+                document.getElementById('statsRow').style.display = 'table-row';
+                document.getElementById('totalEmployeesCell').textContent = `${totalEmployees} employees`;
+            }
+            
+            if (employeesWithArrears) {
+                document.getElementById('arrearsRow').style.display = 'table-row';
+                const arrearsText = employeesWithArrears > 0 
+                    ? `${employeesWithArrears} employees (with arrears)`
+                    : 'No employees with arrears';
+                document.getElementById('employeesWithArrearsCell').textContent = arrearsText;
+            }
+            
+            if (arrearsMonths && arrearsMonths !== '') {
+                document.getElementById('arrearsMonthsRow').style.display = 'table-row';
+                document.getElementById('arrearsMonthsCell').textContent = arrearsMonths;
+            }
         }
 
         // Start download function

@@ -2825,10 +2825,23 @@ class EmployeePayrollSalaryProcessApiController extends Controller
                 $fileContent = \Storage::get($tempPath);
                 \Storage::delete($tempPath); // Clean up temp file
 
+                // Calculate arrears months range if available
+                $arrearsMonthsRange = '';
+                if ($arrearsStats['employeesWithArrears'] > 0 && !empty($arrearsStats['employeesWithArrearsDetails'])) {
+                    $firstEmployee = $arrearsStats['employeesWithArrearsDetails'][0];
+                    if (isset($firstEmployee['effectiveFrom']) && isset($firstEmployee['monthsCount'])) {
+                        $arrearsMonthsRange = $firstEmployee['monthsCount'] . ' months (from ' . $firstEmployee['effectiveFrom'] . ')';
+                    }
+                }
+
                 return response($fileContent)
                     ->header('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
                     ->header('Content-Disposition', 'attachment; filename="' . $fileName . '"')
-                    ->header('Content-Length', strlen($fileContent));
+                    ->header('Content-Length', strlen($fileContent))
+                    ->header('X-Total-Employees', $arrearsStats['totalEmployees'])
+                    ->header('X-Employees-With-Arrears', $arrearsStats['employeesWithArrears'])
+                    ->header('X-Arrears-Months', $arrearsMonthsRange)
+                    ->header('Access-Control-Expose-Headers', 'X-Total-Employees, X-Employees-With-Arrears, X-Arrears-Months');
             }
 
             // Fallback to original method
