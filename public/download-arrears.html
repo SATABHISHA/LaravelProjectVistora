@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Download Salary Sheet with Arrears</title>
+    <title>Download Arrears Export</title>
     <style>
         body {
             font-family: Arial, sans-serif;
@@ -91,7 +91,7 @@
 </head>
 <body>
     <div class="container">
-        <h1>📊 Salary Sheet with Arrears Export</h1>
+        <h1 id="pageTitle">📊 Salary Sheet with Arrears Export</h1>
 
         <div class="success-box">
             <strong>✓ Export Page Ready!</strong><br>
@@ -110,8 +110,13 @@
             </div>
         </div>
 
+        <div id="errorMessage" style="display:none; background-color: #f8d7da; border-left: 4px solid #dc3545; padding: 15px; margin: 20px 0;">
+            <strong>❌ Error:</strong>
+            <p id="errorText"></p>
+        </div>
+
         <div style="text-align: center; margin: 30px 0;">
-            <button class="download-btn" onclick="startDownload()">
+            <button class="download-btn" onclick="startDownload()" id="downloadBtn">
                 ⬇ Download Excel File
             </button>
         </div>
@@ -197,7 +202,7 @@
             const subBranch = getUrlParameter('subBranch');
 
             if (!corpId || !companyName || !year || !month) {
-                alert('Missing required parameters. Please check the URL.');
+                showError('Missing required parameters. Please check the URL.');
                 return;
             }
 
@@ -209,30 +214,76 @@
             }
 
             // Update button text
-            const button = document.querySelector('.download-btn');
-            button.textContent = '⏳ Downloading...';
+            const button = document.getElementById('downloadBtn');
+            button.textContent = '⏳ Checking data...';
             button.disabled = true;
 
-            // Create a temporary link and click it
-            const link = document.createElement('a');
-            link.href = apiUrl;
-            link.download = `SalarySheet_WithArrears_${companyName}_${month}_${year}.xlsx`;
-            document.body.appendChild(link);
-            link.click();
-            document.body.removeChild(link);
+            // Hide previous errors
+            document.getElementById('errorMessage').style.display = 'none';
 
-            // Reset button after a delay
-            setTimeout(() => {
-                button.textContent = '⬇ Download Excel File';
-                button.disabled = false;
-            }, 3000);
+            // Check if data exists first
+            fetch(apiUrl)
+                .then(response => {
+                    if (!response.ok) {
+                        return response.text().then(text => {
+                            throw new Error(text || `Server returned ${response.status}`);
+                        });
+                    }
+                    
+                    // Check if response is JSON (error) or Excel (success)
+                    const contentType = response.headers.get('content-type');
+                    if (contentType && contentType.includes('application/json')) {
+                        return response.json().then(data => {
+                            if (data.status === false) {
+                                throw new Error(data.message || 'No arrears data available');
+                            }
+                        });
+                    }
+                    
+                    // If we got here, data is valid - proceed with download
+                    button.textContent = '⏳ Downloading...';
+                    
+                    // Create a temporary link and click it
+                    const link = document.createElement('a');
+                    link.href = apiUrl;
+                    link.download = `SalarySheet_WithArrears_${companyName}_${month}_${year}.xlsx`;
+                    document.body.appendChild(link);
+                    link.click();
+                    document.body.removeChild(link);
+
+                    // Reset button after a delay
+                    setTimeout(() => {
+                        button.textContent = '⬇ Download Excel File';
+                        button.disabled = false;
+                    }, 3000);
+                })
+                .catch(error => {
+                    showError(error.message);
+                    button.textContent = '⬇ Download Excel File';
+                    button.disabled = false;
+                });
 
             console.log('Download initiated for:', apiUrl);
+        }
+
+        // Show error message
+        function showError(message) {
+            const errorDiv = document.getElementById('errorMessage');
+            const errorText = document.getElementById('errorText');
+            errorText.textContent = message;
+            errorDiv.style.display = 'block';
         }
 
         // Initialize page
         document.addEventListener('DOMContentLoaded', function() {
             updateDetails();
+            
+            // Update page title with company name
+            const companyName = getUrlParameter('companyName');
+            if (companyName) {
+                document.getElementById('pageTitle').textContent = `📊 ${companyName} - Salary Sheet with Arrears Export`;
+                document.title = `Download Arrears Export - ${companyName}`;
+            }
         });
     </script>
 </body>

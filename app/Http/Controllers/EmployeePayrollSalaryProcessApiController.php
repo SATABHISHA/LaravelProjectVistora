@@ -2625,10 +2625,11 @@ class EmployeePayrollSalaryProcessApiController extends Controller
                     }
                     $currentMonth = \Carbon\Carbon::parse($request->year . '-' . $request->month . '-01');
                     
-                    // Calculate months between effective date and current month
-                    $monthsDiff = $effectiveFrom->diffInMonths($currentMonth);
-                    
-                    if ($monthsDiff > 0) {
+                    // Check if effective date is BEFORE the current month (arrears only for past months)
+                    if ($effectiveFrom->lt($currentMonth)) {
+                        // Calculate months between effective date and current month
+                        $monthsDiff = $effectiveFrom->diffInMonths($currentMonth);
+                        
                         $arrearStatus = 'Arrears Due';
                         $arrearsEffectiveFrom = $effectiveFrom->format('M Y');
                         $arrearsMonthCount = $monthsDiff;
@@ -2661,6 +2662,7 @@ class EmployeePayrollSalaryProcessApiController extends Controller
                             'arrearsAmount' => round($netArrearsPayable, 2)
                         ];
                     } else {
+                        // Effective date is in current month or future - no arrears yet
                         $arrearStatus = 'No Arrears';
                         $arrearsStats['employeesWithoutArrears']++;
                     }
