@@ -652,6 +652,44 @@ class EmployeeAttendanceSummaryApiController extends Controller
                 }
             }
 
+            // Get holiday and week-off dates for the month (once for all employees)
+            $holidayDates = DB::table('holiday_lists')
+                ->where('corpId', $corpId)
+                ->whereRaw("DATE_FORMAT(holidayDate, '%M') = ?", [$month])
+                ->whereRaw("YEAR(holidayDate) = ?", [$year])
+                ->pluck('holidayDate')
+                ->toArray();
+
+            // Determine $puid for shift policy lookup
+            $companyShiftPolicy = DB::table('company_shift_policy')
+                ->select('shift_code')
+                ->where('company_name', $companyName)
+                ->where('corp_id', $corpId)
+                ->first();
+
+            $puid = null;
+            $usedFallback = true;
+            
+            if ($companyShiftPolicy) {
+                $shiftPolicy = DB::table('shiftpolicy')
+                    ->select('puid')
+                    ->where('shift_code', $companyShiftPolicy->shift_code)
+                    ->where('corp_id', $corpId)
+                    ->first();
+                    
+                if ($shiftPolicy) {
+                    $puid = $shiftPolicy->puid;
+                    $usedFallback = false;
+                }
+            }
+
+            $weekOffDates = $this->getWeekOffDatesForMonth($puid, $month, $year, $usedFallback);
+            $nonWorkingDates = array_unique(array_merge($holidayDates, $weekOffDates));
+            
+            // Calculate working days (total days in month - non-working days)
+            $totalDaysInMonth = Carbon::createFromFormat('F Y', $month . ' ' . $year)->daysInMonth;
+            $workingDays = $totalDaysInMonth - count($nonWorkingDates);
+
             // Get unique employee codes from attendance data
             $empCodes = $attendanceData->pluck('empCode')->unique();
 
@@ -659,17 +697,6 @@ class EmployeeAttendanceSummaryApiController extends Controller
             foreach ($empCodes as $empCode) {
                 // Calculate attendance statistics for this employee
                 $employeeAttendance = $attendanceData->where('empCode', $empCode);
-
-                // Get holiday and week-off dates for the month
-                $holidayDates = DB::table('holiday_lists')
-                    ->where('corpId', $corpId)
-                    ->whereRaw("DATE_FORMAT(holidayDate, '%M') = ?", [$month])
-                    ->whereRaw("YEAR(holidayDate) = ?", [$year])
-                    ->pluck('holidayDate')
-                    ->toArray();
-
-                $weekOffDates = $this->getWeekOffDatesForMonth($puid, $month, $year, $usedFallback);
-                $nonWorkingDates = array_merge($holidayDates, $weekOffDates);
 
                 $totalPresent = 0;
                 $totalLeave = 0;
@@ -690,10 +717,6 @@ class EmployeeAttendanceSummaryApiController extends Controller
                         $totalPresent++;
                     }
                 }
-
-                // Calculate working days (total days in month - weekends - holidays)
-                $totalDaysInMonth = Carbon::createFromFormat('F Y', $month . ' ' . $year)->daysInMonth;
-                $workingDays = $totalDaysInMonth - count($nonWorkingDates);
                 
                 // Correctly calculate absent and paid days
                 $totalAbsent = $workingDays - $totalPresent - $totalLeave;
@@ -705,8 +728,8 @@ class EmployeeAttendanceSummaryApiController extends Controller
                     'companyName' => $companyName,
                     'totalPresent' => $totalPresent,
                     'workingDays' => $workingDays,
-                    'holidays' => $holidays,
-                    'weekOff' => $weekOffCount,
+                    'holidays' => count($holidayDates),
+                    'weekOff' => count($weekOffDates),
                     'leave' => $totalLeave,
                     'paidDays' => $paidDays,
                     'absent' => $totalAbsent,
@@ -728,8 +751,8 @@ class EmployeeAttendanceSummaryApiController extends Controller
                     'period' => $month . ' ' . $year,
                     'company' => $companyName,
                     'corpId' => $corpId,
-                    'holidays_in_period' => $holidays,
-                    'week_off_days' => $weekOffCount,
+                    'holidays_in_period' => count($holidayDates),
+                    'week_off_days' => count($weekOffDates),
                     'working_days_calculated' => $workingDays,
                     'used_fallback_logic' => $usedFallback,
                     'fallback_note' => $usedFallback ? 'Saturday and Sunday treated as weekends' : null
