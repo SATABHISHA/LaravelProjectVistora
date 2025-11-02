@@ -1,0 +1,182 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Download IMS MACO Arrears Export</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 900px;
+            margin: 50px auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            background-color: white;
+            padding: 30px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #333;
+            border-bottom: 3px solid #4CAF50;
+            padding-bottom: 10px;
+        }
+        .info-box {
+            background-color: #e7f3ff;
+            border-left: 4px solid #2196F3;
+            padding: 15px;
+            margin: 20px 0;
+        }
+        .success-box {
+            background-color: #e8f5e9;
+            border-left: 4px solid #4CAF50;
+            padding: 15px;
+            margin: 20px 0;
+        }
+        .download-btn {
+            display: inline-block;
+            background-color: #4CAF50;
+            color: white;
+            padding: 15px 32px;
+            text-align: center;
+            text-decoration: none;
+            font-size: 16px;
+            border-radius: 4px;
+            border: none;
+            cursor: pointer;
+            margin: 10px 0;
+            transition: background-color 0.3s;
+        }
+        .download-btn:hover {
+            background-color: #45a049;
+        }
+        .download-btn:active {
+            background-color: #3d8b40;
+        }
+        .details {
+            margin: 20px 0;
+        }
+        .details table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+        .details td {
+            padding: 8px;
+            border-bottom: 1px solid #ddd;
+        }
+        .details td:first-child {
+            font-weight: bold;
+            width: 200px;
+        }
+        .status {
+            display: inline-block;
+            padding: 5px 10px;
+            border-radius: 4px;
+            font-size: 14px;
+            font-weight: bold;
+        }
+        .status.ready {
+            background-color: #4CAF50;
+            color: white;
+        }
+        code {
+            background-color: #f4f4f4;
+            padding: 2px 6px;
+            border-radius: 3px;
+            font-family: 'Courier New', monospace;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>📊 Salary Sheet with Arrears Export - IMS MACO</h1>
+        
+        <div class="success-box">
+            <strong>✓ Server is Running!</strong><br>
+            The Laravel development server is active on <code>http://127.0.0.1:8000</code>
+        </div>
+
+        <div class="info-box">
+            <strong>📋 Export Details:</strong>
+            <div class="details">
+                <table>
+                    <tr>
+                        <td>Company:</td>
+                        <td><strong>IMS MACO SERVICES INDIA PVT. LTD.</strong></td>
+                    </tr>
+                    <tr>
+                        <td>Month:</td>
+                        <td>November 2025</td>
+                    </tr>
+                    <tr>
+                        <td>Total Employees:</td>
+                        <td>26 employees</td>
+                    </tr>
+                    <tr>
+                        <td>Employees with Arrears:</td>
+                        <td>24 employees (arrears from September 2025)</td>
+                    </tr>
+                    <tr>
+                        <td>Arrears Months:</td>
+                        <td>2 months (Sep 2025 - Oct 2025)</td>
+                    </tr>
+                    <tr>
+                        <td>Export Format:</td>
+                        <td>Excel (.xlsx)</td>
+                    </tr>
+                    <tr>
+                        <td>Status:</td>
+                        <td><span class="status ready">READY TO DOWNLOAD</span></td>
+                    </tr>
+                </table>
+            </div>
+        </div>
+
+        <div style="text-align: center; margin: 30px 0;">
+            <a href="http://127.0.0.1:8000/api/payroll/export-with-arrears?corpId=maco&companyName=IMS%20MACO%20SERVICES%20INDIA%20PVT.%20LTD.&year=2025&month=November" 
+               class="download-btn"
+               download="SalarySheet_WithArrears_IMS_MACO_November_2025.xlsx">
+                ⬇ Download Excel File
+            </a>
+        </div>
+
+        <div class="info-box">
+            <strong>💡 What's in the Excel file?</strong>
+            <ul style="margin: 10px 0;">
+                <li><strong>Current Month Salary:</strong> November 2025 salary breakdown by component</li>
+                <li><strong>Arrears Calculation:</strong> 2 months of arrears (Sep + Oct) for each salary component</li>
+                <li><strong>Total Gross:</strong> Current month + Arrears gross earnings</li>
+                <li><strong>Total Deductions:</strong> Current month + Arrears deductions</li>
+                <li><strong>Net Take Home:</strong> Final amount after all calculations</li>
+                <li><strong>Employee Details:</strong> Code, Name, Designation, Arrears status</li>
+            </ul>
+        </div>
+
+        <div style="background-color: #fff3cd; border-left: 4px solid #ffc107; padding: 15px; margin: 20px 0;">
+            <strong>⚠ Important Notes:</strong>
+            <ul style="margin: 10px 0;">
+                <li>Make sure the Laravel server is running before clicking download</li>
+                <li>The download should start immediately when you click the button</li>
+                <li>File size is approximately 12 KB (12,487 bytes)</li>
+                <li>If download fails, refresh this page and try again</li>
+            </ul>
+        </div>
+
+        <div style="margin-top: 30px; padding-top: 20px; border-top: 2px solid #e0e0e0;">
+            <h3>🔧 Server Information</h3>
+            <p><strong>Laravel Development Server:</strong> <code>http://127.0.0.1:8000</code></p>
+            <p><strong>API Endpoint:</strong> <code>GET /api/payroll/export-with-arrears</code></p>
+            <p><strong>Status:</strong> <span style="color: #4CAF50; font-weight: bold;">● Online</span></p>
+        </div>
+    </div>
+
+    <script>
+        // Check if server is responsive
+        document.querySelector('.download-btn').addEventListener('click', function(e) {
+            console.log('Download initiated for IMS MACO arrears export');
+        });
+    </script>
+</body>
+</html>

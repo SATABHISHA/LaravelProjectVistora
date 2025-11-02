@@ -8,6 +8,7 @@ use App\Models\EmployeeDetail;
 use App\Models\EmploymentDetail;
 use App\Exports\PayrollExport;
 use App\Exports\ReleasedPayrollExport;
+use App\Exports\PayrollArrearsExport;
 use Maatwebsite\Excel\Facades\Excel;
 use ZipArchive;
 use Illuminate\Support\Facades\File;
@@ -2427,6 +2428,411 @@ class EmployeePayrollSalaryProcessApiController extends Controller
         $breakdown['monthly_net_salary'] = $breakdown['monthly_gross_total'] + $breakdown['monthly_benefits_total'] - $breakdown['monthly_deductions_total'];
 
         return $breakdown;
+    }
+
+    /**
+     * Export payroll data with arrears calculation
+     *
+     * @param Request $request
+     * @return \Symfony\Component\HttpFoundation\BinaryFileResponse
+     */
+    public function exportPayrollWithArrears(Request $request)
+    {
+        // Validate required fields
+        $request->validate([
+            'corpId' => 'required|string|max:10',
+            'companyName' => 'required|string|max:100',
+            'year' => 'required|string|max:4',
+            'month' => 'required|string|max:50',
+            'subBranch' => 'nullable|string|max:100',
+        ]);
+
+        try {
+            // Get payroll records with Released status
+            $payrollRecords = EmployeePayrollSalaryProcess::where('corpId', $request->corpId)
+                ->where('companyName', $request->companyName)
+                ->where('year', $request->year)
+                ->where('month', $request->month)
+                ->where('status', 'Released')
+                ->get();
+
+            if ($payrollRecords->isEmpty()) {
+                abort(404, 'No released payroll records found for the specified period');
+            }
+
+            // Get all employee codes
+            $empCodes = $payrollRecords->pluck('empCode')->unique()->toArray();
+            
+            // Fetch employee details
+            $employeeDetails = EmployeeDetail::whereIn('EmpCode', $empCodes)->get()->keyBy('EmpCode');
+            
+            $employmentDetailsQuery = EmploymentDetail::whereIn('EmpCode', $empCodes);
+            
+            // Apply SubBranch filter if provided
+            if ($request->has('subBranch') && !empty($request->subBranch)) {
+                $employmentDetailsQuery->where('SubBranch', $request->subBranch);
+            }
+            
+            $employmentDetails = $employmentDetailsQuery->get()->keyBy('EmpCode');
+
+            // Filter payroll records based on employment details
+            if ($request->has('subBranch') && !empty($request->subBranch)) {
+                $filteredEmpCodes = $employmentDetails->pluck('EmpCode')->toArray();
+                $payrollRecords = $payrollRecords->whereIn('empCode', $filteredEmpCodes);
+            }
+
+            if ($payrollRecords->isEmpty()) {
+                abort(404, 'No released payroll records found for the specified SubBranch and period');
+            }
+
+            // Fetch salary structures with arrears info
+            $salaryStructures = \App\Models\EmployeeSalaryStructure::where('corpId', $request->corpId)
+                ->where('companyName', $request->companyName)
+                ->where('year', $request->year)
+                ->whereIn('empCode', $empCodes)
+                ->get()
+                ->keyBy('empCode');
+
+            $excelData = [];
+            $dynamicHeaders = ['gross' => [], 'deductions' => []];
+            $totals = [];
+            $serialNo = 1;
+            
+            $arrearsStats = [
+                'totalEmployees' => 0,
+                'employeesWithArrears' => 0,
+                'employeesWithoutArrears' => 0,
+                'employeesWithoutRevision' => 0,
+                'employeesWithArrearsDetails' => [],
+                'employeesWithoutRevisionDetails' => []
+            ];
+
+            // FIRST PASS: Collect ALL dynamic headers
+            foreach ($payrollRecords as $record) {
+                $grossList = $this->safeJsonDecode($record->grossList);
+                $recurringDeductions = $this->safeJsonDecode($record->recurringDeduction);
+
+                foreach ($grossList as $item) {
+                    $componentName = $item['componentName'] ?? 'Unknown Component';
+                    $headerKey = 'gross_' . str_replace(' ', '_', strtolower($componentName));
+                    $dynamicHeaders['gross'][$headerKey] = $componentName;
+                }
+                
+                foreach ($recurringDeductions as $item) {
+                    $componentName = $item['componentName'] ?? 'Unknown Component';
+                    $headerKey = 'deduction_' . str_replace(' ', '_', strtolower($componentName));
+                    $dynamicHeaders['deductions'][$headerKey] = $componentName;
+                }
+            }
+
+            // SECOND PASS: Process each record with arrears calculation
+            foreach ($payrollRecords as $record) {
+                $arrearsStats['totalEmployees']++;
+                
+                $employeeDetail = $employeeDetails->get($record->empCode);
+                $employmentDetail = $employmentDetails->get($record->empCode);
+                $salaryStructure = $salaryStructures->get($record->empCode);
+                
+                $fullName = $this->getFullEmployeeName($employeeDetail);
+
+                // Parse current month salary
+                $grossList = $this->safeJsonDecode($record->grossList);
+                $recurringDeductions = $this->safeJsonDecode($record->recurringDeduction);
+
+                // Calculate current month totals
+                $monthlyTotalGross = 0;
+                $monthlyTotalDeductions = 0;
+
+                foreach ($grossList as $item) {
+                    if (isset($item['calculatedValue']) && is_numeric($item['calculatedValue'])) {
+                        $monthlyTotalGross += (float)$item['calculatedValue'];
+                    }
+                }
+
+                foreach ($recurringDeductions as $item) {
+                    if (isset($item['calculatedValue']) && is_numeric($item['calculatedValue'])) {
+                        $monthlyTotalDeductions += (float)$item['calculatedValue'];
+                    }
+                }
+
+                $netTakeHomeMonthly = $monthlyTotalGross - $monthlyTotalDeductions;
+
+                // Calculate arrears
+                $arrearStatus = 'No Revision';
+                $arrearsEffectiveFrom = '';
+                $arrearsMonthCount = 0;
+                $totalGrossArrears = 0;
+                $totalDeductionArrears = 0;
+                $netArrearsPayable = 0;
+                $arrearsGrossBreakup = [];
+                $arrearsDeductionBreakup = [];
+
+                if ($salaryStructure && !empty($salaryStructure->arrearWithEffectFrom)) {
+                    try {
+                        // Try to parse different date formats
+                        $dateString = $salaryStructure->arrearWithEffectFrom;
+                        if (strpos($dateString, '/') !== false) {
+                            // Format: 20/8/2025 or 20/08/2025
+                            $effectiveFrom = \Carbon\Carbon::createFromFormat('d/m/Y', $dateString);
+                        } else {
+                            $effectiveFrom = \Carbon\Carbon::parse($dateString);
+                        }
+                    } catch (\Exception $e) {
+                        // If parsing fails, skip arrears calculation
+                        $effectiveFrom = null;
+                    }
+                    
+                    if ($effectiveFrom) {
+                        $currentMonth = \Carbon\Carbon::parse($request->year . '-' . $request->month . '-01');
+                    } else {
+                        // Skip arrears if date is invalid
+                        $arrearsStats['employeesWithoutRevision']++;
+                        $arrearsStats['employeesWithoutRevisionDetails'][] = [
+                            'empCode' => $record->empCode,
+                            'empName' => $fullName
+                        ];
+                        
+                        // Continue to next record
+                        $row['monthlyTotalGross'] = round($monthlyTotalGross, 2);
+                        $row['monthlyTotalDeductions'] = round($monthlyTotalDeductions, 2);
+                        
+                        // Initialize ALL dynamic headers with 0
+                        foreach ($dynamicHeaders['gross'] as $headerKey => $headerName) {
+                            $row[$headerKey] = 0;
+                            $row['arrears_' . $headerKey] = 0;
+                        }
+                        foreach ($dynamicHeaders['deductions'] as $headerKey => $headerName) {
+                            $row[$headerKey] = 0;
+                            $row['arrears_' . $headerKey] = 0;
+                        }
+                        
+                        foreach ($grossList as $item) {
+                            $componentName = $item['componentName'] ?? 'Unknown Component';
+                            $headerKey = 'gross_' . str_replace(' ', '_', strtolower($componentName));
+                            $value = (float)($item['calculatedValue'] ?? 0);
+                            $row[$headerKey] = $value;
+                        }
+                        
+                        foreach ($recurringDeductions as $item) {
+                            $componentName = $item['componentName'] ?? 'Unknown Component';
+                            $headerKey = 'deduction_' . str_replace(' ', '_', strtolower($componentName));
+                            $value = (float)($item['calculatedValue'] ?? 0);
+                            $row[$headerKey] = $value;
+                        }
+                        
+                        $excelData[] = $row;
+                        continue;
+                    }
+                    $currentMonth = \Carbon\Carbon::parse($request->year . '-' . $request->month . '-01');
+                    
+                    // Calculate months between effective date and current month
+                    $monthsDiff = $effectiveFrom->diffInMonths($currentMonth);
+                    
+                    if ($monthsDiff > 0) {
+                        $arrearStatus = 'Arrears Due';
+                        $arrearsEffectiveFrom = $effectiveFrom->format('M Y');
+                        $arrearsMonthCount = $monthsDiff;
+                        
+                        // Calculate arrears for each gross component
+                        foreach ($grossList as $item) {
+                            $componentName = $item['componentName'] ?? 'Unknown Component';
+                            $monthlyValue = (float)($item['calculatedValue'] ?? 0);
+                            $arrearsValue = $monthlyValue * $monthsDiff;
+                            $totalGrossArrears += $arrearsValue;
+                            $arrearsGrossBreakup[$componentName] = $arrearsValue;
+                        }
+                        
+                        // Calculate arrears for each deduction component
+                        foreach ($recurringDeductions as $item) {
+                            $componentName = $item['componentName'] ?? 'Unknown Component';
+                            $monthlyValue = (float)($item['calculatedValue'] ?? 0);
+                            $arrearsValue = $monthlyValue * $monthsDiff;
+                            $totalDeductionArrears += $arrearsValue;
+                            $arrearsDeductionBreakup[$componentName] = $arrearsValue;
+                        }
+                        
+                        $netArrearsPayable = $totalGrossArrears - $totalDeductionArrears;
+                        $arrearsStats['employeesWithArrears']++;
+                        $arrearsStats['employeesWithArrearsDetails'][] = [
+                            'empCode' => $record->empCode,
+                            'empName' => $fullName,
+                            'effectiveFrom' => $arrearsEffectiveFrom,
+                            'monthsCount' => $arrearsMonthCount,
+                            'arrearsAmount' => round($netArrearsPayable, 2)
+                        ];
+                    } else {
+                        $arrearStatus = 'No Arrears';
+                        $arrearsStats['employeesWithoutArrears']++;
+                    }
+                } else {
+                    $arrearsStats['employeesWithoutRevision']++;
+                    $arrearsStats['employeesWithoutRevisionDetails'][] = [
+                        'empCode' => $record->empCode,
+                        'empName' => $fullName
+                    ];
+                }
+
+                $netTakeHomeWithArrears = $netTakeHomeMonthly + $netArrearsPayable;
+
+                // Build row data
+                $row = [
+                    'serialNo' => $serialNo++,
+                    'empCode' => $record->empCode ?? '',
+                    'empName' => $fullName ?: 'N/A',
+                    'designation' => $employmentDetail->Designation ?? 'N/A',
+                    'arrearStatus' => $arrearStatus,
+                    'arrearsEffectiveFrom' => $arrearsEffectiveFrom,
+                    'arrearsMonthCount' => $arrearsMonthCount,
+                    'monthlyTotalGross' => round($monthlyTotalGross, 2),
+                    'monthlyTotalDeductions' => round($monthlyTotalDeductions, 2),
+                    'totalGrossArrears' => round($totalGrossArrears, 2),
+                    'totalDeductionArrears' => round($totalDeductionArrears, 2),
+                    'netArrearsPayable' => round($netArrearsPayable, 2),
+                    'netTakeHomeWithArrears' => round($netTakeHomeWithArrears, 2),
+                    'status' => $record->status,
+                ];
+
+                // Initialize ALL dynamic headers with 0
+                foreach ($dynamicHeaders['gross'] as $headerKey => $headerName) {
+                    $row[$headerKey] = 0;
+                    $row['arrears_' . $headerKey] = 0;
+                    if (!isset($totals[$headerKey])) {
+                        $totals[$headerKey] = 0;
+                        $totals['arrears_' . $headerKey] = 0;
+                    }
+                }
+                foreach ($dynamicHeaders['deductions'] as $headerKey => $headerName) {
+                    $row[$headerKey] = 0;
+                    $row['arrears_' . $headerKey] = 0;
+                    if (!isset($totals[$headerKey])) {
+                        $totals[$headerKey] = 0;
+                        $totals['arrears_' . $headerKey] = 0;
+                    }
+                }
+
+                // Populate actual values for gross components
+                foreach ($grossList as $item) {
+                    $componentName = $item['componentName'] ?? 'Unknown Component';
+                    $headerKey = 'gross_' . str_replace(' ', '_', strtolower($componentName));
+                    $value = (float)($item['calculatedValue'] ?? 0);
+                    $row[$headerKey] = $value;
+                    $totals[$headerKey] = ($totals[$headerKey] ?? 0) + $value;
+                    
+                    // Arrears value
+                    $arrearsValue = $arrearsGrossBreakup[$componentName] ?? 0;
+                    $row['arrears_' . $headerKey] = $arrearsValue;
+                    $totals['arrears_' . $headerKey] = ($totals['arrears_' . $headerKey] ?? 0) + $arrearsValue;
+                }
+                
+                // Populate actual values for deduction components
+                foreach ($recurringDeductions as $item) {
+                    $componentName = $item['componentName'] ?? 'Unknown Component';
+                    $headerKey = 'deduction_' . str_replace(' ', '_', strtolower($componentName));
+                    $value = (float)($item['calculatedValue'] ?? 0);
+                    $row[$headerKey] = $value;
+                    $totals[$headerKey] = ($totals[$headerKey] ?? 0) + $value;
+                    
+                    // Arrears value
+                    $arrearsValue = $arrearsDeductionBreakup[$componentName] ?? 0;
+                    $row['arrears_' . $headerKey] = $arrearsValue;
+                    $totals['arrears_' . $headerKey] = ($totals['arrears_' . $headerKey] ?? 0) + $arrearsValue;
+                }
+
+                // Add to summary totals
+                $totals['monthlyTotalGross'] = ($totals['monthlyTotalGross'] ?? 0) + $monthlyTotalGross;
+                $totals['monthlyTotalDeductions'] = ($totals['monthlyTotalDeductions'] ?? 0) + $monthlyTotalDeductions;
+                $totals['totalGrossArrears'] = ($totals['totalGrossArrears'] ?? 0) + $totalGrossArrears;
+                $totals['totalDeductionArrears'] = ($totals['totalDeductionArrears'] ?? 0) + $totalDeductionArrears;
+                $totals['netArrearsPayable'] = ($totals['netArrearsPayable'] ?? 0) + $netArrearsPayable;
+                $totals['netTakeHomeWithArrears'] = ($totals['netTakeHomeWithArrears'] ?? 0) + $netTakeHomeWithArrears;
+
+                $excelData[] = $row;
+            }
+
+            // Create totals row
+            $totalsRow = [
+                'serialNo' => '',
+                'empCode' => 'TOTAL',
+                'empName' => '',
+                'designation' => '',
+                'arrearStatus' => '',
+                'arrearsEffectiveFrom' => '',
+                'arrearsMonthCount' => '',
+                'monthlyTotalGross' => round($totals['monthlyTotalGross'] ?? 0, 2),
+                'monthlyTotalDeductions' => round($totals['monthlyTotalDeductions'] ?? 0, 2),
+                'totalGrossArrears' => round($totals['totalGrossArrears'] ?? 0, 2),
+                'totalDeductionArrears' => round($totals['totalDeductionArrears'] ?? 0, 2),
+                'netArrearsPayable' => round($totals['netArrearsPayable'] ?? 0, 2),
+                'netTakeHomeWithArrears' => round($totals['netTakeHomeWithArrears'] ?? 0, 2),
+                'status' => '',
+            ];
+
+            // Add dynamic totals
+            foreach ($dynamicHeaders['gross'] as $key => $value) {
+                $totalsRow[$key] = round($totals[$key] ?? 0, 2);
+                $totalsRow['arrears_' . $key] = round($totals['arrears_' . $key] ?? 0, 2);
+            }
+            foreach ($dynamicHeaders['deductions'] as $key => $value) {
+                $totalsRow[$key] = round($totals[$key] ?? 0, 2);
+                $totalsRow['arrears_' . $key] = round($totals['arrears_' . $key] ?? 0, 2);
+            }
+
+            $excelData[] = $totalsRow;
+
+            // Company and arrears information
+            $companyInfo = [
+                'companyName' => $request->companyName,
+                'year' => $request->year,
+                'month' => $request->month,
+                'subBranch' => $request->subBranch ?? 'All SubBranches'
+            ];
+
+            $arrearsInfo = [
+                'totalEmployees' => $arrearsStats['totalEmployees'],
+                'totalEmployeesWithArrears' => $arrearsStats['employeesWithArrears'],
+                'employeesWithoutRevision' => $arrearsStats['employeesWithoutRevision'],
+                'employeesWithArrearsDetails' => $arrearsStats['employeesWithArrearsDetails'],
+                'employeesWithoutRevisionDetails' => $arrearsStats['employeesWithoutRevisionDetails']
+            ];
+
+            // Generate filename
+            $subBranchSuffix = $request->has('subBranch') && !empty($request->subBranch) ? "_{$request->subBranch}" : '';
+            $fileName = "SalarySheet_WithArrears_{$request->companyName}_{$request->month}_{$request->year}{$subBranchSuffix}.xlsx";
+
+            // Check if any arrears found
+            if ($arrearsStats['employeesWithArrears'] == 0 && $arrearsStats['employeesWithoutRevision'] > 0) {
+                // No arrears and no revisions - return message
+                return response()->json([
+                    'status' => false,
+                    'message' => 'No arrears found for the current year. Salary revisions have not been initiated.',
+                    'details' => [
+                        'total_employees' => $arrearsStats['totalEmployees'],
+                        'employees_without_salary_revision' => $arrearsStats['employeesWithoutRevision'],
+                        'employees_without_revision_details' => $arrearsStats['employeesWithoutRevisionDetails']
+                    ]
+                ], 404);
+            }
+
+            // Store Excel file temporarily, then return as download
+            $tempPath = 'temp_arrears_export_' . time() . '.xlsx';
+            Excel::store(new PayrollArrearsExport($excelData, $dynamicHeaders, $companyInfo, $arrearsInfo), $tempPath, 'local');
+
+            if (\Storage::exists($tempPath)) {
+                $fileContent = \Storage::get($tempPath);
+                \Storage::delete($tempPath); // Clean up temp file
+
+                return response($fileContent)
+                    ->header('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
+                    ->header('Content-Disposition', 'attachment; filename="' . $fileName . '"')
+                    ->header('Content-Length', strlen($fileContent));
+            }
+
+            // Fallback to original method
+            return Excel::download(new PayrollArrearsExport($excelData, $dynamicHeaders, $companyInfo, $arrearsInfo), $fileName);
+
+        } catch (\Exception $e) {
+            abort(500, 'Error in exporting payroll data with arrears: ' . $e->getMessage());
+        }
     }
 
     /**

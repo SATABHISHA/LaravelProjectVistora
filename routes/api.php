@@ -619,6 +619,9 @@ Route::get('/payroll-salary-process/export-excel', [EmployeePayrollSalaryProcess
 
 Route::get('/payroll/export-released-excel', [EmployeePayrollSalaryProcessApiController::class, 'exportReleasedPayrollExcel']);
 
+// Export payroll with arrears calculation
+Route::get('/payroll/export-with-arrears', [EmployeePayrollSalaryProcessApiController::class, 'exportPayrollWithArrears']);
+
 // PDF Salary Slip Routes with CORS middleware
 Route::middleware(['cors'])->group(function () {
     Route::get('/salary-slip/download-pdf/{corpId}/{empCode}/{year}/{month}/{companyName?}', [EmployeePayrollSalaryProcessApiController::class, 'downloadSalarySlipPdf']);
