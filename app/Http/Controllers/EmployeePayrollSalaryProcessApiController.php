@@ -2803,19 +2803,9 @@ class EmployeePayrollSalaryProcessApiController extends Controller
             $subBranchSuffix = $request->has('subBranch') && !empty($request->subBranch) ? "_{$request->subBranch}" : '';
             $fileName = "SalarySheet_WithArrears_{$request->companyName}_{$request->month}_{$request->year}{$subBranchSuffix}.xlsx";
 
-            // Check if any arrears found
-            if ($arrearsStats['employeesWithArrears'] == 0 && $arrearsStats['employeesWithoutRevision'] > 0) {
-                // No arrears and no revisions - return message
-                return response()->json([
-                    'status' => false,
-                    'message' => 'No arrears found for the current year. Salary revisions have not been initiated.',
-                    'details' => [
-                        'total_employees' => $arrearsStats['totalEmployees'],
-                        'employees_without_salary_revision' => $arrearsStats['employeesWithoutRevision'],
-                        'employees_without_revision_details' => $arrearsStats['employeesWithoutRevisionDetails']
-                    ]
-                ], 404);
-            }
+            // Note: We still generate Excel even if no arrears found
+            // The Excel will show "No Arrears" status for employees without revision
+            // Only return error if NO payroll records exist at all (handled earlier in the code)
 
             // Store Excel file temporarily, then return as download
             $tempPath = 'temp_arrears_export_' . time() . '.xlsx';

@@ -287,13 +287,12 @@
                     }
                     
                     showError(errorMessage);
-                    document.getElementById('statusBadge').textContent = 'NOT AVAILABLE';
+                    document.getElementById('statusBadge').textContent = 'CHECK DETAILS';
                     document.getElementById('statusBadge').classList.remove('ready');
-                    document.getElementById('statusBadge').style.backgroundColor = '#dc3545';
+                    document.getElementById('statusBadge').style.backgroundColor = '#ffc107';
                     
-                    // Disable download button
-                    document.getElementById('downloadBtn').disabled = true;
-                    document.getElementById('downloadBtn').style.cursor = 'not-allowed';
+                    // Keep download button enabled - let user try anyway
+                    // The download will show proper error if truly unavailable
                 });
         }
 
@@ -313,11 +312,21 @@
                 document.getElementById('totalEmployeesCell').textContent = `${totalEmployees} employees`;
             }
             
-            if (employeesWithArrears) {
+            if (employeesWithArrears !== null) {
                 document.getElementById('arrearsRow').style.display = 'table-row';
-                const arrearsText = employeesWithArrears > 0 
-                    ? `${employeesWithArrears} employees (with arrears)`
-                    : 'No employees with arrears';
+                const arrearsCount = parseInt(employeesWithArrears);
+                const totalCount = parseInt(totalEmployees) || 0;
+                const withoutArrears = totalCount - arrearsCount;
+                
+                let arrearsText = '';
+                if (arrearsCount > 0) {
+                    arrearsText = `${arrearsCount} employees (with arrears)`;
+                    if (withoutArrears > 0) {
+                        arrearsText += `, ${withoutArrears} without arrears`;
+                    }
+                } else {
+                    arrearsText = 'No employees with arrears (all employees included in export)';
+                }
                 document.getElementById('employeesWithArrearsCell').textContent = arrearsText;
             }
             
