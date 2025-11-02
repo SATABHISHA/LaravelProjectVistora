@@ -386,12 +386,27 @@ class EmployeePayrollSalaryProcessApiController extends Controller
         ]);
 
         try {
-            // Get payroll records
+            // Get payroll records - ensure strict year filtering
             $payrollRecords = EmployeePayrollSalaryProcess::where('corpId', $request->corpId)
                 ->where('companyName', $request->companyName)
                 ->where('year', $request->year)
                 ->where('month', $request->month)
+                ->whereNotNull('year')
+                ->where('year', '!=', '')
                 ->get();
+
+            // Log the query results for debugging
+            \Log::info("ExportPayrollExcel query results", [
+                'corpId' => $request->corpId,
+                'companyName' => $request->companyName,
+                'year' => $request->year,
+                'month' => $request->month,
+                'record_count' => $payrollRecords->count(),
+                'years_found' => $payrollRecords->pluck('year')->unique()->toArray(),
+                'sample_records' => $payrollRecords->take(3)->map(function($r) {
+                    return ['empCode' => $r->empCode, 'year' => $r->year, 'month' => $r->month];
+                })->toArray()
+            ]);
 
             if ($payrollRecords->isEmpty()) {
                 abort(404, 'No payroll records found for the specified period');
@@ -631,13 +646,28 @@ class EmployeePayrollSalaryProcessApiController extends Controller
         ]);
 
         try {
-            // Get payroll records with Released status only
+            // Get payroll records with Released status only - ensure strict year filtering
             $payrollRecords = EmployeePayrollSalaryProcess::where('corpId', $request->corpId)
                 ->where('companyName', $request->companyName)
                 ->where('year', $request->year)
                 ->where('month', $request->month)
                 ->where('status', 'Released') // Filter only Released status
+                ->whereNotNull('year')
+                ->where('year', '!=', '')
                 ->get();
+
+            // Log the query results for debugging
+            \Log::info("ExportReleasedPayrollExcel query results", [
+                'corpId' => $request->corpId,
+                'companyName' => $request->companyName,
+                'year' => $request->year,
+                'month' => $request->month,
+                'record_count' => $payrollRecords->count(),
+                'years_found' => $payrollRecords->pluck('year')->unique()->toArray(),
+                'sample_records' => $payrollRecords->take(3)->map(function($r) {
+                    return ['empCode' => $r->empCode, 'year' => $r->year, 'month' => $r->month];
+                })->toArray()
+            ]);
 
             if ($payrollRecords->isEmpty()) {
                 abort(404, 'No released payroll records found for the specified period');
@@ -2448,13 +2478,28 @@ class EmployeePayrollSalaryProcessApiController extends Controller
         ]);
 
         try {
-            // Get payroll records with Released status
+            // Get payroll records with Released status - ensure strict year filtering
             $payrollRecords = EmployeePayrollSalaryProcess::where('corpId', $request->corpId)
                 ->where('companyName', $request->companyName)
                 ->where('year', $request->year)
                 ->where('month', $request->month)
                 ->where('status', 'Released')
+                ->whereNotNull('year')
+                ->where('year', '!=', '')
                 ->get();
+
+            // Log the query results for debugging
+            \Log::info("ExportPayrollWithArrears query results", [
+                'corpId' => $request->corpId,
+                'companyName' => $request->companyName,
+                'year' => $request->year,
+                'month' => $request->month,
+                'record_count' => $payrollRecords->count(),
+                'years_found' => $payrollRecords->pluck('year')->unique()->toArray(),
+                'sample_records' => $payrollRecords->take(3)->map(function($r) {
+                    return ['empCode' => $r->empCode, 'year' => $r->year, 'month' => $r->month];
+                })->toArray()
+            ]);
 
             if ($payrollRecords->isEmpty()) {
                 abort(404, 'No released payroll records found for the specified period');
@@ -2485,11 +2530,13 @@ class EmployeePayrollSalaryProcessApiController extends Controller
                 abort(404, 'No released payroll records found for the specified SubBranch and period');
             }
 
-            // Fetch salary structures with arrears info
+            // Fetch salary structures with arrears info - ensure year filtering
             $salaryStructures = \App\Models\EmployeeSalaryStructure::where('corpId', $request->corpId)
                 ->where('companyName', $request->companyName)
                 ->where('year', $request->year)
                 ->whereIn('empCode', $empCodes)
+                ->whereNotNull('year')
+                ->where('year', '!=', '')
                 ->get()
                 ->keyBy('empCode');
 
