@@ -2623,6 +2623,8 @@ class EmployeePayrollSalaryProcessApiController extends Controller
                         $excelData[] = $row;
                         continue;
                     }
+                    
+                    // Parse current export month
                     $currentMonth = \Carbon\Carbon::parse($request->year . '-' . $request->month . '-01');
                     
                     // Check if effective date is BEFORE the current month (arrears only for past months)

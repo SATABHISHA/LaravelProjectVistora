@@ -35,6 +35,13 @@
             padding: 15px;
             margin: 20px 0;
         }
+        .error-box {
+            background-color: #f8d7da;
+            border-left: 4px solid #dc3545;
+            padding: 15px;
+            margin: 20px 0;
+            display: none;
+        }
         .download-btn {
             display: inline-block;
             background-color: #4CAF50;
@@ -54,6 +61,10 @@
         }
         .download-btn:active {
             background-color: #3d8b40;
+        }
+        .download-btn:disabled {
+            background-color: #cccccc;
+            cursor: not-allowed;
         }
         .details {
             margin: 20px 0;
@@ -92,7 +103,7 @@
 <body>
     <div class="container">
         <h1 id="pageTitle">📊 Salary Sheet with Arrears Export</h1>
-
+        
         <div class="success-box">
             <strong>✓ Export Page Ready!</strong><br>
             Click the download button below to get your Excel file with arrears calculations.
@@ -103,6 +114,22 @@
             <div class="details">
                 <table id="exportDetails">
                     <tr>
+                        <td>Company:</td>
+                        <td id="companyNameCell"><strong>Loading...</strong></td>
+                    </tr>
+                    <tr>
+                        <td>Month:</td>
+                        <td id="monthYearCell">Loading...</td>
+                    </tr>
+                    <tr>
+                        <td>Sub Branch:</td>
+                        <td id="subBranchCell">All SubBranches</td>
+                    </tr>
+                    <tr>
+                        <td>Export Format:</td>
+                        <td>Excel (.xlsx)</td>
+                    </tr>
+                    <tr>
                         <td>Status:</td>
                         <td><span class="status ready">READY TO DOWNLOAD</span></td>
                     </tr>
@@ -110,7 +137,7 @@
             </div>
         </div>
 
-        <div id="errorMessage" style="display:none; background-color: #f8d7da; border-left: 4px solid #dc3545; padding: 15px; margin: 20px 0;">
+        <div class="error-box" id="errorMessage">
             <strong>❌ Error:</strong>
             <p id="errorText"></p>
         </div>
@@ -124,8 +151,8 @@
         <div class="info-box">
             <strong>💡 What's in the Excel file?</strong>
             <ul style="margin: 10px 0;">
-                <li><strong>Current Month Salary:</strong> Complete salary breakdown by component</li>
-                <li><strong>Arrears Calculation:</strong> Automatic calculation from effective date</li>
+                <li><strong>Current Month Salary:</strong> <span id="currentMonthDesc">Current month</span> salary breakdown by component</li>
+                <li><strong>Arrears Calculation:</strong> Automatic calculation from salary revision effective date</li>
                 <li><strong>Total Gross:</strong> Current month + Arrears gross earnings</li>
                 <li><strong>Total Deductions:</strong> Current month + Arrears deductions</li>
                 <li><strong>Net Take Home:</strong> Final amount after all calculations</li>
@@ -137,9 +164,9 @@
             <strong>⚠ Important Notes:</strong>
             <ul style="margin: 10px 0;">
                 <li>The download will start automatically when you click the button</li>
-                <li>File size is approximately 12 KB (12,487 bytes)</li>
+                <li>If no arrears are due, you will see an error message</li>
+                <li>Arrears are calculated only for months BEFORE the export month</li>
                 <li>If download fails, check your internet connection and try again</li>
-                <li>The Excel file includes professional formatting with totals and summaries</li>
             </ul>
         </div>
 
@@ -147,6 +174,7 @@
             <h3>🔧 Technical Details</h3>
             <p><strong>API Endpoint:</strong> <code>GET /api/payroll/export-with-arrears</code></p>
             <p><strong>Response Format:</strong> Excel (.xlsx)</p>
+            <p><strong>Server:</strong> <code>https://vistora.sroy.es</code></p>
             <p><strong>Status:</strong> <span style="color: #4CAF50; font-weight: bold;">● Active</span></p>
         </div>
     </div>
@@ -162,35 +190,17 @@
 
         // Update details table with URL parameters
         function updateDetails() {
-            const corpId = getUrlParameter('corpId') || 'Not specified';
             const companyName = getUrlParameter('companyName') || 'Not specified';
             const year = getUrlParameter('year') || 'Not specified';
             const month = getUrlParameter('month') || 'Not specified';
             const subBranch = getUrlParameter('subBranch') || 'All SubBranches';
 
-            const detailsTable = document.getElementById('exportDetails');
-            detailsTable.innerHTML = `
-                <tr>
-                    <td>Corporate ID:</td>
-                    <td><strong>${corpId}</strong></td>
-                </tr>
-                <tr>
-                    <td>Company:</td>
-                    <td><strong>${companyName}</strong></td>
-                </tr>
-                <tr>
-                    <td>Month:</td>
-                    <td>${month} ${year}</td>
-                </tr>
-                <tr>
-                    <td>Sub Branch:</td>
-                    <td>${subBranch}</td>
-                </tr>
-                <tr>
-                    <td>Status:</td>
-                    <td><span class="status ready">READY TO DOWNLOAD</span></td>
-                </tr>
-            `;
+            document.getElementById('companyNameCell').innerHTML = `<strong>${companyName}</strong>`;
+            document.getElementById('monthYearCell').textContent = `${month} ${year}`;
+            document.getElementById('subBranchCell').textContent = subBranch;
+            
+            // Update "What's in the Excel file" description
+            document.getElementById('currentMonthDesc').textContent = `${month} ${year}`;
         }
 
         // Start download function
@@ -215,53 +225,25 @@
 
             // Update button text
             const button = document.getElementById('downloadBtn');
-            button.textContent = '⏳ Checking data...';
+            button.textContent = '⏳ Downloading...';
             button.disabled = true;
 
             // Hide previous errors
             document.getElementById('errorMessage').style.display = 'none';
 
-            // Check if data exists first
-            fetch(apiUrl)
-                .then(response => {
-                    if (!response.ok) {
-                        return response.text().then(text => {
-                            throw new Error(text || `Server returned ${response.status}`);
-                        });
-                    }
-                    
-                    // Check if response is JSON (error) or Excel (success)
-                    const contentType = response.headers.get('content-type');
-                    if (contentType && contentType.includes('application/json')) {
-                        return response.json().then(data => {
-                            if (data.status === false) {
-                                throw new Error(data.message || 'No arrears data available');
-                            }
-                        });
-                    }
-                    
-                    // If we got here, data is valid - proceed with download
-                    button.textContent = '⏳ Downloading...';
-                    
-                    // Create a temporary link and click it
-                    const link = document.createElement('a');
-                    link.href = apiUrl;
-                    link.download = `SalarySheet_WithArrears_${companyName}_${month}_${year}.xlsx`;
-                    document.body.appendChild(link);
-                    link.click();
-                    document.body.removeChild(link);
+            // Create a temporary link and trigger download
+            const link = document.createElement('a');
+            link.href = apiUrl;
+            link.download = `SalarySheet_WithArrears_${companyName}_${month}_${year}.xlsx`;
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
 
-                    // Reset button after a delay
-                    setTimeout(() => {
-                        button.textContent = '⬇ Download Excel File';
-                        button.disabled = false;
-                    }, 3000);
-                })
-                .catch(error => {
-                    showError(error.message);
-                    button.textContent = '⬇ Download Excel File';
-                    button.disabled = false;
-                });
+            // Reset button after a delay
+            setTimeout(() => {
+                button.textContent = '⬇ Download Excel File';
+                button.disabled = false;
+            }, 3000);
 
             console.log('Download initiated for:', apiUrl);
         }
@@ -280,6 +262,9 @@
             
             // Update page title with company name
             const companyName = getUrlParameter('companyName');
+            const month = getUrlParameter('month');
+            const year = getUrlParameter('year');
+            
             if (companyName) {
                 document.getElementById('pageTitle').textContent = `📊 ${companyName} - Salary Sheet with Arrears Export`;
                 document.title = `Download Arrears Export - ${companyName}`;
