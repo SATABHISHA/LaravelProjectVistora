@@ -660,39 +660,44 @@ class EmployeeAttendanceSummaryApiController extends Controller
                 // Calculate attendance statistics for this employee
                 $employeeAttendance = $attendanceData->where('empCode', $empCode);
 
+                // Get holiday and week-off dates for the month
+                $holidayDates = DB::table('holiday_lists')
+                    ->where('corpId', $corpId)
+                    ->whereRaw("DATE_FORMAT(holidayDate, '%M') = ?", [$month])
+                    ->whereRaw("YEAR(holidayDate) = ?", [$year])
+                    ->pluck('holidayDate')
+                    ->toArray();
+
+                $weekOffDates = $this->getWeekOffDatesForMonth($puid, $month, $year, $usedFallback);
+                $nonWorkingDates = array_merge($holidayDates, $weekOffDates);
+
                 $totalPresent = 0;
                 $totalLeave = 0;
-                $totalAbsent = 0;
                 
                 foreach ($employeeAttendance as $attendance) {
                     $attendanceDate = Carbon::parse($attendance->date)->format('Y-m-d');
+
+                    // Skip non-working days from any calculation
+                    if (in_array($attendanceDate, $nonWorkingDates)) {
+                        continue;
+                    }
+
                     $leaveStatus = $leaveStatusMap[$empCode][$attendanceDate] ?? null;
                     
-                    // Determine the status based on leave request
                     if ($leaveStatus === 'Approved') {
-                        // Approved leave counts as Leave
                         $totalLeave++;
-                    } elseif (in_array($leaveStatus, ['Pending', 'Rejected', 'Returned'])) {
-                        // Pending/Rejected/Returned leave counts as Absent
-                        $totalAbsent++;
                     } elseif ($attendance->attendanceStatus === 'Present') {
-                        // No leave request or attendance is Present
                         $totalPresent++;
-                    } elseif ($attendance->attendanceStatus === 'Leave') {
-                        // Direct leave entry in attendance
-                        $totalLeave++;
-                    } else {
-                        // Other cases count as Absent
-                        $totalAbsent++;
                     }
                 }
 
                 // Calculate working days (total days in month - weekends - holidays)
                 $totalDaysInMonth = Carbon::createFromFormat('F Y', $month . ' ' . $year)->daysInMonth;
-                $workingDays = $totalDaysInMonth - $weekOffCount - $holidays;
+                $workingDays = $totalDaysInMonth - count($nonWorkingDates);
                 
-                // Calculate paid days: working days - absent
-                $paidDays = $workingDays - $totalAbsent;
+                // Correctly calculate absent and paid days
+                $totalAbsent = $workingDays - $totalPresent - $totalLeave;
+                $paidDays = $totalPresent + $totalLeave;
 
                 $summaryData[] = [
                     'corpId' => $corpId,
@@ -836,5 +841,53 @@ class EmployeeAttendanceSummaryApiController extends Controller
                 'error' => $e->getMessage()
             ], 500);
         }
+    }
+
+    /**
+     * Get all week-off dates for a given month based on shift policy or fallback
+     *
+     * @param string|null $puid
+     * @param string $month
+     * @param string $year
+     * @param bool $useFallback
+     * @return array
+     */
+    private function getWeekOffDatesForMonth($puid, $month, $year, $useFallback)
+    {
+        $dates = [];
+        $firstDay = Carbon::createFromFormat('F Y', $month . ' ' . $year)->startOfMonth();
+        $lastDay = $firstDay->copy()->endOfMonth();
+
+        if ($useFallback || !$puid) {
+            // Fallback: Saturday and Sunday are week-offs
+            for ($date = $firstDay->copy(); $date->lte($lastDay); $date->addDay()) {
+                if ($date->isSaturday() || $date->isSunday()) {
+                    $dates[] = $date->format('Y-m-d');
+                }
+            }
+            return $dates;
+        }
+
+        // Get weekly schedule from shift policy
+        $weeklySchedule = DB::table('shift_policy_weekly_schedule')
+            ->where('puid', $puid)
+            ->get()
+            ->keyBy('week_no');
+
+        for ($date = $firstDay->copy(); $date->lte($lastDay); $date->addDay()) {
+            $weekNumber = 'Week ' . $date->weekOfMonth;
+            $dayName = $date->format('l'); // e.g., "Sunday", "Monday"
+
+            if (isset($weeklySchedule[$weekNumber])) {
+                $schedule = $weeklySchedule[$weekNumber];
+                // Assuming your schedule table has columns like 'sunday_time', 'monday_time'
+                $timeColumn = strtolower($dayName) . '_time';
+                if (isset($schedule->$timeColumn) && $schedule->$timeColumn === 'Full Day') {
+                    $dates[] = $date->format('Y-m-d');
+                }
+            }
+        }
+
+        return $dates;
     }
 }
