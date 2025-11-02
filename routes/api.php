@@ -668,6 +668,9 @@ Route::delete('/attendance-summary/{id}', [EmployeeAttendanceSummaryApiControlle
 // Check attendance summary existence (GET with route parameters)
 Route::get('/check-attendance-summary/check-exists/{corpId}/{companyName}/{month}/{year}', [EmployeeAttendanceSummaryApiController::class, 'checkAttendanceSummaryExistsByRoute']);
 
+// Recalculate attendance summaries for a specific period
+Route::post('/attendance-summary/recalculate', [EmployeeAttendanceSummaryApiController::class, 'recalculateAttendanceSummaries']);
+
 // Test Routes
 Route::get('/test-professional-tax', [App\Http\Controllers\ProfessionalTaxTestController::class, 'test']);
 Route::post('/test-professional-tax/add', [App\Http\Controllers\ProfessionalTaxTestController::class, 'addSimple']);

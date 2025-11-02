@@ -871,23 +871,175 @@ class EmployeeAttendanceSummaryApiController extends Controller
         // Get weekly schedule from shift policy
         $weeklySchedule = DB::table('shift_policy_weekly_schedule')
             ->where('puid', $puid)
-            ->get()
-            ->keyBy('week_no');
+            ->get(); // Fetches all week rows for the policy
+
+        $scheduleMap = [];
+        foreach ($weeklySchedule as $week) {
+            $scheduleMap[$week->week_no] = (array)$week;
+        }
 
         for ($date = $firstDay->copy(); $date->lte($lastDay); $date->addDay()) {
-            $weekNumber = 'Week ' . $date->weekOfMonth;
-            $dayName = $date->format('l'); // e.g., "Sunday", "Monday"
+            $weekOfMonth = 'Week ' . $date->weekOfMonth;
+            $dayName = strtolower($date->format('l')); // sunday, monday, etc.
 
-            if (isset($weeklySchedule[$weekNumber])) {
-                $schedule = $weeklySchedule[$weekNumber];
-                // Assuming your schedule table has columns like 'sunday_time', 'monday_time'
-                $timeColumn = strtolower($dayName) . '_time';
-                if (isset($schedule->$timeColumn) && $schedule->$timeColumn === 'Full Day') {
+            if (isset($scheduleMap[$weekOfMonth])) {
+                $weekSchedule = $scheduleMap[$weekOfMonth];
+                // Check if the day is a full day off
+                if (isset($weekSchedule[$dayName]) && $weekSchedule[$dayName] === 'Full Day') {
                     $dates[] = $date->format('Y-m-d');
                 }
             }
         }
 
         return $dates;
+    }
+
+    /**
+     * Recalculate attendance summaries for a given period.
+     *
+     * @param Request $request
+     * @return \Illuminate\Http\JsonResponse
+     */
+    public function recalculateAttendanceSummaries(Request $request)
+    {
+        // Validate required fields
+        $validator = Validator::make($request->all(), [
+            'corpId' => 'required|string|max:10',
+            'companyName' => 'required|string|max:100',
+            'month' => 'required|string|max:30',
+            'year' => 'required|string|max:4',
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json(['status' => false, 'message' => 'Validation failed', 'errors' => $validator->errors()], 422);
+        }
+
+        try {
+            $corpId = $request->input('corpId');
+            $companyName = $request->input('companyName');
+            $month = $request->input('month');
+            $year = $request->input('year');
+
+            // Get existing summary records
+            $existingSummaries = EmployeeAttendanceSummary::where('corpId', $corpId)
+                ->where('companyName', $companyName)
+                ->where('month', $month)
+                ->where('year', $year)
+                ->get();
+
+            if ($existingSummaries->isEmpty()) {
+                return response()->json(['status' => false, 'message' => 'No existing attendance summaries found for the specified period to recalculate.'], 404);
+            }
+
+            // --- Recalculation Logic (adapted from bulkInsert) ---
+
+            // Get holiday dates for the month
+            $holidayDates = DB::table('holiday_lists')
+                ->where('corpId', $corpId)
+                ->whereRaw("DATE_FORMAT(holidayDate, '%M') = ?", [$month])
+                ->whereRaw("YEAR(holidayDate) = ?", [$year])
+                ->pluck('holidayDate')
+                ->toArray();
+
+            // Get company shift policy
+            $companyShiftPolicy = DB::table('company_shift_policy')->select('shift_code')->where('company_name', $companyName)->where('corp_id', $corpId)->first();
+            $puid = null;
+            $usedFallback = true;
+            if ($companyShiftPolicy) {
+                $shiftPolicy = DB::table('shiftpolicy')->select('puid')->where('shift_code', $companyShiftPolicy->shift_code)->where('corp_id', $corpId)->first();
+                if ($shiftPolicy) {
+                    $puid = $shiftPolicy->puid;
+                    $usedFallback = false;
+                }
+            }
+
+            $weekOffDates = $this->getWeekOffDatesForMonth($puid, $month, $year, $usedFallback);
+            $nonWorkingDates = array_unique(array_merge($holidayDates, $weekOffDates));
+            
+            $totalDaysInMonth = Carbon::createFromFormat('F Y', $month . ' ' . $year)->daysInMonth;
+            $workingDays = $totalDaysInMonth - count($nonWorkingDates);
+
+            // Get all attendance and leave data for the period to avoid querying in a loop
+            $attendanceData = DB::table('attendances')
+                ->where('companyName', $companyName)
+                ->where('corpId', $corpId)
+                ->whereRaw("DATE_FORMAT(date, '%M') = ?", [$month])
+                ->whereRaw("YEAR(date) = ?", [$year])
+                ->get()->groupBy('empCode');
+
+            $monthNumber = Carbon::parse($month)->month;
+            $startDate = Carbon::create($year, $monthNumber, 1)->format('Y-m-d');
+            $endDate = Carbon::create($year, $monthNumber, 1)->endOfMonth()->format('Y-m-d');
+            
+            $leaveRequests = DB::table('leave_request')
+                ->where('corp_id', $corpId)
+                ->where('company_name', $companyName)
+                ->where(function($query) use ($startDate, $endDate) {
+                    $query->whereBetween('from_date', [$startDate, $endDate])
+                          ->orWhereBetween('to_date', [$startDate, $endDate])
+                          ->orWhere(function($q) use ($startDate, $endDate) {
+                              $q->where('from_date', '<=', $startDate)->where('to_date', '>=', $endDate);
+                          });
+                })
+                ->get();
+
+            $leaveStatusMap = [];
+            foreach ($leaveRequests as $leave) {
+                for ($date = Carbon::parse($leave->from_date); $date->lte(Carbon::parse($leave->to_date)); $date->addDay()) {
+                    $dateKey = $date->format('Y-m-d');
+                    if ($date->gte(Carbon::parse($startDate)) && $date->lte(Carbon::parse($endDate))) {
+                        $leaveStatusMap[$leave->empcode][$dateKey] = $leave->status;
+                    }
+                }
+            }
+
+            $updatedCount = 0;
+            foreach ($existingSummaries as $summary) {
+                $empCode = $summary->empCode;
+                $employeeAttendance = $attendanceData->get($empCode) ?? collect();
+
+                $totalPresent = 0;
+                $totalLeave = 0;
+
+                foreach ($employeeAttendance as $attendance) {
+                    $attendanceDate = Carbon::parse($attendance->date)->format('Y-m-d');
+                    if (in_array($attendanceDate, $nonWorkingDates)) continue;
+
+                    $leaveStatus = $leaveStatusMap[$empCode][$attendanceDate] ?? null;
+                    
+                    if ($leaveStatus === 'Approved') {
+                        $totalLeave++;
+                    } elseif ($attendance->attendanceStatus === 'Present') {
+                        $totalPresent++;
+                    }
+                }
+                
+                $totalAbsent = $workingDays - $totalPresent - $totalLeave;
+                $paidDays = $totalPresent + $totalLeave;
+
+                // Update the record
+                $summary->update([
+                    'totalPresent' => $totalPresent,
+                    'workingDays' => $workingDays,
+                    'holidays' => count($holidayDates),
+                    'weekOff' => count($weekOffDates),
+                    'leave' => $totalLeave,
+                    'paidDays' => $paidDays,
+                    'absent' => $totalAbsent,
+                ]);
+                $updatedCount++;
+            }
+
+            return response()->json([
+                'status' => true,
+                'message' => "Successfully recalculated attendance for {$updatedCount} employees.",
+                'period' => "{$month} {$year}",
+                'company' => $companyName,
+            ]);
+
+        } catch (\Exception $e) {
+            \Log::error("Recalculation Error: " . $e->getMessage());
+            return response()->json(['status' => false, 'message' => 'An error occurred during recalculation.', 'error' => $e->getMessage()], 500);
+        }
     }
 }
