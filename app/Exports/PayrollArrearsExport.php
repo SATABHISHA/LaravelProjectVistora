@@ -33,6 +33,14 @@ class PayrollArrearsExport implements FromArray, WithHeadings, ShouldAutoSize, W
     {
         $excelRows = [];
 
+        // Helper to normalize values
+        $normalize = function($val) {
+            if ($val === null || $val === '') {
+                return 0.0;
+            }
+            return is_numeric($val) ? (float)$val : $val;
+        };
+
         foreach ($this->data as $row) {
             $excelRow = [];
 
@@ -41,17 +49,11 @@ class PayrollArrearsExport implements FromArray, WithHeadings, ShouldAutoSize, W
             $excelRow[] = $row['empCode'] ?? '';
             $excelRow[] = $row['empName'] ?? '';
             $excelRow[] = $row['designation'] ?? '';
+            $excelRow[] = $normalize($row['paidDaysCurrent'] ?? 0);
+            $excelRow[] = $normalize($row['paidDaysWithArrears'] ?? 0);
             $excelRow[] = $row['arrearStatus'] ?? '';
             $excelRow[] = $row['arrearsEffectiveFrom'] ?? '';
             $excelRow[] = $row['arrearsMonthCount'] ?? 0;
-            
-            // Helper to normalize values
-            $normalize = function($val) {
-                if ($val === null || $val === '') {
-                    return 0.0;
-                }
-                return is_numeric($val) ? (float)$val : $val;
-            };
 
             // Current month gross components
             foreach ($this->dynamicHeaders['gross'] as $key => $header) {
@@ -113,6 +115,8 @@ class PayrollArrearsExport implements FromArray, WithHeadings, ShouldAutoSize, W
             'Employee Code',
             'Employee Name',
             'Designation',
+            'Paid Days (Current)',
+            'Paid Days (With Arrears)',
             'Arrear Status',
             'Arrears From',
             'Arrear Months',

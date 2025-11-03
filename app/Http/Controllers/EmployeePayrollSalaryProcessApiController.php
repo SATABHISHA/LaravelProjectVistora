@@ -2540,6 +2540,15 @@ class EmployeePayrollSalaryProcessApiController extends Controller
                 ->get()
                 ->keyBy('empCode');
 
+            // Fetch attendance summaries for paid days
+            $attendanceSummaries = \App\Models\EmployeeAttendanceSummary::where('corpId', $request->corpId)
+                ->where('companyName', $request->companyName)
+                ->where('month', $request->month)
+                ->where('year', $request->year)
+                ->whereIn('empCode', $empCodes)
+                ->get()
+                ->keyBy('empCode');
+
             $excelData = [];
             $dynamicHeaders = ['gross' => [], 'deductions' => []];
             $totals = [];
@@ -2725,12 +2734,19 @@ class EmployeePayrollSalaryProcessApiController extends Controller
 
                 $netTakeHomeWithArrears = $netTakeHomeMonthly + $netArrearsPayable;
 
+                // Fetch paid days from attendance summary
+                $attendanceSummary = $attendanceSummaries->get($record->empCode);
+                $paidDaysCurrent = $attendanceSummary ? (float)$attendanceSummary->paidDays : 0;
+                $paidDaysWithArrears = $paidDaysCurrent; // Same as current for arrears calculation
+
                 // Build row data
                 $row = [
                     'serialNo' => $serialNo++,
                     'empCode' => $record->empCode ?? '',
                     'empName' => $fullName ?: 'N/A',
                     'designation' => $employmentDetail->Designation ?? 'N/A',
+                    'paidDaysCurrent' => round($paidDaysCurrent, 2),
+                    'paidDaysWithArrears' => round($paidDaysWithArrears, 2),
                     'arrearStatus' => $arrearStatus,
                     'arrearsEffectiveFrom' => $arrearsEffectiveFrom,
                     'arrearsMonthCount' => $arrearsMonthCount,
@@ -2806,6 +2822,8 @@ class EmployeePayrollSalaryProcessApiController extends Controller
                 'empCode' => 'TOTAL',
                 'empName' => '',
                 'designation' => '',
+                'paidDaysCurrent' => '',
+                'paidDaysWithArrears' => '',
                 'arrearStatus' => '',
                 'arrearsEffectiveFrom' => '',
                 'arrearsMonthCount' => '',
