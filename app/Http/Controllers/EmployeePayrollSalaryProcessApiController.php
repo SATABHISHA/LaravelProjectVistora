@@ -302,15 +302,16 @@ class EmployeePayrollSalaryProcessApiController extends Controller
             ], 409); // 409 Conflict status code
         }
 
-        // Build query for salary structures
-        $query = \App\Models\EmployeeSalaryStructure::where('corpId', $request->corpId);
+        // Build query for salary structures - MUST filter by year
+        $query = \App\Models\EmployeeSalaryStructure::where('corpId', $request->corpId)
+            ->where('year', $request->year);
         
         // Add company name filter if provided
         if ($request->has('companyName') && !empty($request->companyName)) {
             $query->where('companyName', $request->companyName);
         }
         
-        // Get filtered salary structures
+        // Get filtered salary structures for the specific year
         $salaryStructures = $query->get();
 
         if ($salaryStructures->isEmpty()) {
@@ -1689,9 +1690,10 @@ class EmployeePayrollSalaryProcessApiController extends Controller
                 ], 409);
             }
 
-            // Get salary structures for the specified employees
+            // Get salary structures for the specified employees - MUST filter by year
             $salaryStructures = \App\Models\EmployeeSalaryStructure::where('corpId', $request->corpId)
                 ->where('companyName', $request->companyName)
+                ->where('year', $request->year)
                 ->whereIn('empCode', $request->empCodes)
                 ->get();
 
