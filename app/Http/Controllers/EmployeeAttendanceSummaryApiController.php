@@ -113,8 +113,8 @@ class EmployeeAttendanceSummaryApiController extends Controller
             // Check if the month has 5 weeks
             $firstDayOfMonth = Carbon::create($year, Carbon::parse($month)->month, 1);
             $lastDayOfMonth = $firstDayOfMonth->copy()->endOfMonth();
-            $totalWeeks = $firstDayOfMonth->weekOfYear !== $lastDayOfMonth->weekOfYear ? 
-                         $lastDayOfMonth->weekOfMonth : $firstDayOfMonth->weekOfMonth;
+            $totalWeeks = $firstDayOfMonth->weekOfYear !== $lastDayOfMonth->weekOfYear ?
+                $lastDayOfMonth->weekOfMonth : $firstDayOfMonth->weekOfMonth;
             $hasFiveWeeks = $totalWeeks >= 5;
 
             // Get weekly schedule and calculate week-off days
@@ -142,27 +142,37 @@ class EmployeeAttendanceSummaryApiController extends Controller
             $monthNumber = Carbon::parse($month)->month;
             $startDate = Carbon::create($year, $monthNumber, 1)->format('Y-m-d');
             $endDate = Carbon::create($year, $monthNumber, 1)->endOfMonth()->format('Y-m-d');
-            
+
             $leaveRequests = DB::table('leave_request')
                 ->select('empcode', 'from_date', 'to_date', 'status')
                 ->where('corp_id', $corpId)
                 ->where('company_name', $companyName)
-                ->where(function($query) use ($startDate, $endDate) {
+                ->where(function ($query) use ($startDate, $endDate) {
                     $query->whereBetween('from_date', [$startDate, $endDate])
-                          ->orWhereBetween('to_date', [$startDate, $endDate])
-                          ->orWhere(function($q) use ($startDate, $endDate) {
-                              $q->where('from_date', '<=', $startDate)
+                        ->orWhereBetween('to_date', [$startDate, $endDate])
+                        ->orWhere(function ($q) use ($startDate, $endDate) {
+                            $q->where('from_date', '<=', $startDate)
                                 ->where('to_date', '>=', $endDate);
-                          });
+                        });
                 })
                 ->get();
-            
+
             // Create a map of leave status by empCode and date
             $leaveStatusMap = [];
             foreach ($leaveRequests as $leave) {
-                $fromDate = Carbon::parse($leave->from_date);
-                $toDate = Carbon::parse($leave->to_date);
-                
+                $fromDateStr = $leave->from_date;
+                $toDateStr = $leave->to_date;
+                if (preg_match('/^\d{2}\/\d{2}\/\d{4}$/', $fromDateStr)) {
+                    $fromDate = Carbon::createFromFormat('d/m/Y', $fromDateStr);
+                } else {
+                    $fromDate = Carbon::parse($fromDateStr);
+                }
+                if (preg_match('/^\d{2}\/\d{2}\/\d{4}$/', $toDateStr)) {
+                    $toDate = Carbon::createFromFormat('d/m/Y', $toDateStr);
+                } else {
+                    $toDate = Carbon::parse($toDateStr);
+                }
+
                 for ($date = $fromDate->copy(); $date->lte($toDate); $date->addDay()) {
                     $dateKey = $date->format('Y-m-d');
                     if ($date->gte(Carbon::parse($startDate)) && $date->lte(Carbon::parse($endDate))) {
@@ -180,15 +190,23 @@ class EmployeeAttendanceSummaryApiController extends Controller
             foreach ($empCodes as $empCode) {
                 // Calculate attendance statistics for this employee
                 $employeeAttendance = $attendanceData->where('empCode', $empCode);
-                
+
                 $totalPresent = 0;
                 $totalLeave = 0;
                 $totalAbsent = 0;
-                
+
                 foreach ($employeeAttendance as $attendance) {
-                    $attendanceDate = Carbon::parse($attendance->date)->format('Y-m-d');
+                    $dateString = $attendance->date;
+                    $dateObj = null;
+                    if (preg_match('/^\d{2}\/\d{2}\/\d{4}$/', $dateString)) {
+                        $dateObj = Carbon::createFromFormat('d/m/Y', $dateString);
+                    } else {
+                        $dateObj = Carbon::parse($dateString);
+                    }
+                    $attendanceDate = $dateObj->format('Y-m-d');
+
                     $leaveStatus = $leaveStatusMap[$empCode][$attendanceDate] ?? null;
-                    
+
                     // Determine the status based on leave request
                     if ($leaveStatus === 'Approved') {
                         // Approved leave counts as Leave
@@ -207,11 +225,11 @@ class EmployeeAttendanceSummaryApiController extends Controller
                         $totalAbsent++;
                     }
                 }
-                
+
                 // Calculate working days (total days in month - holidays - week-offs)
                 $totalDaysInMonth = Carbon::createFromFormat('F Y', $month . ' ' . $year)->daysInMonth;
                 $workingDays = $totalDaysInMonth - $holidays - $weekOffCount;
-                
+
                 // Calculate paid days: working days - absent
                 $paidDays = $workingDays - $totalAbsent;
 
@@ -306,7 +324,7 @@ class EmployeeAttendanceSummaryApiController extends Controller
             // Update with provided data
             $attendanceSummary->update($request->only([
                 'corpId',
-                'empCode', 
+                'empCode',
                 'companyName',
                 'totalPresent',
                 'workingDays',
@@ -413,7 +431,7 @@ class EmployeeAttendanceSummaryApiController extends Controller
                 ->select(
                     'eas.*',
                     'ed.FirstName',
-                    'ed.MiddleName', 
+                    'ed.MiddleName',
                     'ed.LastName',
                     DB::raw("TRIM(CONCAT(COALESCE(ed.FirstName, ''), ' ', COALESCE(ed.MiddleName, ''), ' ', COALESCE(ed.LastName, ''))) as employeeFullName"),
                     DB::raw("CONCAT(
@@ -623,27 +641,37 @@ class EmployeeAttendanceSummaryApiController extends Controller
             $monthNumber = Carbon::parse($month)->month;
             $startDate = Carbon::create($year, $monthNumber, 1)->format('Y-m-d');
             $endDate = Carbon::create($year, $monthNumber, 1)->endOfMonth()->format('Y-m-d');
-            
+
             $leaveRequests = DB::table('leave_request')
                 ->select('empcode', 'from_date', 'to_date', 'status')
                 ->where('corp_id', $corpId)
                 ->where('company_name', $companyName)
-                ->where(function($query) use ($startDate, $endDate) {
+                ->where(function ($query) use ($startDate, $endDate) {
                     $query->whereBetween('from_date', [$startDate, $endDate])
-                          ->orWhereBetween('to_date', [$startDate, $endDate])
-                          ->orWhere(function($q) use ($startDate, $endDate) {
-                              $q->where('from_date', '<=', $startDate)
+                        ->orWhereBetween('to_date', [$startDate, $endDate])
+                        ->orWhere(function ($q) use ($startDate, $endDate) {
+                            $q->where('from_date', '<=', $startDate)
                                 ->where('to_date', '>=', $endDate);
-                          });
+                        });
                 })
                 ->get();
-            
+
             // Create a map of leave status by empCode and date
             $leaveStatusMap = [];
             foreach ($leaveRequests as $leave) {
-                $fromDate = Carbon::parse($leave->from_date);
-                $toDate = Carbon::parse($leave->to_date);
-                
+                $fromDateStr = $leave->from_date;
+                $toDateStr = $leave->to_date;
+                if (preg_match('/^\d{2}\/\d{2}\/\d{4}$/', $fromDateStr)) {
+                    $fromDate = Carbon::createFromFormat('d/m/Y', $fromDateStr);
+                } else {
+                    $fromDate = Carbon::parse($fromDateStr);
+                }
+                if (preg_match('/^\d{2}\/\d{2}\/\d{4}$/', $toDateStr)) {
+                    $toDate = Carbon::createFromFormat('d/m/Y', $toDateStr);
+                } else {
+                    $toDate = Carbon::parse($toDateStr);
+                }
+
                 for ($date = $fromDate->copy(); $date->lte($toDate); $date->addDay()) {
                     $dateKey = $date->format('Y-m-d');
                     if ($date->gte(Carbon::parse($startDate)) && $date->lte(Carbon::parse($endDate))) {
@@ -669,14 +697,14 @@ class EmployeeAttendanceSummaryApiController extends Controller
 
             $puid = null;
             $usedFallback = true;
-            
+
             if ($companyShiftPolicy) {
                 $shiftPolicy = DB::table('shiftpolicy')
                     ->select('puid')
                     ->where('shift_code', $companyShiftPolicy->shift_code)
                     ->where('corp_id', $corpId)
                     ->first();
-                    
+
                 if ($shiftPolicy) {
                     $puid = $shiftPolicy->puid;
                     $usedFallback = false;
@@ -685,7 +713,7 @@ class EmployeeAttendanceSummaryApiController extends Controller
 
             $weekOffDates = $this->getWeekOffDatesForMonth($puid, $month, $year, $usedFallback);
             $nonWorkingDates = array_unique(array_merge($holidayDates, $weekOffDates));
-            
+
             // Calculate working days (total days in month - non-working days)
             $totalDaysInMonth = Carbon::createFromFormat('F Y', $month . ' ' . $year)->daysInMonth;
             $workingDays = $totalDaysInMonth - count($nonWorkingDates);
@@ -700,9 +728,16 @@ class EmployeeAttendanceSummaryApiController extends Controller
 
                 $totalPresent = 0;
                 $totalLeave = 0;
-                
+
                 foreach ($employeeAttendance as $attendance) {
-                    $attendanceDate = Carbon::parse($attendance->date)->format('Y-m-d');
+                    $dateString = $attendance->date;
+                    $dateObj = null;
+                    if (preg_match('/^\d{2}\/\d{2}\/\d{4}$/', $dateString)) {
+                        $dateObj = Carbon::createFromFormat('d/m/Y', $dateString);
+                    } else {
+                        $dateObj = Carbon::parse($dateString);
+                    }
+                    $attendanceDate = $dateObj->format('Y-m-d');
 
                     // Skip non-working days from any calculation
                     if (in_array($attendanceDate, $nonWorkingDates)) {
@@ -710,14 +745,14 @@ class EmployeeAttendanceSummaryApiController extends Controller
                     }
 
                     $leaveStatus = $leaveStatusMap[$empCode][$attendanceDate] ?? null;
-                    
+
                     if ($leaveStatus === 'Approved') {
                         $totalLeave++;
                     } elseif ($attendance->attendanceStatus === 'Present') {
                         $totalPresent++;
                     }
                 }
-                
+
                 // Correctly calculate absent and paid days
                 $totalAbsent = $workingDays - $totalPresent - $totalLeave;
                 $paidDays = $totalPresent + $totalLeave;
@@ -779,17 +814,17 @@ class EmployeeAttendanceSummaryApiController extends Controller
     {
         $firstDay = Carbon::createFromFormat('F Y', $month . ' ' . $year)->startOfMonth();
         $lastDay = $firstDay->copy()->endOfMonth();
-        
+
         $weekendCount = 0;
         $current = $firstDay->copy();
-        
+
         while ($current->lte($lastDay)) {
             if ($current->isSaturday() || $current->isSunday()) {
                 $weekendCount++;
             }
             $current->addDay();
         }
-        
+
         return $weekendCount;
     }
 
@@ -806,7 +841,7 @@ class EmployeeAttendanceSummaryApiController extends Controller
         // Check if the month has 5 weeks
         $firstDayOfMonth = Carbon::create($year, Carbon::parse($month)->month, 1);
         $lastDayOfMonth = $firstDayOfMonth->copy()->endOfMonth();
-        $totalWeeks = $firstDayOfMonth->weekOfYear !== $lastDayOfMonth->weekOfYear ? 
+        $totalWeeks = $firstDayOfMonth->weekOfYear !== $lastDayOfMonth->weekOfYear ?
                      $lastDayOfMonth->weekOfMonth : $firstDayOfMonth->weekOfMonth;
         $hasFiveWeeks = $totalWeeks >= 5;
 
@@ -978,7 +1013,7 @@ class EmployeeAttendanceSummaryApiController extends Controller
 
             $weekOffDates = $this->getWeekOffDatesForMonth($puid, $month, $year, $usedFallback);
             $nonWorkingDates = array_unique(array_merge($holidayDates, $weekOffDates));
-            
+
             $totalDaysInMonth = Carbon::createFromFormat('F Y', $month . ' ' . $year)->daysInMonth;
             $workingDays = $totalDaysInMonth - count($nonWorkingDates);
 
@@ -993,7 +1028,7 @@ class EmployeeAttendanceSummaryApiController extends Controller
             $monthNumber = Carbon::parse($month)->month;
             $startDate = Carbon::create($year, $monthNumber, 1)->format('Y-m-d');
             $endDate = Carbon::create($year, $monthNumber, 1)->endOfMonth()->format('Y-m-d');
-            
+
             $leaveRequests = DB::table('leave_request')
                 ->where('corp_id', $corpId)
                 ->where('company_name', $companyName)
@@ -1029,14 +1064,14 @@ class EmployeeAttendanceSummaryApiController extends Controller
                     if (in_array($attendanceDate, $nonWorkingDates)) continue;
 
                     $leaveStatus = $leaveStatusMap[$empCode][$attendanceDate] ?? null;
-                    
+
                     if ($leaveStatus === 'Approved') {
                         $totalLeave++;
                     } elseif ($attendance->attendanceStatus === 'Present') {
                         $totalPresent++;
                     }
                 }
-                
+
                 $totalAbsent = $workingDays - $totalPresent - $totalLeave;
                 $paidDays = $totalPresent + $totalLeave;
 
