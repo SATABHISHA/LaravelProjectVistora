@@ -176,19 +176,17 @@ class EmployeePayrollSalaryProcessApiController extends Controller
     public function getSpecific($corpId, $empCode, $year, $month, $companyName = null)
     {
         // Normalize month: accept numeric (1-12) or month name ("January", etc.)
-        if (is_numeric($month)) {
-            $monthNumber = (int)$month;
-            $monthName = date('F', mktime(0, 0, 0, $monthNumber, 1));
-        } else {
-            $monthName = ucfirst(strtolower($month));
-            $monthNumber = (int)date('n', strtotime($monthName));
+        if (is_numeric($month) && $month >= 1 && $month <= 12) {
+            // Convert numeric month to month name
+            $month = date('F', mktime(0, 0, 0, (int)$month, 1));
         }
+        // If already a month name, use as-is
 
         // Start building the query
         $query = EmployeePayrollSalaryProcess::where('corpId', $corpId)
             ->where('empCode', $empCode)
             ->where('year', $year)
-            ->where('month', $monthName);
+            ->where('month', $month);
         
         // Add company name filter if provided
         if ($companyName) {
@@ -207,7 +205,6 @@ class EmployeePayrollSalaryProcessApiController extends Controller
                     'empCode' => $empCode,
                     'year' => $year,
                     'month' => $month,
-                    'month_searched' => $monthName,
                     'companyName' => $companyName ?: 'Not specified'
                 ]
             ], 404);
@@ -1086,29 +1083,27 @@ class EmployeePayrollSalaryProcessApiController extends Controller
     {
         try {
             // Normalize month: accept numeric (1-12) or month name ("January", etc.)
-            if (is_numeric($month)) {
-                $monthNumber = (int)$month;
-                $monthName = date('F', mktime(0, 0, 0, $monthNumber, 1));
-            } else {
-                $monthName = ucfirst(strtolower($month));
-                $monthNumber = (int)date('n', strtotime($monthName));
+            if (is_numeric($month) && $month >= 1 && $month <= 12) {
+                // Convert numeric month to month name
+                $month = date('F', mktime(0, 0, 0, (int)$month, 1));
             }
+            // If already a month name, use as-is
 
             // Check if payroll exists for this period
             $payrollExists = EmployeePayrollSalaryProcess::where('corpId', $corpId)
                 ->where('companyName', $companyName)
                 ->where('year', $year)
-                ->where('month', $monthName)
+                ->where('month', $month)
                 ->exists();
 
-            $filterDescription = "corpId: {$corpId}, companyName: {$companyName}, year: {$year}, month: {$monthName}";
+            $filterDescription = "corpId: {$corpId}, companyName: {$companyName}, year: {$year}, month: {$month}";
 
             if ($payrollExists) {
                 // Get count of records for additional info
                 $recordsCount = EmployeePayrollSalaryProcess::where('corpId', $corpId)
                     ->where('companyName', $companyName)
                     ->where('year', $year)
-                    ->where('month', $monthName)
+                    ->where('month', $month)
                     ->count();
 
                 return response()->json([
@@ -1156,24 +1151,23 @@ class EmployeePayrollSalaryProcessApiController extends Controller
 
         try {
             // Normalize month: accept numeric (1-12) or month name ("January", etc.)
-            if (is_numeric($request->month)) {
-                $monthNumber = (int)$request->month;
-                $monthName = date('F', mktime(0, 0, 0, $monthNumber, 1));
-            } else {
-                $monthName = ucfirst(strtolower($request->month));
-                $monthNumber = (int)date('n', strtotime($monthName));
+            $month = $request->month;
+            if (is_numeric($month) && $month >= 1 && $month <= 12) {
+                // Convert numeric month to month name
+                $month = date('F', mktime(0, 0, 0, (int)$month, 1));
             }
+            // If already a month name, use as-is
 
             // Check if payroll entries exist for this period
             $payrollQuery = EmployeePayrollSalaryProcess::where('corpId', $request->corpId)
                 ->where('companyName', $request->companyName)
                 ->where('year', $request->year)
-                ->where('month', $monthName);
+                ->where('month', $month);
 
             $payrollRecords = $payrollQuery->get();
 
             if ($payrollRecords->isEmpty()) {
-                $filterDescription = "corpId: {$request->corpId}, companyName: {$request->companyName}, year: {$request->year}, month: {$request->month} (searched as: {$monthName})";
+                $filterDescription = "corpId: {$request->corpId}, companyName: {$request->companyName}, year: {$request->year}, month: {$month}";
                 
                 return response()->json([
                     'status' => false,
@@ -1196,14 +1190,14 @@ class EmployeePayrollSalaryProcessApiController extends Controller
             $updatedCount = EmployeePayrollSalaryProcess::where('corpId', $request->corpId)
                 ->where('companyName', $request->companyName)
                 ->where('year', $request->year)
-                ->where('month', $monthName)
+                ->where('month', $month)
                 ->where('status', '!=', 'Released') // Only update non-released records
                 ->update([
                     'status' => 'Released',
                     'updated_at' => now()
                 ]);
 
-            $filterDescription = "corpId: {$request->corpId}, companyName: {$request->companyName}, year: {$request->year}, month: {$monthName}";
+            $filterDescription = "corpId: {$request->corpId}, companyName: {$request->companyName}, year: {$request->year}, month: {$month}";
 
             // Prepare response message
             if ($updatedCount > 0) {
@@ -1254,24 +1248,23 @@ class EmployeePayrollSalaryProcessApiController extends Controller
 
         try {
             // Normalize month: accept numeric (1-12) or month name ("January", etc.)
-            if (is_numeric($request->month)) {
-                $monthNumber = (int)$request->month;
-                $monthName = date('F', mktime(0, 0, 0, $monthNumber, 1));
-            } else {
-                $monthName = ucfirst(strtolower($request->month));
-                $monthNumber = (int)date('n', strtotime($monthName));
+            $month = $request->month;
+            if (is_numeric($month) && $month >= 1 && $month <= 12) {
+                // Convert numeric month to month name
+                $month = date('F', mktime(0, 0, 0, (int)$month, 1));
             }
+            // If already a month name, use as-is
 
             // Check if payroll entries exist for this period
             $payrollQuery = EmployeePayrollSalaryProcess::where('corpId', $request->corpId)
                 ->where('companyName', $request->companyName)
                 ->where('year', $request->year)
-                ->where('month', $monthName);
+                ->where('month', $month);
 
             $allPayrollRecords = $payrollQuery->get();
 
             if ($allPayrollRecords->isEmpty()) {
-                $filterDescription = "corpId: {$request->corpId}, companyName: {$request->companyName}, year: {$request->year}, month: {$monthName}";
+                $filterDescription = "corpId: {$request->corpId}, companyName: {$request->companyName}, year: {$request->year}, month: {$month}";
                 
                 return response()->json([
                     'status' => false,
@@ -1285,7 +1278,7 @@ class EmployeePayrollSalaryProcessApiController extends Controller
             $initiatedRecords = $allPayrollRecords->where('status', 'Initiated');
 
             if ($initiatedRecords->isEmpty()) {
-                $filterDescription = "corpId: {$request->corpId}, companyName: {$request->companyName}, year: {$request->year}, month: {$monthName}";
+                $filterDescription = "corpId: {$request->corpId}, companyName: {$request->companyName}, year: {$request->year}, month: {$month}";
                 
                 // Get current status breakdown
                 $statusBreakdown = $allPayrollRecords->groupBy('status')->map(function ($group) {
@@ -1311,14 +1304,14 @@ class EmployeePayrollSalaryProcessApiController extends Controller
             $updatedCount = EmployeePayrollSalaryProcess::where('corpId', $request->corpId)
                 ->where('companyName', $request->companyName)
                 ->where('year', $request->year)
-                ->where('month', $monthName)
+                ->where('month', $month)
                 ->where('status', 'Initiated') // Only update 'Initiated' records
                 ->update([
                     'status' => 'Released',
                     'updated_at' => now()
                 ]);
 
-            $filterDescription = "corpId: {$request->corpId}, companyName: {$request->companyName}, year: {$request->year}, month: {$monthName}";
+            $filterDescription = "corpId: {$request->corpId}, companyName: {$request->companyName}, year: {$request->year}, month: {$month}";
 
             // Count records by other statuses (excluding the ones we just updated)
             $otherStatusCount = $allPayrollRecords->where('status', '!=', 'Initiated')->count();
