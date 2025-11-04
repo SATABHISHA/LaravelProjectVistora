@@ -2079,15 +2079,18 @@ class EmployeePayrollSalaryProcessApiController extends Controller
                 ]);
             }
 
-            // Normalize month and get payroll status for all employees for the specified period
-            $monthNumber = is_numeric($request->month) ? (int)$request->month : (int)date('n', strtotime($request->month));
+            // Normalize month to month name for consistency
+            $month = $request->month;
+            if (is_numeric($month) && $month >= 1 && $month <= 12) {
+                $month = date('F', mktime(0, 0, 0, (int)$month, 1));
+            }
 
             // Get payroll status for all employees for the specified period
             $empCodes = $employees->pluck('EmpCode')->toArray();
             $payrollStatuses = EmployeePayrollSalaryProcess::where('corpId', $request->corpId)
                 ->where('companyName', $request->companyName)
                 ->where('year', $request->year)
-                ->where('month', $monthNumber)
+                ->where('month', $month)
                 ->whereIn('empCode', $empCodes)
                 ->pluck('status', 'empCode')
                 ->toArray();
