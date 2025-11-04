@@ -3113,5 +3113,105 @@ class EmployeePayrollSalaryProcessApiController extends Controller
             abort(500, 'Error in exporting payroll data with arrears: ' . $e->getMessage());
         }
     }
+
+    /**
+     * Calculate salary totals from payroll components
+     *
+     * @param array $grossList
+     * @param array $otherBenefits
+     * @param array $recurringDeductions
+     * @param array $otherAllowances
+     * @return array
+     */
+    private function calculateSalaryTotals($grossList, $otherBenefits, $recurringDeductions, $otherAllowances = [])
+    {
+        // Initialize totals
+        $monthlyGross = 0.0;
+        $monthlyAllowance = 0.0;
+        $monthlyDeduction = 0.0;
+
+        // Calculate gross total
+        if (is_array($grossList)) {
+            foreach ($grossList as $item) {
+                if (isset($item['calculatedValue'])) {
+                    $monthlyGross += (float)$item['calculatedValue'];
+                }
+            }
+        }
+
+        // Calculate other benefits total
+        if (is_array($otherBenefits)) {
+            foreach ($otherBenefits as $item) {
+                if (isset($item['calculatedValue'])) {
+                    $monthlyAllowance += (float)$item['calculatedValue'];
+                }
+            }
+        }
+
+        // Calculate other allowances total (if provided separately)
+        if (is_array($otherAllowances)) {
+            foreach ($otherAllowances as $item) {
+                if (isset($item['calculatedValue'])) {
+                    $monthlyAllowance += (float)$item['calculatedValue'];
+                }
+            }
+        }
+
+        // Calculate deductions total
+        if (is_array($recurringDeductions)) {
+            foreach ($recurringDeductions as $item) {
+                if (isset($item['calculatedValue'])) {
+                    $monthlyDeduction += (float)$item['calculatedValue'];
+                }
+            }
+        }
+
+        // Calculate net salary (gross - deduction only, allowances are separate)
+        $monthlyNetSalary = $monthlyGross - $monthlyDeduction;
+
+        // Calculate annual values
+        $annualGross = $monthlyGross * 12;
+        $annualAllowance = $monthlyAllowance * 12;
+        $annualDeduction = $monthlyDeduction * 12;
+        $annualNetSalary = $monthlyNetSalary * 12;
+
+        return [
+            'monthlyGross' => round($monthlyGross, 2),
+            'annualGross' => round($annualGross, 2),
+            'monthlyDeduction' => round($monthlyDeduction, 2),
+            'annualDeduction' => round($annualDeduction, 2),
+            'monthlyAllowance' => round($monthlyAllowance, 2),
+            'annualAllowance' => round($annualAllowance, 2),
+            'monthlyNetSalary' => round($monthlyNetSalary, 2),
+            'annualNetSalary' => round($annualNetSalary, 2)
+        ];
+    }
+
+    /**
+     * Safely sum values in an array, recursively processing nested arrays
+     *
+     * @param array $array The array to sum
+     * @return float The sum of numeric values
+     */
+    private function safeArraySum($array) 
+    {
+        $sum = 0;
+        
+        if (!is_array($array)) {
+            return 0;
+        }
+        
+        foreach ($array as $value) {
+            if (is_array($value)) {
+                // Recursively sum nested arrays
+                $sum += $this->safeArraySum($value);
+            } else if (is_numeric($value)) {
+                // Only add numeric values
+                $sum += $value;
+            }
+        }
+        
+        return $sum;
+    }
 }
 
