@@ -3157,8 +3157,7 @@ class EmployeePayrollSalaryProcessApiController extends Controller
             Excel::store(new PayrollArrearsExport($excelData, $dynamicHeaders, $companyInfo, $arrearsInfo), $tempPath, 'local');
 
             if (Storage::exists($tempPath)) {
-                $fileContent = Storage::get($tempPath);
-                Storage::delete($tempPath); // Clean up temp file
+                $fullPath = storage_path('app/' . $tempPath);
 
                 // Calculate arrears months range if available
                 $arrearsMonthsRange = '';
@@ -3169,14 +3168,16 @@ class EmployeePayrollSalaryProcessApiController extends Controller
                     }
                 }
 
-                return response($fileContent)
-                    ->header('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
-                    ->header('Content-Disposition', 'attachment; filename="' . $fileName . '"')
-                    ->header('Content-Length', strlen($fileContent))
-                    ->header('X-Total-Employees', $arrearsStats['totalEmployees'])
-                    ->header('X-Employees-With-Arrears', $arrearsStats['employeesWithArrears'])
-                    ->header('X-Arrears-Months', $arrearsMonthsRange)
-                    ->header('Access-Control-Expose-Headers', 'X-Total-Employees, X-Employees-With-Arrears, X-Arrears-Months');
+                $headers = [
+                    'Content-Type' => 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+                    'X-Total-Employees' => $arrearsStats['totalEmployees'],
+                    'X-Employees-With-Arrears' => $arrearsStats['employeesWithArrears'],
+                    'X-Arrears-Months' => $arrearsMonthsRange,
+                    'Access-Control-Expose-Headers' => 'X-Total-Employees, X-Employees-With-Arrears, X-Arrears-Months'
+                ];
+
+                // Return a BinaryFileResponse and delete the temp file after sending
+                return response()->download($fullPath, $fileName, $headers)->deleteFileAfterSend(true);
             }
 
             // Fallback to original method
