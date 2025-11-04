@@ -414,7 +414,7 @@ class EmployeePayrollSalaryProcessApiController extends Controller
                 ->get();
 
             // Log the query results for debugging
-            \Log::info("ExportPayrollExcel query results", [
+            Log::info("ExportPayrollExcel query results", [
                 'corpId' => $request->corpId,
                 'companyName' => $request->companyName,
                 'year' => $request->year,
@@ -627,6 +627,18 @@ class EmployeePayrollSalaryProcessApiController extends Controller
             // Add totals row to data
             $excelData[] = $totalsRow;
 
+            // Ensure arrears stats are initialized (fallback when no arrears calculation was run)
+            if (!isset($arrearsStats) || !is_array($arrearsStats)) {
+                $arrearsStats = [
+                    'totalEmployees' => 0,
+                    'employeesWithArrears' => 0,
+                    'employeesWithoutArrears' => 0,
+                    'employeesWithoutRevision' => 0,
+                    'employeesWithArrearsDetails' => [],
+                    'employeesWithoutRevisionDetails' => []
+                ];
+            }
+
             // Company and arrears information
             $companyInfo = [
                 'companyName' => $request->companyName,
@@ -655,9 +667,8 @@ class EmployeePayrollSalaryProcessApiController extends Controller
             $tempPath = 'temp_arrears_export_' . time() . '.xlsx';
             Excel::store(new PayrollArrearsExport($excelData, $dynamicHeaders, $companyInfo, $arrearsInfo), $tempPath, 'local');
 
-            if (\Storage::exists($tempPath)) {
-                $fileContent = \Storage::get($tempPath);
-                \Storage::delete($tempPath); // Clean up temp file
+            if (Storage::exists($tempPath)) {
+                $fullPath = storage_path('app/' . $tempPath);
 
                 // Calculate arrears months range if available
                 $arrearsMonthsRange = '';
@@ -668,14 +679,16 @@ class EmployeePayrollSalaryProcessApiController extends Controller
                     }
                 }
 
-                return response($fileContent)
-                    ->header('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
-                    ->header('Content-Disposition', 'attachment; filename="' . $fileName . '"')
-                    ->header('Content-Length', strlen($fileContent))
-                    ->header('X-Total-Employees', $arrearsStats['totalEmployees'])
-                    ->header('X-Employees-With-Arrears', $arrearsStats['employeesWithArrears'])
-                    ->header('X-Arrears-Months', $arrearsMonthsRange)
-                    ->header('Access-Control-Expose-Headers', 'X-Total-Employees, X-Employees-With-Arrears, X-Arrears-Months');
+                $headers = [
+                    'Content-Type' => 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+                    'X-Total-Employees' => $arrearsStats['totalEmployees'],
+                    'X-Employees-With-Arrears' => $arrearsStats['employeesWithArrears'],
+                    'X-Arrears-Months' => $arrearsMonthsRange,
+                    'Access-Control-Expose-Headers' => 'X-Total-Employees, X-Employees-With-Arrears, X-Arrears-Months'
+                ];
+
+                // Return a BinaryFileResponse by using response()->download and remove the temp file after sending
+                return response()->download($fullPath, $fileName, $headers)->deleteFileAfterSend(true);
             }
 
             // Fallback to original method
@@ -1168,7 +1181,7 @@ class EmployeePayrollSalaryProcessApiController extends Controller
                 ->where('month', $month);
 
             // Log the SQL query for debugging
-            \Log::info('Release Salary Query', [
+            Log::info('Release Salary Query', [
                 'corpId' => $request->corpId,
                 'companyName' => $request->companyName,
                 'year' => $request->year,
@@ -1184,7 +1197,7 @@ class EmployeePayrollSalaryProcessApiController extends Controller
                 $filterDescription = "corpId: {$request->corpId}, companyName: {$request->companyName}, year: {$request->year}, month: {$month}";
                 
                 // Log for debugging
-                \Log::warning('No payroll records found', [
+                Log::warning('No payroll records found', [
                     'filter' => $filterDescription,
                     'query_result_count' => $payrollRecords->count()
                 ]);
@@ -1473,7 +1486,7 @@ class EmployeePayrollSalaryProcessApiController extends Controller
             ]);
 
         } catch (\Exception $e) {
-            \Log::error('Error generating salary slip PDF: ' . $e->getMessage());
+            Log::error('Error generating salary slip PDF: ' . $e->getMessage());
             abort(500, 'Error generating salary slip: ' . $e->getMessage());
         }
     }
@@ -1608,7 +1621,7 @@ class EmployeePayrollSalaryProcessApiController extends Controller
             return response()->download($zipFilePath)->deleteFileAfterSend(true);
 
         } catch (\Exception $e) {
-            \Log::error('Error generating bulk salary slips: ' . $e->getMessage());
+            Log::error('Error generating bulk salary slips: ' . $e->getMessage());
             abort(500, 'Error generating salary slips: ' . $e->getMessage());
         }
     }
@@ -1725,7 +1738,7 @@ class EmployeePayrollSalaryProcessApiController extends Controller
             ]);
 
         } catch (\Exception $e) {
-            \Log::error('Error generating single custom salary slip: ' . $e->getMessage());
+            Log::error('Error generating single custom salary slip: ' . $e->getMessage());
             abort(500, 'Error generating salary slip: ' . $e->getMessage());
         }
     }
@@ -1873,7 +1886,7 @@ class EmployeePayrollSalaryProcessApiController extends Controller
             if (isset($tempDir) && File::exists($tempDir)) {
                 File::deleteDirectory($tempDir);
             }
-            \Log::error('Error generating bulk custom salary slips: ' . $e->getMessage());
+            Log::error('Error generating bulk custom salary slips: ' . $e->getMessage());
             abort(500, 'Error generating bulk custom salary slips: ' . $e->getMessage());
         }
     }
@@ -2756,7 +2769,7 @@ class EmployeePayrollSalaryProcessApiController extends Controller
                 ->get();
 
             // Log the query results for debugging
-            \Log::info("ExportPayrollWithArrears query results", [
+            Log::info("ExportPayrollWithArrears query results", [
                 'corpId' => $request->corpId,
                 'companyName' => $request->companyName,
                 'year' => $request->year,
@@ -3143,9 +3156,9 @@ class EmployeePayrollSalaryProcessApiController extends Controller
             $tempPath = 'temp_arrears_export_' . time() . '.xlsx';
             Excel::store(new PayrollArrearsExport($excelData, $dynamicHeaders, $companyInfo, $arrearsInfo), $tempPath, 'local');
 
-            if (\Storage::exists($tempPath)) {
-                $fileContent = \Storage::get($tempPath);
-                \Storage::delete($tempPath); // Clean up temp file
+            if (Storage::exists($tempPath)) {
+                $fileContent = Storage::get($tempPath);
+                Storage::delete($tempPath); // Clean up temp file
 
                 // Calculate arrears months range if available
                 $arrearsMonthsRange = '';
