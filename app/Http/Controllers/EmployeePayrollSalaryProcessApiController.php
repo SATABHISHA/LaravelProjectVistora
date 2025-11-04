@@ -276,10 +276,14 @@ class EmployeePayrollSalaryProcessApiController extends Controller
             'isShownToEmployeeYn' => 'required|integer',
         ]);
 
+        // Normalize month to numeric value and month name
+        $monthNumber = is_numeric($request->month) ? (int)$request->month : (int)date('n', strtotime($request->month));
+        $monthName = date('F', mktime(0, 0, 0, $monthNumber, 1));
+
         // Check if payroll already exists for this period
         $existingPayrollQuery = EmployeePayrollSalaryProcess::where('corpId', $request->corpId)
             ->where('year', $request->year)
-            ->where('month', $request->month);
+            ->where('month', $monthNumber);
 
         // Add company name filter if provided
         if ($request->has('companyName') && !empty($request->companyName)) {
@@ -387,11 +391,14 @@ class EmployeePayrollSalaryProcessApiController extends Controller
         ]);
 
         try {
+            // Normalize month to numeric value for consistent queries
+            $monthNumber = is_numeric($request->month) ? (int)$request->month : (int)date('n', strtotime($request->month));
+
             // Get payroll records - ensure strict year filtering
             $payrollRecords = EmployeePayrollSalaryProcess::where('corpId', $request->corpId)
                 ->where('companyName', $request->companyName)
                 ->where('year', $request->year)
-                ->where('month', $request->month)
+                ->where('month', $monthNumber)
                 ->whereNotNull('year')
                 ->where('year', '!=', '')
                 ->get();
@@ -610,770 +617,363 @@ class EmployeePayrollSalaryProcessApiController extends Controller
             // Add totals row to data
             $excelData[] = $totalsRow;
 
-            // Company information for the heading
+            // Company and arrears information
             $companyInfo = [
                 'companyName' => $request->companyName,
                 'year' => $request->year,
                 'month' => $request->month,
                 'subBranch' => $request->subBranch ?? 'All SubBranches'
+            ];
+
+            $arrearsInfo = [
+                'totalEmployees' => $arrearsStats['totalEmployees'],
+                'totalEmployeesWithArrears' => $arrearsStats['employeesWithArrears'],
+                'employeesWithoutRevision' => $arrearsStats['employeesWithoutRevision'],
+                'employeesWithArrearsDetails' => $arrearsStats['employeesWithArrearsDetails'],
+                'employeesWithoutRevisionDetails' => $arrearsStats['employeesWithoutRevisionDetails']
             ];
 
             // Generate filename
             $subBranchSuffix = $request->has('subBranch') && !empty($request->subBranch) ? "_{$request->subBranch}" : '';
-            $fileName = "Payroll_{$request->companyName}_{$request->year}_{$request->month}{$subBranchSuffix}.xlsx";
+            $fileName = "SalarySheet_WithArrears_{$request->companyName}_{$request->month}_{$request->year}{$subBranchSuffix}.xlsx";
 
-            return Excel::download(new PayrollExport($excelData, $dynamicHeaders, $companyInfo), $fileName);
+            // Note: We still generate Excel even if no arrears found
+            // The Excel will show "No Arrears" status for employees without revision
+            // Only return error if NO payroll records exist at all (handled earlier in the code)
+
+            // Store Excel file temporarily, then return as download
+            $tempPath = 'temp_arrears_export_' . time() . '.xlsx';
+            Excel::store(new PayrollArrearsExport($excelData, $dynamicHeaders, $companyInfo, $arrearsInfo), $tempPath, 'local');
+
+            if (\Storage::exists($tempPath)) {
+                $fileContent = \Storage::get($tempPath);
+                \Storage::delete($tempPath); // Clean up temp file
+
+                // Calculate arrears months range if available
+                $arrearsMonthsRange = '';
+                if ($arrearsStats['employeesWithArrears'] > 0 && !empty($arrearsStats['employeesWithArrearsDetails'])) {
+                    $firstEmployee = $arrearsStats['employeesWithArrearsDetails'][0];
+                    if (isset($firstEmployee['effectiveFrom']) && isset($firstEmployee['monthsCount'])) {
+                        $arrearsMonthsRange = $firstEmployee['monthsCount'] . ' months (from ' . $firstEmployee['effectiveFrom'] . ')';
+                    }
+                }
+
+                return response($fileContent)
+                    ->header('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
+                    ->header('Content-Disposition', 'attachment; filename="' . $fileName . '"')
+                    ->header('Content-Length', strlen($fileContent))
+                    ->header('X-Total-Employees', $arrearsStats['totalEmployees'])
+                    ->header('X-Employees-With-Arrears', $arrearsStats['employeesWithArrears'])
+                    ->header('X-Arrears-Months', $arrearsMonthsRange)
+                    ->header('Access-Control-Expose-Headers', 'X-Total-Employees, X-Employees-With-Arrears, X-Arrears-Months');
+            }
+
+            // Fallback to original method
+            return Excel::download(new PayrollArrearsExport($excelData, $dynamicHeaders, $companyInfo, $arrearsInfo), $fileName);
 
         } catch (\Exception $e) {
-            abort(500, 'Error in exporting payroll data: ' . $e->getMessage());
+            abort(500, 'Error in exporting payroll data with arrears: ' . $e->getMessage());
         }
     }
 
     /**
-     * Export payroll data to Excel for employees with Released status only
+     * Get list of all branches for a company (for filtering purposes)
      *
      * @param Request $request
-     * @return \Symfony\Component\HttpFoundation\BinaryFileResponse
+     * @return \Illuminate\Http\JsonResponse
      */
-    public function exportReleasedPayrollExcel(Request $request)
+    public function getBranchList(Request $request)
     {
         // Validate required fields
         $request->validate([
             'corpId' => 'required|string|max:10',
-            'companyName' => 'required|string|max:100',
-            'year' => 'required|string|max:4',
-            'month' => 'required|string|max:50',
-            'subBranch' => 'nullable|string|max:100', // Optional SubBranch filter
+            'companyName' => 'required|string|max:100'
         ]);
 
         try {
-            // Get payroll records with Released status only - ensure strict year filtering
-            $payrollRecords = EmployeePayrollSalaryProcess::where('corpId', $request->corpId)
-                ->where('companyName', $request->companyName)
-                ->where('year', $request->year)
-                ->where('month', $request->month)
-                ->where('status', 'Released') // Filter only Released status
-                ->whereNotNull('year')
-                ->where('year', '!=', '')
+            // Get all unique branches and sub-branches for the company
+            $branches = EmploymentDetail::where('corp_id', $request->corpId)
+                ->where('company_name', $request->companyName)
+                ->select('Branch', 'SubBranch')
+                ->distinct()
+                ->whereNotNull('Branch')
+                ->orderBy('Branch')
+                ->orderBy('SubBranch')
                 ->get();
 
-            // Log the query results for debugging
-            \Log::info("ExportReleasedPayrollExcel query results", [
-                'corpId' => $request->corpId,
-                'companyName' => $request->companyName,
-                'year' => $request->year,
-                'month' => $request->month,
-                'record_count' => $payrollRecords->count(),
-                'years_found' => $payrollRecords->pluck('year')->unique()->toArray(),
-                'sample_records' => $payrollRecords->take(3)->map(function($r) {
-                    return ['empCode' => $r->empCode, 'year' => $r->year, 'month' => $r->month];
-                })->toArray()
-            ]);
+            $branchList = [];
+            $branchSummary = [];
 
-            if ($payrollRecords->isEmpty()) {
-                abort(404, 'No released payroll records found for the specified period');
-            }
+            foreach ($branches as $branch) {
+                $branchName = $branch->Branch ?? 'N/A';
+                $subBranchName = $branch->SubBranch ?? 'N/A';
 
-            // Get all employee codes from payroll records
-            $empCodes = $payrollRecords->pluck('empCode')->unique()->toArray();
-            
-            // Fetch employee details and employment details with SubBranch filter
-            $employeeDetails = EmployeeDetail::whereIn('EmpCode', $empCodes)->get()->keyBy('EmpCode');
-            
-            $employmentDetailsQuery = EmploymentDetail::whereIn('EmpCode', $empCodes);
-            
-            // Apply SubBranch filter if provided
-            if ($request->has('subBranch') && !empty($request->subBranch)) {
-                $employmentDetailsQuery->where('SubBranch', $request->subBranch);
-            }
-            
-            $employmentDetails = $employmentDetailsQuery->get()->keyBy('EmpCode');
-
-            // Filter payroll records based on employment details (if SubBranch filter applied)
-            if ($request->has('subBranch') && !empty($request->subBranch)) {
-                $filteredEmpCodes = $employmentDetails->pluck('EmpCode')->toArray();
-                $payrollRecords = $payrollRecords->whereIn('empCode', $filteredEmpCodes);
-            }
-
-            if ($payrollRecords->isEmpty()) {
-                abort(404, 'No released payroll records found for the specified SubBranch and period');
-            }
-
-            $excelData = [];
-            $dynamicHeaders = [];
-            $totals = []; // For calculating column totals
-            $serialNo = 1; // For serial number
-
-            // FIRST PASS: Collect ALL possible dynamic headers from ALL records
-            foreach ($payrollRecords as $record) {
-                $grossList = $this->safeJsonDecode($record->grossList);
-                $recurringDeductions = $this->safeJsonDecode($record->recurringDeduction);
-
-                // Build complete list of dynamic headers from all records
-                foreach ($grossList as $item) {
-                    $componentName = $item['componentName'] ?? 'Unknown Component';
-                    $headerKey = 'gross_' . str_replace(' ', '_', strtolower($componentName));
-                    $dynamicHeaders[$headerKey] = $componentName;
-                }
-                
-                foreach ($recurringDeductions as $item) {
-                    $componentName = $item['componentName'] ?? 'Unknown Component';
-                    $headerKey = 'deduction_' . str_replace(' ', '_', strtolower($componentName));
-                    $dynamicHeaders[$headerKey] = $componentName;
-                }
-            }
-
-            // SECOND PASS: Process each record and ensure all dynamic columns have values
-            foreach ($payrollRecords as $record) {
-                // Get employee details and employment details
-                $employeeDetail = $employeeDetails->get($record->empCode);
-                $employmentDetail = $employmentDetails->get($record->empCode);
-                
-                // Build full name using the helper method
-                $fullName = $this->getFullEmployeeName($employeeDetail);
-
-                // Parse JSON fields safely - REMOVED otherAllowances and otherBenefits
-                $grossList = $this->safeJsonDecode($record->grossList);
-                $recurringDeductions = $this->safeJsonDecode($record->recurringDeduction);
-
-                // Calculate totals - REMOVED ALL benefits calculation
-                $monthlyTotalGross = 0;
-                $monthlyTotalDeductions = 0;
-
-                // Calculate gross total
-                foreach ($grossList as $item) {
-                    if (isset($item['calculatedValue']) && is_numeric($item['calculatedValue'])) {
-                        $monthlyTotalGross += (float)$item['calculatedValue'];
-                    }
-                }
-
-                // Calculate deductions total
-                foreach ($recurringDeductions as $item) {
-                    if (isset($item['calculatedValue']) && is_numeric($item['calculatedValue'])) {
-                        $monthlyTotalDeductions += (float)$item['calculatedValue'];
-                    }
-                }
-
-                // Calculate net salary - REMOVED benefits from calculation
-                $netTakeHomeMonthly = $monthlyTotalGross - $monthlyTotalDeductions;
-
-                // Build row data as associative array (with serial number and paid days)
-                $row = [
-                    'serialNo' => $serialNo++,
-                    'empCode' => $record->empCode ?? '',
-                    'empName' => $fullName ?: 'N/A',
-                    'designation' => $employmentDetail->Designation ?? 'N/A',
-                    'paidDays' => 0, // Currently set to 0 as attendance not calculated
-                    'dateOfJoining' => $employmentDetail->dateOfJoining ?? 'N/A',
-                    'monthlyTotalGross' => round($monthlyTotalGross, 2),
-                    'monthlyTotalRecurringDeductions' => round($monthlyTotalDeductions, 2),
-                    'netTakeHomeMonthly' => round($netTakeHomeMonthly, 2),
-                    'status' => $record->status, // Will always be 'Released'
+                $branchList[] = [
+                    'branch' => $branchName,
+                    'sub_branch' => $subBranchName,
+                    'combined_name' => $branchName . ($subBranchName !== 'N/A' ? ' - ' . $subBranchName : '')
                 ];
 
-                // Initialize ALL dynamic headers with 0 first
-                foreach ($dynamicHeaders as $headerKey => $headerName) {
-                    $row[$headerKey] = 0;
-                    if (!isset($totals[$headerKey])) {
-                        $totals[$headerKey] = 0;
-                    }
+                // Count employees per branch
+                if (!isset($branchSummary[$branchName])) {
+                    $branchSummary[$branchName] = [
+                        'branch_name' => $branchName,
+                        'sub_branches' => [],
+                        'total_employees' => 0
+                    ];
                 }
 
-                // Now populate actual values for gross components that exist
-                foreach ($grossList as $item) {
-                    $componentName = $item['componentName'] ?? 'Unknown Component';
-                    $headerKey = 'gross_' . str_replace(' ', '_', strtolower($componentName));
-                    $value = 0;
-                    if (isset($item['calculatedValue']) && is_numeric($item['calculatedValue'])) {
-                        $value = (float)$item['calculatedValue'];
-                    }
-                    $row[$headerKey] = $value;
-                    $totals[$headerKey] += $value;
-                }
-                
-                // Now populate actual values for deduction components that exist
-                foreach ($recurringDeductions as $item) {
-                    $componentName = $item['componentName'] ?? 'Unknown Component';
-                    $headerKey = 'deduction_' . str_replace(' ', '_', strtolower($componentName));
-                    $value = 0;
-                    if (isset($item['calculatedValue']) && is_numeric($item['calculatedValue'])) {
-                        $value = (float)$item['calculatedValue'];
-                    }
-                    $row[$headerKey] = $value;
-                    $totals[$headerKey] += $value;
-                }
-
-                // Add totals for summary columns - REMOVED all benefits-related totals
-                $totals['monthlyTotalGross'] = ($totals['monthlyTotalGross'] ?? 0) + $monthlyTotalGross;
-                $totals['monthlyTotalRecurringDeductions'] = ($totals['monthlyTotalRecurringDeductions'] ?? 0) + $monthlyTotalDeductions;
-                $totals['netTakeHomeMonthly'] = ($totals['netTakeHomeMonthly'] ?? 0) + $netTakeHomeMonthly;
-                $totals['paidDays'] = ($totals['paidDays'] ?? 0) + 0; // Sum of paid days (0 for now)
-
-                $excelData[] = $row;
-            }
-
-            // Create totals row - REMOVED all benefits-related fields
-            $totalsRow = [
-                'serialNo' => '',
-                'empCode' => 'TOTAL',
-                'empName' => '',
-                'designation' => '',
-                'paidDays' => round($totals['paidDays'] ?? 0, 0),
-                'dateOfJoining' => '',
-                'monthlyTotalGross' => round($totals['monthlyTotalGross'] ?? 0, 2),
-                'monthlyTotalRecurringDeductions' => round($totals['monthlyTotalRecurringDeductions'] ?? 0, 2),
-                'netTakeHomeMonthly' => round($totals['netTakeHomeMonthly'] ?? 0, 2),
-                'status' => '',
-            ];
-
-            // Add dynamic totals with 0 default values
-            foreach ($dynamicHeaders as $key => $value) {
-                $totalsRow[$key] = round($totals[$key] ?? 0, 2);
-            }
-
-            // Add totals row to data
-            $excelData[] = $totalsRow;
-
-            // Company information for the heading
-            $companyInfo = [
-                'companyName' => $request->companyName,
-                'year' => $request->year,
-                'month' => $request->month,
-                'subBranch' => $request->subBranch ?? 'All SubBranches'
-            ];
-
-            // Generate filename with Released indicator
-            $subBranchSuffix = $request->has('subBranch') && !empty($request->subBranch) ? "_{$request->subBranch}" : '';
-            $fileName = "SalarySheet_{$request->companyName}_{$request->month}_{$request->year}{$subBranchSuffix}.xlsx";
-
-            // Use the ReleasedPayrollExport class
-            return Excel::download(new ReleasedPayrollExport($excelData, $dynamicHeaders, $companyInfo), $fileName);
-
-        } catch (\Exception $e) {
-            abort(500, 'Error in exporting released payroll data: ' . $e->getMessage());
-        }
-    }
-
-    /**
-     * Safely decode JSON to array
-     */
-    private function safeJsonDecode($jsonString)
-    {
-        if (empty($jsonString) || !is_string($jsonString)) {
-            return [];
-        }
-
-        $decoded = json_decode($jsonString, true);
-        
-        // If json_decode fails or returns non-array, return empty array
-        if (!is_array($decoded)) {
-            return [];
-        }
-
-        return $decoded;
-    }
-
-    /**
-     * Calculate salary totals
-     *
-     * @param array $grossList
-     * @param array $otherBenefits
-     * @param array $recurringDeductions
-     * @param array $otherAllowances
-     * @return array
-     */
-    private function calculateSalaryTotals($grossList, $otherBenefits, $recurringDeductions, $otherAllowances = [])
-    {
-        // Initialize totals
-        $monthlyGross = 0.0;
-        $monthlyAllowance = 0.0;
-        $monthlyDeduction = 0.0;
-
-        try {
-            // Calculate gross total with safe processing
-            if (is_array($grossList)) {
-                foreach ($grossList as $item) {
-                    if (is_array($item) && isset($item['calculatedValue']) && is_numeric($item['calculatedValue'])) {
-                        $monthlyGross += (float)$item['calculatedValue'];
-                    }
-                }
-            }
-
-            // Calculate other benefits total with safe processing
-            if (is_array($otherBenefits)) {
-                foreach ($otherBenefits as $item) {
-                    if (is_array($item) && isset($item['calculatedValue']) && is_numeric($item['calculatedValue'])) {
-                        $monthlyAllowance += (float)$item['calculatedValue'];
-                    }
-                }
-            }
-
-            // Calculate other allowances total (if provided separately) with safe processing
-            if (is_array($otherAllowances)) {
-                foreach ($otherAllowances as $item) {
-                    if (is_array($item) && isset($item['calculatedValue']) && is_numeric($item['calculatedValue'])) {
-                        $monthlyAllowance += (float)$item['calculatedValue'];
-                    }
-                }
-            }
-
-            // Calculate deductions total with safe processing
-            if (is_array($recurringDeductions)) {
-                foreach ($recurringDeductions as $item) {
-                    if (is_array($item) && isset($item['calculatedValue']) && is_numeric($item['calculatedValue'])) {
-                        $monthlyDeduction += (float)$item['calculatedValue'];
-                    }
-                }
-            }
-        } catch (\Exception $e) {
-            // Log calculation error but continue with whatever totals we have
-            Log::warning("Error in salary calculations: " . $e->getMessage());
-        }
-
-        // Calculate net salary (gross - deduction only, allowances are separate)
-        $monthlyNetSalary = $monthlyGross - $monthlyDeduction;
-
-        // Calculate annual values
-        $annualGross = $monthlyGross * 12;
-        $annualAllowance = $monthlyAllowance * 12;
-        $annualDeduction = $monthlyDeduction * 12;
-        $annualNetSalary = $monthlyNetSalary * 12;
-
-        return [
-            'monthlyGross' => round($monthlyGross, 2),
-            'annualGross' => round($annualGross, 2),
-            'monthlyDeduction' => round($monthlyDeduction, 2),
-            'annualDeduction' => round($annualDeduction, 2),
-            'monthlyAllowance' => round($monthlyAllowance, 2),
-            'annualAllowance' => round($annualAllowance, 2),
-            'monthlyNetSalary' => round($monthlyNetSalary, 2),
-            'annualNetSalary' => round($annualNetSalary, 2)
-        ];
-    }
-
-    /**
-     * Safely sum values in an array, recursively processing nested arrays
-     *
-     * @param array $array The array to sum
-     * @return float The sum of numeric values
-     */
-    private function safeArraySum($array) 
-    {
-        $sum = 0;
-        
-        if (!is_array($array)) {
-            return 0;
-        }
-        
-        foreach ($array as $value) {
-            if (is_array($value)) {
-                // Recursively sum nested arrays
-                $sum += $this->safeArraySum($value);
-            } else if (is_numeric($value)) {
-                // Only add numeric values
-                $sum += $value;
-            }
-        }
-        
-        return $sum;
-    }
-
-    /**
-     * Check if payroll has been initiated for a specific period
-     *
-     * @param string $corpId
-     * @param string $companyName
-     * @param string $year
-     * @param string $month
-     * @return \Illuminate\Http\JsonResponse
-     */
-    public function checkPayrollInitiated($corpId, $companyName, $year, $month)
-    {
-        try {
-            // Check if payroll exists for this period
-            $payrollExists = EmployeePayrollSalaryProcess::where('corpId', $corpId)
-                ->where('companyName', $companyName)
-                ->where('year', $year)
-                ->where('month', $month)
-                ->exists();
-
-            $filterDescription = "corpId: {$corpId}, companyName: {$companyName}, year: {$year}, month: {$month}";
-
-            if ($payrollExists) {
-                // Get count of records for additional info
-                $recordsCount = EmployeePayrollSalaryProcess::where('corpId', $corpId)
-                    ->where('companyName', $companyName)
-                    ->where('year', $year)
-                    ->where('month', $month)
+                $employeeCount = EmploymentDetail::where('corp_id', $request->corpId)
+                    ->where('company_name', $request->companyName)
+                    ->where('Branch', $branchName)
+                    ->where('SubBranch', $subBranchName)
                     ->count();
 
-                return response()->json([
-                    'status' => true,
-                    'initiated' => true,
-                    'message' => 'Payroll has been initiated for this period',
-                    'filter' => $filterDescription,
-                    'records_count' => $recordsCount
-                ]);
-            } else {
-                return response()->json([
-                    'status' => true,
-                    'initiated' => false,
-                    'message' => 'Payroll has not been initiated for this period',
-                    'filter' => $filterDescription,
-                    'records_count' => 0
-                ]);
-            }
-
-        } catch (\Exception $e) {
-            return response()->json([
-                'status' => false,
-                'initiated' => false,
-                'message' => 'Error checking payroll status: ' . $e->getMessage(),
-                'filter' => "corpId: {$corpId}, companyName: {$companyName}, year: {$year}, month: {$month}"
-            ], 500);
-        }
-    }
-
-    /**
-     * Release salary in bulk - update status from any status to 'Released'
-     *
-     * @param Request $request
-     * @return \Illuminate\Http\JsonResponse
-     */
-    public function releaseSalary(Request $request)
-    {
-        // Validate required fields
-        $request->validate([
-            'corpId' => 'required|string|max:10',
-            'companyName' => 'required|string|max:100',
-            'year' => 'required|string|max:4',
-            'month' => 'required|string|max:50',
-        ]);
-
-        try {
-            // Check if payroll entries exist for this period
-            $payrollQuery = EmployeePayrollSalaryProcess::where('corpId', $request->corpId)
-                ->where('companyName', $request->companyName)
-                ->where('year', $request->year)
-                ->where('month', $request->month);
-
-            $payrollRecords = $payrollQuery->get();
-
-            if ($payrollRecords->isEmpty()) {
-                $filterDescription = "corpId: {$request->corpId}, companyName: {$request->companyName}, year: {$request->year}, month: {$request->month}";
-                
-                return response()->json([
-                    'status' => false,
-                    'message' => 'No payroll entries found for the specified period',
-                    'filter' => $filterDescription,
-                    'records_found' => 0
-                ], 404);
-            }
-
-            // Get current status breakdown before update
-            $statusBreakdown = $payrollRecords->groupBy('status')->map(function ($group) {
-                return $group->count();
-            })->toArray();
-
-            // Count records that are already released
-            $alreadyReleasedCount = $payrollRecords->where('status', 'Released')->count();
-            $toBeUpdatedCount = $payrollRecords->where('status', '!=', 'Released')->count();
-
-            // Update all records to 'Released' status
-            $updatedCount = EmployeePayrollSalaryProcess::where('corpId', $request->corpId)
-                ->where('companyName', $request->companyName)
-                ->where('year', $request->year)
-                ->where('month', $request->month)
-                ->where('status', '!=', 'Released') // Only update non-released records
-                ->update([
-                    'status' => 'Released',
-                    'updated_at' => now()
-                ]);
-
-            $filterDescription = "corpId: {$request->corpId}, companyName: {$request->companyName}, year: {$request->year}, month: {$request->month}";
-
-            // Prepare response message
-            if ($updatedCount > 0) {
-                $message = "Successfully released salary for {$updatedCount} employees";
-                if ($alreadyReleasedCount > 0) {
-                    $message .= ". {$alreadyReleasedCount} employees were already in 'Released' status";
-                }
-            } else {
-                $message = "All {$payrollRecords->count()} employees are already in 'Released' status";
+                $branchSummary[$branchName]['sub_branches'][] = [
+                    'sub_branch_name' => $subBranchName,
+                    'employee_count' => $employeeCount
+                ];
+                $branchSummary[$branchName]['total_employees'] += $employeeCount;
             }
 
             return response()->json([
                 'status' => true,
-                'message' => $message,
-                'filter' => $filterDescription,
-                'summary' => [
-                    'total_records' => $payrollRecords->count(),
-                    'updated_to_released' => $updatedCount,
-                    'already_released' => $alreadyReleasedCount,
-                    'previous_status_breakdown' => $statusBreakdown
+                'message' => 'Branch list retrieved successfully',
+                'filter' => "corpId: {$request->corpId}, companyName: {$request->companyName}",
+                'data' => [
+                    'all_branches' => $branchList,
+                    'branch_summary' => array_values($branchSummary),
+                    'unique_branches' => array_unique(collect($branchList)->pluck('branch')->toArray()),
+                    'unique_sub_branches' => array_unique(collect($branchList)->pluck('sub_branch')->toArray())
                 ]
             ]);
 
         } catch (\Exception $e) {
             return response()->json([
                 'status' => false,
-                'message' => 'Error releasing salary: ' . $e->getMessage(),
-                'filter' => "corpId: {$request->corpId}, companyName: {$request->companyName}, year: {$request->year}, month: {$request->month}"
+                'message' => 'Error retrieving branch list: ' . $e->getMessage(),
+                'filter' => "corpId: {$request->corpId}, companyName: {$request->companyName}",
+                'data' => []
             ], 500);
         }
     }
 
-    /**
-     * Release salary only for records with 'Initiated' status
-     *
-     * @param Request $request
-     * @return \Illuminate\Http\JsonResponse
-     */
-    public function releaseSalaryInitiatedOnly(Request $request)
+
+    private function numberToWords($number)
     {
-        // Validate required fields
-        $request->validate([
-            'corpId' => 'required|string|max:10',
-            'companyName' => 'required|string|max:100',
-            'year' => 'required|string|max:4',
-            'month' => 'required|string|max:50',
-        ]);
-
-        try {
-            // Check if payroll entries exist for this period
-            $payrollQuery = EmployeePayrollSalaryProcess::where('corpId', $request->corpId)
-                ->where('companyName', $request->companyName)
-                ->where('year', $request->year)
-                ->where('month', $request->month);
-
-            $allPayrollRecords = $payrollQuery->get();
-
-            if ($allPayrollRecords->isEmpty()) {
-                $filterDescription = "corpId: {$request->corpId}, companyName: {$request->companyName}, year: {$request->year}, month: {$request->month}";
-                
-                return response()->json([
-                    'status' => false,
-                    'message' => 'No payroll entries found for the specified period',
-                    'filter' => $filterDescription,
-                    'records_found' => 0
-                ], 404);
-            }
-
-            // Get records with 'Initiated' status only
-            $initiatedRecords = $allPayrollRecords->where('status', 'Initiated');
-
-            if ($initiatedRecords->isEmpty()) {
-                $filterDescription = "corpId: {$request->corpId}, companyName: {$request->companyName}, year: {$request->year}, month: {$request->month}";
-                
-                // Get current status breakdown
-                $statusBreakdown = $allPayrollRecords->groupBy('status')->map(function ($group) {
-                    return $group->count();
-                })->toArray();
-
-                return response()->json([
-                    'status' => false,
-                    'message' => 'No payroll entries with "Initiated" status found for the specified period',
-                    'filter' => $filterDescription,
-                    'total_records' => $allPayrollRecords->count(),
-                    'initiated_records' => 0,
-                    'current_status_breakdown' => $statusBreakdown
-                ], 404);
-            }
-
-            // Get current status breakdown before update
-            $statusBreakdown = $allPayrollRecords->groupBy('status')->map(function ($group) {
-                return $group->count();
-            })->toArray();
-
-            // Update only 'Initiated' records to 'Released' status
-            $updatedCount = EmployeePayrollSalaryProcess::where('corpId', $request->corpId)
-                ->where('companyName', $request->companyName)
-                ->where('year', $request->year)
-                ->where('month', $request->month)
-                ->where('status', 'Initiated') // Only update 'Initiated' records
-                ->update([
-                    'status' => 'Released',
-                    'updated_at' => now()
-                ]);
-
-            $filterDescription = "corpId: {$request->corpId}, companyName: {$request->companyName}, year: {$request->year}, month: {$request->month}";
-
-            // Count records by other statuses (excluding the ones we just updated)
-            $otherStatusCount = $allPayrollRecords->where('status', '!=', 'Initiated')->count();
-
-            $message = "Successfully released salary for {$updatedCount} employees with 'Initiated' status";
-            if ($otherStatusCount > 0) {
-                $message .= ". {$otherStatusCount} employees with other statuses were not affected";
-            }
-
-            return response()->json([
-                'status' => true,
-                'message' => $message,
-                'filter' => $filterDescription,
-                'summary' => [
-                    'total_records' => $allPayrollRecords->count(),
-                    'initiated_records_updated' => $updatedCount,
-                    'other_status_records' => $otherStatusCount,
-                    'previous_status_breakdown' => $statusBreakdown,
-                    'updated_from' => 'Initiated',
-                    'updated_to' => 'Released'
-                ]
-            ]);
-
-        } catch (\Exception $e) {
-            return response()->json([
-                'status' => false,
-                'message' => 'Error releasing salary: ' . $e->getMessage(),
-                'filter' => "corpId: {$request->corpId}, companyName: {$request->companyName}, year: {$request->year}, month: {$request->month}"
-            ], 500);
-            
+        // Check if the intl extension is enabled
+        if (class_exists('NumberFormatter')) {
+            // Use NumberFormatter if available (preferred method)
+            $formatter = new \NumberFormatter('en_IN', \NumberFormatter::SPELLOUT);
+            $inWords = $formatter->format($number);
+            return ucwords($inWords) . ' Only';
         }
+        
+        // Fallback: Manual conversion for Indian currency system
+        if ($number == 0) {
+            return 'Zero Only';
+        }
+
+        $ones = ['', 'One', 'Two', 'Three', 'Four', 'Five', 'Six', 'Seven', 'Eight', 'Nine'];
+        $tens = ['', '', 'Twenty', 'Thirty', 'Forty', 'Fifty', 'Sixty', 'Seventy', 'Eighty', 'Ninety'];
+        $teens = ['Ten', 'Eleven', 'Twelve', 'Thirteen', 'Fourteen', 'Fifteen', 'Sixteen', 'Seventeen', 'Eighteen', 'Nineteen'];
+
+        $convertTwoDigits = function($num) use ($ones, $tens, $teens) {
+            if ($num < 10) return $ones[$num];
+            if ($num >= 10 && $num < 20) return $teens[$num - 10];
+            return $tens[floor($num / 10)] . ($num % 10 ? ' ' . $ones[$num % 10] : '');
+        };
+
+        // Split into integer and decimal parts
+        $parts = explode('.', number_format($number, 2, '.', ''));
+        $integerPart = (int)$parts[0];
+        $decimalPart = isset($parts[1]) ? (int)$parts[1] : 0;
+
+        $words = '';
+
+        // Crore (10,000,000)
+        if ($integerPart >= 10000000) {
+            $crore = floor($integerPart / 10000000);
+            $words .= $convertTwoDigits($crore) . ' Crore ';
+            $integerPart %= 10000000;
+        }
+
+        // Lakh (100,000)
+        if ($integerPart >= 100000) {
+            $lakh = floor($integerPart / 100000);
+            $words .= $convertTwoDigits($lakh) . ' Lakh ';
+            $integerPart %= 100000;
+        }
+
+        // Thousand (1,000)
+        if ($integerPart >= 1000) {
+            $thousand = floor($integerPart / 1000);
+            $words .= $convertTwoDigits($thousand) . ' Thousand ';
+            $integerPart %= 1000;
+        }
+
+        // Hundred (100)
+        if ($integerPart >= 100) {
+            $hundred = floor($integerPart / 100);
+            $words .= $ones[$hundred] . ' Hundred ';
+            $integerPart %= 100;
+        }
+
+        // Remaining two digits
+        if ($integerPart > 0) {
+            $words .= $convertTwoDigits($integerPart);
+        }
+
+        // Add decimal part (paise)
+        if ($decimalPart > 0) {
+            $words = trim($words) . ' Rupees and ' . $convertTwoDigits($decimalPart) . ' Paise';
+        } else {
+            $words = trim($words) . ' Rupees';
+        }
+
+        return trim($words) . ' Only';
     }
 
     /**
-     * Generate and download salary slip PDF for a specific employee
+     * Download salary slip PDF for a single employee (original design)
      *
-     * @param Request $request
      * @param string $corpId
      * @param string $empCode
      * @param string $year
      * @param string $month
      * @param string|null $companyName
-     * @return \Illuminate\Http\Response
+     * @return \Symfony\Component\HttpFoundation\StreamedResponse
      */
     public function downloadSalarySlipPdf($corpId, $empCode, $year, $month, $companyName = null)
     {
         try {
-            // Start building the query
+            // Normalize month: accept numeric (1-12) or month name ("January", etc.)
+            if (is_numeric($month)) {
+                $monthNumber = (int)$month;
+                $monthName = date('F', mktime(0, 0, 0, $monthNumber, 1));
+            } else {
+                $monthName = ucfirst(strtolower($month));
+                $monthNumber = (int)date('n', strtotime($monthName));
+            }
+
             $query = EmployeePayrollSalaryProcess::where('corpId', $corpId)
                 ->where('empCode', $empCode)
                 ->where('year', $year)
-                ->where('month', $month);
-            
-            // Add company name filter if provided
+                ->where('month', $monthName);
+
             if ($companyName) {
                 $query->where('companyName', $companyName);
             }
-            
-            // Get the payroll record
+
             $payroll = $query->first();
 
             if (!$payroll) {
-                abort(404, 'Payroll record not found for the specified employee and period');
+                abort(404, 'Payroll record not found for the specified employee and period.');
             }
 
-            // Parse JSON data from fields
+            $employeeDetail = EmployeeDetail::where('corp_id', $corpId)->where('EmpCode', $empCode)->first();
+            $employmentDetail = EmploymentDetail::where('corp_id', $corpId)->where('EmpCode', $empCode)->first();
+
+            // Get full employee name
+            $fullName = $this->getFullEmployeeName($employeeDetail);
+
+            // Decode JSON data
             $grossList = json_decode($payroll->grossList, true) ?: [];
-            $otherAllowances = json_decode($payroll->otherAllowances, true) ?: [];
-            $otherBenefits = json_decode($payroll->otherBenefits, true) ?: [];
-            $recurringDeduction = json_decode($payroll->recurringDeduction, true) ?: [];
-
-            // Calculate salary totals
-            $salarySummary = $this->calculateSalaryTotals(
-                $grossList,
-                $otherBenefits, 
-                $recurringDeduction,
-                $otherAllowances
+            $otherBenefitsAllowances = array_merge(
+                json_decode($payroll->otherAllowances, true) ?: [],
+                json_decode($payroll->otherBenefits, true) ?: []
             );
+            $deductions = json_decode($payroll->recurringDeduction, true) ?: [];
 
-            // Get employee details
-            $employeeDetail = EmployeeDetail::where('corp_id', $corpId)
-                ->where('EmpCode', $empCode)
-                ->first();
+            // Calculate totals
+            $totalGrossMonthly = array_sum(array_column($grossList, 'calculatedValue'));
+            $totalBenefitsMonthly = array_sum(array_column($otherBenefitsAllowances, 'calculatedValue'));
+            $totalDeductionsMonthly = array_sum(array_column($deductions, 'calculatedValue'));
+            $netSalaryMonthly = $totalGrossMonthly + $totalBenefitsMonthly - $totalDeductionsMonthly;
 
-            $employmentDetail = EmploymentDetail::where('corp_id', $corpId)
-                ->where('EmpCode', $empCode)
-                ->first();
-
-            // Prepare employee details for PDF
-            $employeeDetails = [
-                'full_name' => $this->getFullEmployeeName($employeeDetail),
-                'designation' => $employmentDetail->Designation ?? 'N/A',
-                'date_of_joining' => $employmentDetail->dateOfJoining ?? 'N/A',
-                'department' => $employmentDetail->Department ?? 'N/A',
-            ];
-
-            // Prepare data for PDF
-            $pdfData = [
-                'id' => $payroll->id,
-                'corpId' => $payroll->corpId,
-                'empCode' => $payroll->empCode,
+            $data = [
+                'corpId' => $corpId,
+                'empCode' => $empCode,
                 'companyName' => $payroll->companyName,
-                'year' => $payroll->year,
-                'month' => $payroll->month,
+                'year' => $year,
+                'month' => $monthName,
                 'status' => $payroll->status,
                 'gross' => $grossList,
-                'deductions' => $recurringDeduction,
-                'otherBenefitsAllowances' => array_merge($otherBenefits, $otherAllowances),
+                'otherBenefitsAllowances' => $otherBenefitsAllowances,
+                'deductions' => $deductions,
             ];
 
-            // Format summary to match expected structure
-            $formattedSummary = [
-                'totalGross' => [
-                    'monthly' => $salarySummary['monthlyGross'],
-                    'annual' => $salarySummary['annualGross']
-                ],
-                'totalDeductions' => [
-                    'monthly' => $salarySummary['monthlyDeduction'],
-                    'annual' => $salarySummary['annualDeduction']
-                ],
-                'totalBenefits' => [
-                    'monthly' => $salarySummary['monthlyAllowance'],
-                    'annual' => $salarySummary['annualAllowance']
-                ],
-                'netSalary' => [
-                    'monthly' => $salarySummary['monthlyNetSalary'],
-                    'annual' => $salarySummary['annualNetSalary']
-                ]
+            $employeeDetails = [
+                'full_name' => $fullName,
+                'designation' => $employmentDetail->Designation ?? 'N/A',
+                'department' => $employmentDetail->Department ?? 'N/A',
+                'date_of_joining' => $employmentDetail->dateOfJoining ?? 'N/A',
             ];
 
-            // Return HTML view that browsers can print as PDF
-            // Users can use Ctrl+P or Cmd+P to print/save as PDF
-            
-            $html = view('salary-slip-pdf', [
-                'data' => $pdfData,
-                'employeeDetails' => $employeeDetails,
-                'summary' => $formattedSummary
-            ])->render();
+            $summary = [
+                'totalGross' => ['monthly' => $totalGrossMonthly],
+                'totalBenefits' => ['monthly' => $totalBenefitsMonthly],
+                'totalDeductions' => ['monthly' => $totalDeductionsMonthly],
+                'netSalary' => ['monthly' => $netSalaryMonthly],
+            ];
 
-            return response($html, 200)
-                ->header('Content-Type', 'text/html');
+            // Generate PDF using Dompdf
+            $html = view('salary-slip-pdf', compact('data', 'employeeDetails', 'summary'))->render();
+
+            $options = new \Dompdf\Options();
+            $options->set('isHtml5ParserEnabled', true);
+            $options->set('isRemoteEnabled', true);
+
+            $dompdf = new \Dompdf\Dompdf($options);
+            $dompdf->loadHtml($html);
+            $dompdf->setPaper('A4', 'portrait');
+            $dompdf->render();
+
+            $filename = "Salary_Slip_{$empCode}_{$monthName}_{$year}.pdf";
+
+            return response()->streamDownload(function() use ($dompdf) {
+                echo $dompdf->output();
+            }, $filename, [
+                'Content-Type' => 'application/pdf',
+            ]);
 
         } catch (\Exception $e) {
-            abort(500, 'Error generating salary slip PDF: ' . $e->getMessage());
+            \Log::error('Error generating salary slip PDF: ' . $e->getMessage());
+            abort(500, 'Error generating salary slip: ' . $e->getMessage());
         }
     }
 
     /**
-     * Generate and download salary slip PDFs for all employees in a ZIP file
+     * Generate and download salary slip PDFs for all employees in a ZIP file (original design)
      *
      * @param Request $request
      * @return \Symfony\Component\HttpFoundation\BinaryFileResponse
      */
     public function downloadAllSalarySlipsPdf(Request $request)
     {
-        // Validate required fields
         $request->validate([
             'corpId' => 'required|string|max:10',
             'companyName' => 'required|string|max:100',
             'year' => 'required|string|max:4',
             'month' => 'required|string|max:50',
-            'status' => 'nullable|string', // Optional status filter
+            'status' => 'nullable|string',
         ]);
 
         try {
-            // Check if the view file exists before processing
-            if (!view()->exists('salary-slip-pdf')) {
-                abort(500, 'Salary slip PDF template not found');
+            // Normalize month
+            if (is_numeric($request->month)) {
+                $monthNumber = (int)$request->month;
+                $monthName = date('F', mktime(0, 0, 0, $monthNumber, 1));
+            } else {
+                $monthName = ucfirst(strtolower($request->month));
+                $monthNumber = (int)date('n', strtotime($monthName));
             }
 
-            // Get payroll records
             $query = EmployeePayrollSalaryProcess::where('corpId', $request->corpId)
                 ->where('companyName', $request->companyName)
                 ->where('year', $request->year)
-                ->where('month', $request->month);
+                ->where('month', $monthName);
 
-            // Add status filter if provided
             if ($request->has('status') && !empty($request->status)) {
                 $query->where('status', $request->status);
             }
@@ -1381,182 +981,343 @@ class EmployeePayrollSalaryProcessApiController extends Controller
             $payrollRecords = $query->get();
 
             if ($payrollRecords->isEmpty()) {
-                abort(404, 'No payroll records found for the specified period and criteria');
+                abort(404, 'No payroll records found for the specified criteria.');
             }
 
-            // Create temporary directory for PDF files
+            $empCodes = $payrollRecords->pluck('empCode')->unique()->toArray();
+            $employeeDetails = EmployeeDetail::where('corp_id', $request->corpId)->whereIn('EmpCode', $empCodes)->get()->keyBy('EmpCode');
+            $employmentDetails = EmploymentDetail::where('corp_id', $request->corpId)->whereIn('EmpCode', $empCodes)->get()->keyBy('EmpCode');
+
             $tempDir = storage_path('app/temp/salary_slips_' . time());
             File::makeDirectory($tempDir, 0755, true);
-
-            // Get all employee codes
-            $empCodes = $payrollRecords->pluck('empCode')->unique()->toArray();
-            
-            // Fetch employee details in bulk
-            $employeeDetails = EmployeeDetail::whereIn('EmpCode', $empCodes)
-                ->where('corp_id', $request->corpId)
-                ->get()
-                ->keyBy('EmpCode');
-            
-            $employmentDetails = EmploymentDetail::whereIn('EmpCode', $empCodes)
-                ->where('corp_id', $request->corpId)
-                ->get()
-                ->keyBy('EmpCode');
-
             $generatedFiles = [];
-            $errorCount = 0;
-            $skippedEmployees = [];
-            $totalEmployees = $payrollRecords->count();
 
             foreach ($payrollRecords as $payroll) {
-                try {
-                    // Validate that we have minimum required data
-                    if (!$payroll->empCode) {
-                        throw new \Exception("Employee code is missing");
-                    }
+                $empCode = $payroll->empCode;
+                $employee = $employeeDetails->get($empCode);
+                $employment = $employmentDetails->get($empCode);
 
-                    // Parse JSON data from fields with validation
-                    $grossList = json_decode($payroll->grossList, true);
-                    $otherAllowances = json_decode($payroll->otherAllowances, true);
-                    $otherBenefits = json_decode($payroll->otherBenefits, true);
-                    $recurringDeduction = json_decode($payroll->recurringDeduction, true);
+                $fullName = $this->getFullEmployeeName($employee);
 
-                    // Ensure arrays are valid (not null due to JSON decode failure)
-                    $grossList = is_array($grossList) ? $grossList : [];
-                    $otherAllowances = is_array($otherAllowances) ? $otherAllowances : [];
-                    $otherBenefits = is_array($otherBenefits) ? $otherBenefits : [];
-                    $recurringDeduction = is_array($recurringDeduction) ? $recurringDeduction : [];
+                $grossList = json_decode($payroll->grossList, true) ?: [];
+                $otherBenefitsAllowances = array_merge(
+                    json_decode($payroll->otherAllowances, true) ?: [],
+                    json_decode($payroll->otherBenefits, true) ?: []
+                );
+                $deductions = json_decode($payroll->recurringDeduction, true) ?: [];
 
-                    // Check if we have any salary data at all
-                    if (empty($grossList) && empty($otherAllowances) && empty($otherBenefits)) {
-                        throw new \Exception("No salary data found for employee");
-                    }
+                $totalGrossMonthly = array_sum(array_column($grossList, 'calculatedValue'));
+                $totalBenefitsMonthly = array_sum(array_column($otherBenefitsAllowances, 'calculatedValue'));
+                $totalDeductionsMonthly = array_sum(array_column($deductions, 'calculatedValue'));
+                $netSalaryMonthly = $totalGrossMonthly + $totalBenefitsMonthly - $totalDeductionsMonthly;
 
-                    // Calculate salary totals
-                    $salarySummary = $this->calculateSalaryTotals(
-                        $grossList,
-                        $otherBenefits, 
-                        $recurringDeduction,
-                        $otherAllowances
-                    );
+                $data = [
+                    'corpId' => $request->corpId,
+                    'empCode' => $empCode,
+                    'companyName' => $payroll->companyName,
+                    'year' => $request->year,
+                    'month' => $monthName,
+                    'status' => $payroll->status,
+                    'gross' => $grossList,
+                    'otherBenefitsAllowances' => $otherBenefitsAllowances,
+                    'deductions' => $deductions,
+                ];
 
-                    // Validate that we have meaningful salary data
-                    if ($salarySummary['monthlyGross'] <= 0 && $salarySummary['monthlyAllowance'] <= 0) {
-                        throw new \Exception("No valid salary amount found for employee");
-                    }
+                $employeeDetailsData = [
+                    'full_name' => $fullName,
+                    'designation' => $employment->Designation ?? 'N/A',
+                    'department' => $employment->Department ?? 'N/A',
+                    'date_of_joining' => $employment->dateOfJoining ?? 'N/A',
+                ];
 
-                    // Get employee details with fallback handling
-                    $employeeDetail = $employeeDetails->get($payroll->empCode);
-                    $employmentDetail = $employmentDetails->get($payroll->empCode);
+                $summary = [
+                    'totalGross' => ['monthly' => $totalGrossMonthly],
+                    'totalBenefits' => ['monthly' => $totalBenefitsMonthly],
+                    'totalDeductions' => ['monthly' => $totalDeductionsMonthly],
+                    'netSalary' => ['monthly' => $netSalaryMonthly],
+                ];
 
-                    // Prepare employee details for PDF with safe defaults
-                    $empDetails = [
-                        'full_name' => $this->getFullEmployeeName($employeeDetail),
-                        'designation' => $employmentDetail->Designation ?? 'N/A',
-                        'date_of_joining' => $employmentDetail->dateOfJoining ?? 'N/A',
-                        'department' => $employmentDetail->Department ?? 'N/A',
-                    ];
+                $html = view('salary-slip-pdf', compact('data', 'employeeDetailsData', 'summary'))->render();
 
-                    // Prepare data for PDF
-                    $pdfData = [
-                        'id' => $payroll->id,
-                        'corpId' => $payroll->corpId,
-                        'empCode' => $payroll->empCode,
-                        'companyName' => $payroll->companyName,
-                        'year' => $payroll->year,
-                        'month' => $payroll->month,
-                        'status' => $payroll->status,
-                        'gross' => $grossList,
-                        'deductions' => $recurringDeduction,
-                        'otherBenefitsAllowances' => array_merge($otherBenefits, $otherAllowances),
-                    ];
+                $options = new \Dompdf\Options();
+                $options->set('isHtml5ParserEnabled', true);
+                $options->set('isRemoteEnabled', true);
 
-                    // Format summary to match expected structure
-                    $formattedSummary = [
-                        'totalGross' => [
-                            'monthly' => $salarySummary['monthlyGross'],
-                            'annual' => $salarySummary['annualGross']
-                        ],
-                        'totalDeductions' => [
-                            'monthly' => $salarySummary['monthlyDeduction'],
-                            'annual' => $salarySummary['annualDeduction']
-                        ],
-                        'totalBenefits' => [
-                            'monthly' => $salarySummary['monthlyAllowance'],
-                            'annual' => $salarySummary['annualAllowance']
-                        ],
-                        'netSalary' => [
-                            'monthly' => $salarySummary['monthlyNetSalary'],
-                            'annual' => $salarySummary['annualNetSalary']
-                        ]
-                    ];
+                $dompdf = new \Dompdf\Dompdf($options);
+                $dompdf->loadHtml($html);
+                $dompdf->setPaper('A4', 'portrait');
+                $dompdf->render();
 
-                    // Generate HTML from view with error handling
-                    try {
-                        $html = view('salary-slip-pdf', [
-                            'data' => $pdfData,
-                            'employeeDetails' => $empDetails,
-                            'summary' => $formattedSummary
-                        ])->render();
-                    } catch (\Exception $viewException) {
-                        throw new \Exception("Failed to generate view: " . $viewException->getMessage());
-                    }
-
-                    // Create PDF using raw Dompdf with proper configuration
-                    $options = new Options();
-                    $options->set('defaultFont', 'Arial');
-                    $options->set('isRemoteEnabled', true);
-                    
-                    $dompdf = new Dompdf($options);
-                    $dompdf->loadHtml($html);
-                    $dompdf->setPaper('A4', 'portrait');
-                    $dompdf->render();
-
-                    // Save PDF to temporary directory
-                    $filename = "SalarySlip_{$payroll->empCode}_{$request->month}_{$request->year}.pdf";
-                    $filePath = $tempDir . '/' . $filename;
-                    
-                    $pdfOutput = $dompdf->output();
-                    if (empty($pdfOutput)) {
-                        throw new \Exception("PDF generation produced empty output");
-                    }
-                    
-                    file_put_contents($filePath, $pdfOutput);
-                    $generatedFiles[] = $filePath;
-
-                } catch (\Exception $e) {
-                    $errorCount++;
-                    $skippedEmployees[] = [
-                        'empCode' => $payroll->empCode ?? 'Unknown',
-                        'error' => $e->getMessage()
-                    ];
-                    
-                    // Log detailed error information
-                    Log::error("Error generating PDF for employee {$payroll->empCode}: " . $e->getMessage(), [
-                        'empCode' => $payroll->empCode,
-                        'corpId' => $payroll->corpId,
-                        'month' => $payroll->month,
-                        'year' => $payroll->year,
-                        'exception' => $e->getTraceAsString()
-                    ]);
-                }
+                $filename = "Salary_Slip_{$empCode}_{$monthName}_{$request->year}.pdf";
+                $filePath = $tempDir . '/' . $filename;
+                file_put_contents($filePath, $dompdf->output());
+                $generatedFiles[] = $filePath;
             }
 
-            // Check if we have any files to zip
+            $zipFileName = "Salary_Slips_{$request->companyName}_{$monthName}_{$request->year}.zip";
+            $zipFilePath = storage_path('app/temp/' . $zipFileName);
+
+            $zip = new ZipArchive();
+            if ($zip->open($zipFilePath, ZipArchive::CREATE | ZipArchive::OVERWRITE) === true) {
+                foreach ($generatedFiles as $file) {
+                    $zip->addFile($file, basename($file));
+                }
+                $zip->close();
+            }
+
+            foreach ($generatedFiles as $file) {
+                unlink($file);
+            }
+            rmdir($tempDir);
+
+            return response()->download($zipFilePath)->deleteFileAfterSend(true);
+
+        } catch (\Exception $e) {
+            \Log::error('Error generating bulk salary slips: ' . $e->getMessage());
+            abort(500, 'Error generating salary slips: ' . $e->getMessage());
+        }
+    }
+
+    /**
+     * GET route handler for bulk download (delegates to POST handler) - original design
+     *
+     * @param Request $request
+     * @return \Symfony\Component\HttpFoundation\BinaryFileResponse
+     */
+    public function downloadAllSalarySlipsPdfGet(Request $request)
+    {
+        return $this->downloadAllSalarySlipsPdf($request);
+    }
+
+    /**
+     * Download custom salary slip PDF for a single employee
+     *
+     * @param string $corpId
+     * @param string $empCode
+     * @param string $year
+     * @param string $month
+     * @param string|null $companyName
+     * @return \Symfony\Component\HttpFoundation\StreamedResponse
+     */
+    public function downloadCustomSalarySlipPdf($corpId, $empCode, $year, $month, $companyName = null)
+    {
+        try {
+            // Normalize month: accept numeric (1-12) or month name ("January", etc.)
+            if (is_numeric($month)) {
+                $monthNumber = (int)$month;
+                $monthName = date('F', mktime(0, 0, 0, $monthNumber, 1));
+            } else {
+                // Month is already a name like "January"
+                $monthName = ucfirst(strtolower($month));
+                $monthNumber = (int)date('n', strtotime($monthName));
+            }
+
+            // Query payroll: the database stores month as string month name
+            $query = EmployeePayrollSalaryProcess::where('corpId', $corpId)
+                ->where('empCode', $empCode)
+                ->where('year', $year)
+                ->where('month', $monthName);
+
+            if ($companyName) {
+                $query->where('companyName', $companyName);
+            }
+
+            $payroll = $query->first();
+
+            if (!$payroll) {
+                abort(404, 'Payroll record not found for the specified employee and period.');
+            }
+
+            // Fetch related data (these tables use snake_case for corp_id)
+            $employeeDetail = \App\Models\EmployeeDetail::where('corp_id', $corpId)->where('EmpCode', $empCode)->first();
+            $employmentDetail = \App\Models\EmploymentDetail::where('corp_id', $corpId)->where('EmpCode', $empCode)->first();
+            $companyDetails = \App\Models\CompanyDetails::where('corp_id', $corpId)->first();
+            $statutoryDetail = \App\Models\EmployeeStatutoryDetail::where('corp_id', $corpId)->where('EmpCode', $empCode)->first();
+            $bankDetail = \App\Models\EmployeeBankDetail::where('corp_id', $corpId)->where('empcode', $empCode)->first();
+            
+            // Attendance table uses camelCase and stores month as string month name
+            $attendanceSummary = \App\Models\EmployeeAttendanceSummary::where('corpId', $corpId)
+                ->where('empCode', $empCode)
+                ->where('year', $year)
+                ->where('month', $monthName)
+                ->first();
+
+            // Process payroll data
+            $earnings = json_decode($payroll->grossList, true) ?: [];
+            $deductions = json_decode($payroll->recurringDeduction, true) ?: [];
+            $totalEarnings = array_sum(array_column($earnings, 'calculatedValue'));
+            $totalDeductions = array_sum(array_column($deductions, 'calculatedValue'));
+            $netPay = $totalEarnings - $totalDeductions;
+
+            // Prepare data for the view
+            $data = [
+                'company' => $companyDetails,
+                'employee' => $employeeDetail,
+                'employment' => $employmentDetail,
+                'statutory' => $statutoryDetail,
+                'bank' => $bankDetail,
+                'payroll' => $payroll,
+                'monthName' => $monthName,
+                'year' => $year,
+                'attendance' => $attendanceSummary,
+                'earnings' => $earnings,
+                'deductions' => $deductions,
+                'totalEarnings' => $totalEarnings,
+                'totalDeductions' => $totalDeductions,
+                'netPay' => $netPay,
+                'netPayInWords' => $this->numberToWords($netPay),
+                'payDays' => $attendanceSummary ? $attendanceSummary->paidDays : 30,
+            ];
+
+            // Generate PDF
+            $html = view('salary-slip-custom-pdf', $data)->render();
+            
+            $options = new \Dompdf\Options();
+            $options->set('isHtml5ParserEnabled', true);
+            $options->set('isRemoteEnabled', true);
+
+            $dompdf = new \Dompdf\Dompdf($options);
+            $dompdf->loadHtml($html);
+            $dompdf->setPaper('A4', 'portrait');
+            $dompdf->render();
+
+            $filename = "Payslip_{$empCode}_{$monthName}_{$year}.pdf";
+
+            return response()->streamDownload(function() use ($dompdf) {
+                echo $dompdf->output();
+            }, $filename, [
+                'Content-Type' => 'application/pdf',
+            ]);
+
+        } catch (\Exception $e) {
+            \Log::error('Error generating single custom salary slip: ' . $e->getMessage());
+            abort(500, 'Error generating salary slip: ' . $e->getMessage());
+        }
+    }
+
+    /**
+     * Generate and download custom salary slip PDFs for all employees in a ZIP file
+     *
+     * @param Request $request
+     * @return \Symfony\Component\HttpFoundation\BinaryFileResponse
+     */
+    public function downloadAllCustomSalarySlipsPdf(Request $request)
+    {
+        // 1. Validate required fields
+        $request->validate([
+            'corpId' => 'required|string|max:10',
+            'companyName' => 'required|string|max:100',
+            'year' => 'required|string|max:4',
+            'month' => 'required|string|max:50',
+            'status' => 'nullable|string',
+        ]);
+
+        try {
+            // Normalize month: accept numeric (1-12) or month name ("January", etc.)
+            if (is_numeric($request->month)) {
+                $monthNumber = (int)$request->month;
+                $monthName = date('F', mktime(0, 0, 0, $monthNumber, 1));
+            } else {
+                // Month is already a name like "January"
+                $monthName = ucfirst(strtolower($request->month));
+                $monthNumber = (int)date('n', strtotime($monthName));
+            }
+
+            // 2. Fetch Payroll Records (payroll table uses camelCase: corpId, companyName)
+            // The database stores month as string month name ("January", "July", etc.)
+            $query = EmployeePayrollSalaryProcess::where('corpId', $request->corpId)
+                ->where('companyName', $request->companyName)
+                ->where('year', $request->year)
+                ->where('month', $monthName);
+
+            if ($request->has('status') && !empty($request->status)) {
+                $query->where('status', $request->status);
+            }
+
+            $payrollRecords = $query->get();
+
+            if ($payrollRecords->isEmpty()) {
+                abort(404, 'No payroll records found for the specified criteria.');
+            }
+
+            // 3. Bulk Fetch All Required Data (other tables use snake_case: corp_id)
+            $empCodes = $payrollRecords->pluck('empCode')->unique()->toArray();
+            
+            $employeeDetails = \App\Models\EmployeeDetail::where('corp_id', $request->corpId)->whereIn('EmpCode', $empCodes)->get()->keyBy('EmpCode');
+            $employmentDetails = \App\Models\EmploymentDetail::where('corp_id', $request->corpId)->whereIn('EmpCode', $empCodes)->get()->keyBy('EmpCode');
+            $companyDetails = \App\Models\CompanyDetails::where('corp_id', $request->corpId)->first();
+            $statutoryDetails = \App\Models\EmployeeStatutoryDetail::where('corp_id', $request->corpId)->whereIn('EmpCode', $empCodes)->get()->keyBy('EmpCode');
+            $bankDetails = \App\Models\EmployeeBankDetail::where('corp_id', $request->corpId)->whereIn('empcode', $empCodes)->get()->keyBy('empcode');
+            
+            // Attendance table uses camelCase and stores month as string month name
+            $attendanceSummaries = \App\Models\EmployeeAttendanceSummary::where('corpId', $request->corpId)
+                ->where('year', $request->year)
+                ->where('month', $monthName)
+                ->whereIn('empCode', $empCodes)
+                ->get()->keyBy('empCode');
+
+            // 4. Prepare for PDF Generation
+            $tempDir = storage_path('app/temp/custom_salary_slips_' . time());
+            File::makeDirectory($tempDir, 0755, true);
+            $generatedFiles = [];
+
+            // 5. Loop and Generate PDFs
+            foreach ($payrollRecords as $payroll) {
+                $empCode = $payroll->empCode;
+                
+                // Process Payroll Data
+                $earnings = json_decode($payroll->grossList, true) ?: [];
+                $deductions = json_decode($payroll->recurringDeduction, true) ?: [];
+                $totalEarnings = array_sum(array_column($earnings, 'calculatedValue'));
+                $totalDeductions = array_sum(array_column($deductions, 'calculatedValue'));
+                $netPay = $totalEarnings - $totalDeductions;
+                $attendance = $attendanceSummaries->get($empCode);
+
+                // Prepare Data for View
+                $data = [
+                    'company' => $companyDetails,
+                    'employee' => $employeeDetails->get($empCode),
+                    'employment' => $employmentDetails->get($empCode),
+                    'statutory' => $statutoryDetails->get($empCode),
+                    'bank' => $bankDetails->get($empCode),
+                    'payroll' => $payroll,
+                    'monthName' => $monthName,
+                    'year' => $request->year,
+                    'attendance' => $attendance,
+                    'earnings' => $earnings,
+                    'deductions' => $deductions,
+                    'totalEarnings' => $totalEarnings,
+                    'totalDeductions' => $totalDeductions,
+                    'netPay' => $netPay,
+                    'netPayInWords' => $this->numberToWords($netPay),
+                    'payDays' => $attendance->paidDays ?? 30,
+                ];
+
+                // Generate HTML and PDF
+                $html = view('salary-slip-custom-pdf', $data)->render();
+                
+                $options = new \Dompdf\Options();
+                $options->set('isHtml5ParserEnabled', true);
+                $options->set('isRemoteEnabled', true);
+
+                $dompdf = new \Dompdf\Dompdf($options);
+                $dompdf->loadHtml($html);
+                $dompdf->setPaper('A4', 'portrait');
+                $dompdf->render();
+
+                $filename = "Payslip_{$empCode}_{$monthName}_{$request->year}.pdf";
+                $filePath = $tempDir . '/' . $filename;
+                file_put_contents($filePath, $dompdf->output());
+                $generatedFiles[] = $filePath;
+            }
+
+            // 6. Create ZIP file
             if (empty($generatedFiles)) {
-                // Clean up temp directory
                 File::deleteDirectory($tempDir);
-                
-                $errorMessage = "Failed to generate any PDF files. ";
-                if (!empty($skippedEmployees)) {
-                    $errorMessage .= "Skipped employees: " . collect($skippedEmployees)->pluck('empCode')->join(', ');
-                }
-                
-                abort(500, $errorMessage);
+                abort(500, "Failed to generate any PDF files.");
             }
 
-            // Create ZIP file with summary information
-            $statusSuffix = $request->has('status') && !empty($request->status) ? "_{$request->status}" : '';
-            $zipFilename = "SalarySlips_{$request->companyName}_{$request->month}_{$request->year}{$statusSuffix}.zip";
+            $zipFilename = "Custom_Payslips_{$request->companyName}_{$monthName}_{$request->year}.zip";
             $zipPath = $tempDir . '/' . $zipFilename;
 
             $zip = new ZipArchive;
@@ -1564,83 +1325,32 @@ class EmployeePayrollSalaryProcessApiController extends Controller
                 foreach ($generatedFiles as $file) {
                     $zip->addFile($file, basename($file));
                 }
-                
-                // Add summary file if there were any errors
-                if ($errorCount > 0) {
-                    $summaryContent = "Salary Slips Generation Summary\n";
-                    $summaryContent .= "=====================================\n\n";
-                    $summaryContent .= "Total employees processed: {$totalEmployees}\n";
-                    $summaryContent .= "Successfully generated: " . count($generatedFiles) . "\n";
-                    $summaryContent .= "Failed/Skipped: {$errorCount}\n\n";
-                    
-                    if (!empty($skippedEmployees)) {
-                        $summaryContent .= "Skipped Employees:\n";
-                        $summaryContent .= "==================\n";
-                        foreach ($skippedEmployees as $skipped) {
-                            $summaryContent .= "Employee Code: {$skipped['empCode']}\n";
-                            $summaryContent .= "Reason: {$skipped['error']}\n\n";
-                        }
-                    }
-                    
-                    $summaryPath = $tempDir . '/Generation_Summary.txt';
-                    file_put_contents($summaryPath, $summaryContent);
-                    $zip->addFile($summaryPath, 'Generation_Summary.txt');
-                }
-                
                 $zip->close();
             } else {
-                // Clean up temp directory
                 File::deleteDirectory($tempDir);
-                abort(500, 'Failed to create ZIP file');
+                abort(500, 'Failed to create ZIP file.');
             }
 
-            // Log success summary
-            Log::info("Salary slips generated successfully", [
-                'total_employees' => $totalEmployees,
-                'generated_files' => count($generatedFiles),
-                'errors' => $errorCount,
-                'corpId' => $request->corpId,
-                'month' => $request->month,
-                'year' => $request->year
-            ]);
-
-            // Return ZIP file as direct download with comprehensive CORS headers
-            return response()->download($zipPath, $zipFilename, [
-                'Access-Control-Allow-Origin' => '*',
-                'Access-Control-Allow-Methods' => 'GET, POST, PUT, DELETE, OPTIONS',
-                'Access-Control-Allow-Headers' => 'Content-Type, Authorization, X-Requested-With, Accept, Origin, X-CSRF-Token',
-                'Access-Control-Expose-Headers' => 'Content-Disposition, Content-Type, Content-Length, X-Filename',
-                'Content-Type' => 'application/zip',
-                'Content-Disposition' => 'attachment; filename="' . $zipFilename . '"',
-                'X-Filename' => $zipFilename
-            ])->deleteFileAfterSend(true);
+            // 7. Return ZIP file for download
+            return response()->download($zipPath, $zipFilename)->deleteFileAfterSend(true);
 
         } catch (\Exception $e) {
-            // Clean up temp directory if it exists
             if (isset($tempDir) && File::exists($tempDir)) {
                 File::deleteDirectory($tempDir);
             }
-            abort(500, 'Error generating salary slip PDFs: ' . $e->getMessage());
+            \Log::error('Error generating bulk custom salary slips: ' . $e->getMessage());
+            abort(500, 'Error generating bulk custom salary slips: ' . $e->getMessage());
         }
     }
 
     /**
-     * Download all salary slips as PDF (GET method for FlutterFlow compatibility)
+     * Download all custom salary slips as PDF (GET method for FlutterFlow compatibility)
      */
-    public function downloadAllSalarySlipsPdfGet(Request $request)
+    public function downloadAllCustomSalarySlipsPdfGet(Request $request)
     {
-        // Validate required fields
-        $request->validate([
-            'corpId' => 'required|string|max:10',
-            'companyName' => 'required|string|max:100',
-            'year' => 'required|string|max:4',
-            'month' => 'required|string|max:50',
-            'status' => 'nullable|string', // Optional status filter
-        ]);
-
-        // Call the existing POST method logic
-        return $this->downloadAllSalarySlipsPdf($request);
+        return $this->downloadAllCustomSalarySlipsPdf($request);
     }
+
 
     /**
      * Initiate salary processing for specific employees using empcode list
@@ -1670,11 +1380,14 @@ class EmployeePayrollSalaryProcessApiController extends Controller
             $processedEmployees = [];
 
             // Check if any payroll already exists for this period and these employees
-            $existingPayrollQuery = EmployeePayrollSalaryProcess::where('corpId', $request->corpId)
-                ->where('companyName', $request->companyName)
-                ->where('year', $request->year)
-                ->where('month', $request->month)
-                ->whereIn('empCode', $request->empCodes);
+                // Normalize month to numeric for comparisons
+                $monthNumber = is_numeric($request->month) ? (int)$request->month : (int)date('n', strtotime($request->month));
+
+                $existingPayrollQuery = EmployeePayrollSalaryProcess::where('corpId', $request->corpId)
+                    ->where('companyName', $request->companyName)
+                    ->where('year', $request->year)
+                    ->where('month', $monthNumber)
+                    ->whereIn('empCode', $request->empCodes);
 
             $existingPayrolls = $existingPayrollQuery->get();
 
@@ -1720,7 +1433,7 @@ class EmployeePayrollSalaryProcessApiController extends Controller
                         'empCode' => $structure->empCode,
                         'companyName' => $structure->companyName,
                         'year' => $request->year,
-                        'month' => $request->month,
+                            'month' => $monthNumber,
                         'grossList' => $structure->grossList,
                         'otherAllowances' => $structure->otherAlowances,
                         'otherBenefits' => $structure->otherBenifits,
@@ -1828,12 +1541,15 @@ class EmployeePayrollSalaryProcessApiController extends Controller
                 ]);
             }
 
+            // Normalize month and get payroll status for all employees for the specified period
+            $monthNumber = is_numeric($request->month) ? (int)$request->month : (int)date('n', strtotime($request->month));
+
             // Get payroll status for all employees for the specified period
             $empCodes = $employees->pluck('EmpCode')->toArray();
             $payrollStatuses = EmployeePayrollSalaryProcess::where('corpId', $request->corpId)
                 ->where('companyName', $request->companyName)
                 ->where('year', $request->year)
-                ->where('month', $request->month)
+                ->where('month', $monthNumber)
                 ->whereIn('empCode', $empCodes)
                 ->pluck('status', 'empCode')
                 ->toArray();
@@ -1971,12 +1687,15 @@ class EmployeePayrollSalaryProcessApiController extends Controller
                 ]);
             }
 
-            // Get payroll status for all employees for the specified period
+            // Normalize month for queries
+            $monthNumber = is_numeric($request->month) ? (int)$request->month : (int)date('n', strtotime($request->month));
+
+            // Get payroll records for the specified period
             $empCodes = $employees->pluck('EmpCode')->toArray();
             $payrollRecords = EmployeePayrollSalaryProcess::where('corpId', $request->corpId)
                 ->where('companyName', $request->companyName)
                 ->where('year', $request->year)
-                ->where('month', $request->month)
+                ->where('month', $monthNumber)
                 ->whereIn('empCode', $empCodes)
                 ->get();
 
@@ -2128,7 +1847,8 @@ class EmployeePayrollSalaryProcessApiController extends Controller
             }
 
             if ($request->has('month') && !empty($request->month)) {
-                $payrollQuery->where('month', $request->month);
+                $monthNumber = is_numeric($request->month) ? (int)$request->month : (int)date('n', strtotime($request->month));
+                $payrollQuery->where('month', $monthNumber);
             }
 
             if ($request->has('status') && !empty($request->status)) {
@@ -2477,14 +2197,18 @@ class EmployeePayrollSalaryProcessApiController extends Controller
             'year' => 'required|string|max:4',
             'month' => 'required|string|max:50',
             'subBranch' => 'nullable|string|max:100',
+ // Optional SubBranch filter
         ]);
 
         try {
+            // Normalize month for queries
+            $monthNumber = is_numeric($request->month) ? (int)$request->month : (int)date('n', strtotime($request->month));
+
             // Get payroll records with Released status - ensure strict year filtering
             $payrollRecords = EmployeePayrollSalaryProcess::where('corpId', $request->corpId)
                 ->where('companyName', $request->companyName)
                 ->where('year', $request->year)
-                ->where('month', $request->month)
+                ->where('month', $monthNumber)
                 ->where('status', 'Released')
                 ->whereNotNull('year')
                 ->where('year', '!=', '')
@@ -2543,9 +2267,12 @@ class EmployeePayrollSalaryProcessApiController extends Controller
                 ->keyBy('empCode');
 
             // Fetch attendance summaries for paid days
+            // Normalize month to numeric value for attendance table lookups
+            $monthNumber = is_numeric($request->month) ? (int)$request->month : (int)date('n', strtotime($request->month));
+
             $attendanceSummaries = \App\Models\EmployeeAttendanceSummary::where('corpId', $request->corpId)
                 ->where('companyName', $request->companyName)
-                ->where('month', $request->month)
+                ->where('month', $monthNumber)
                 ->where('year', $request->year)
                 ->whereIn('empCode', $empCodes)
                 ->get()
@@ -2761,7 +2488,7 @@ class EmployeePayrollSalaryProcessApiController extends Controller
                     'status' => $record->status,
                 ];
 
-                // Initialize ALL dynamic headers with 0
+                // Initialize ALL dynamic headers with 0 first
                 foreach ($dynamicHeaders['gross'] as $headerKey => $headerName) {
                     $row[$headerKey] = 0;
                     $row['arrears_' . $headerKey] = 0;
@@ -2839,15 +2566,12 @@ class EmployeePayrollSalaryProcessApiController extends Controller
             ];
 
             // Add dynamic totals
-            foreach ($dynamicHeaders['gross'] as $key => $value) {
-                $totalsRow[$key] = round($totals[$key] ?? 0, 2);
-                $totalsRow['arrears_' . $key] = round($totals['arrears_' . $key] ?? 0, 2);
-            }
-            foreach ($dynamicHeaders['deductions'] as $key => $value) {
+            foreach ($dynamicHeaders as $key => $value) {
                 $totalsRow[$key] = round($totals[$key] ?? 0, 2);
                 $totalsRow['arrears_' . $key] = round($totals['arrears_' . $key] ?? 0, 2);
             }
 
+            // Add totals row to data
             $excelData[] = $totalsRow;
 
             // Company and arrears information
@@ -2908,89 +2632,5 @@ class EmployeePayrollSalaryProcessApiController extends Controller
             abort(500, 'Error in exporting payroll data with arrears: ' . $e->getMessage());
         }
     }
-
-    /**
-     * Get list of all branches for a company (for filtering purposes)
-     *
-     * @param Request $request
-     * @return \Illuminate\Http\JsonResponse
-     */
-    public function getBranchList(Request $request)
-    {
-        // Validate required fields
-        $request->validate([
-            'corpId' => 'required|string|max:10',
-            'companyName' => 'required|string|max:100'
-        ]);
-
-        try {
-            // Get all unique branches and sub-branches for the company
-            $branches = EmploymentDetail::where('corp_id', $request->corpId)
-                ->where('company_name', $request->companyName)
-                ->select('Branch', 'SubBranch')
-                ->distinct()
-                ->whereNotNull('Branch')
-                ->orderBy('Branch')
-                ->orderBy('SubBranch')
-                ->get();
-
-            $branchList = [];
-            $branchSummary = [];
-
-            foreach ($branches as $branch) {
-                $branchName = $branch->Branch ?? 'N/A';
-                $subBranchName = $branch->SubBranch ?? 'N/A';
-
-                $branchList[] = [
-                    'branch' => $branchName,
-                    'sub_branch' => $subBranchName,
-                    'combined_name' => $branchName . ($subBranchName !== 'N/A' ? ' - ' . $subBranchName : '')
-                ];
-
-                // Count employees per branch
-                if (!isset($branchSummary[$branchName])) {
-                    $branchSummary[$branchName] = [
-                        'branch_name' => $branchName,
-                        'sub_branches' => [],
-                        'total_employees' => 0
-                    ];
-                }
-
-                $employeeCount = EmploymentDetail::where('corp_id', $request->corpId)
-                    ->where('company_name', $request->companyName)
-                    ->where('Branch', $branchName)
-                    ->where('SubBranch', $subBranchName)
-                    ->count();
-
-                $branchSummary[$branchName]['sub_branches'][] = [
-                    'sub_branch_name' => $subBranchName,
-                    'employee_count' => $employeeCount
-                ];
-                $branchSummary[$branchName]['total_employees'] += $employeeCount;
-            }
-
-            return response()->json([
-                'status' => true,
-                'message' => 'Branch list retrieved successfully',
-                'filter' => "corpId: {$request->corpId}, companyName: {$request->companyName}",
-                'data' => [
-                    'all_branches' => $branchList,
-                    'branch_summary' => array_values($branchSummary),
-                    'unique_branches' => array_unique(collect($branchList)->pluck('branch')->toArray()),
-                    'unique_sub_branches' => array_unique(collect($branchList)->pluck('sub_branch')->toArray())
-                ]
-            ]);
-
-        } catch (\Exception $e) {
-            return response()->json([
-                'status' => false,
-                'message' => 'Error retrieving branch list: ' . $e->getMessage(),
-                'filter' => "corpId: {$request->corpId}, companyName: {$request->companyName}",
-                'data' => []
-            ], 500);
-        }
-    }
-
-
 }
 

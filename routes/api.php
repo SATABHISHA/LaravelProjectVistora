@@ -629,6 +629,13 @@ Route::middleware(['cors'])->group(function () {
     
     // GET route for direct download (FlutterFlow compatibility)
     Route::get('/salary-slips/download-all-pdf', [EmployeePayrollSalaryProcessApiController::class, 'downloadAllSalarySlipsPdfGet']);
+
+    // New route for the custom salary slip design
+    Route::get('/salary-slip/download-custom-pdf/{corpId}/{empCode}/{year}/{month}/{companyName?}', [EmployeePayrollSalaryProcessApiController::class, 'downloadCustomSalarySlipPdf']);
+
+    // New routes for bulk downloading custom salary slips
+    Route::post('/salary-slips/download-all-custom-pdf', [EmployeePayrollSalaryProcessApiController::class, 'downloadAllCustomSalarySlipsPdf']);
+    Route::get('/salary-slips/download-all-custom-pdf', [EmployeePayrollSalaryProcessApiController::class, 'downloadAllCustomSalarySlipsPdfGet']);
 });
 
 // Add these new routes for shift codes and shift names
