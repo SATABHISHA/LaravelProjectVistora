@@ -80,3 +80,6 @@ ehthumbs_vista.db
 ._*
 .Spotlight-V100
 .Trashes
+
+# Temporary controller file for comparison
+temp_old_controller.php
