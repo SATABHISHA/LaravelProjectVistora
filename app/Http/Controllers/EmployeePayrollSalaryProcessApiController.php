@@ -283,14 +283,17 @@ class EmployeePayrollSalaryProcessApiController extends Controller
             'isShownToEmployeeYn' => 'required|integer',
         ]);
 
-        // Normalize month to numeric value and month name
-        $monthNumber = is_numeric($request->month) ? (int)$request->month : (int)date('n', strtotime($request->month));
-        $monthName = date('F', mktime(0, 0, 0, $monthNumber, 1));
+        // Normalize month: convert numeric to month name
+        $month = $request->month;
+        if (is_numeric($month) && $month >= 1 && $month <= 12) {
+            $month = date('F', mktime(0, 0, 0, (int)$month, 1));
+        }
+        // If already a month name, use as-is
 
         // Check if payroll already exists for this period
         $existingPayrollQuery = EmployeePayrollSalaryProcess::where('corpId', $request->corpId)
             ->where('year', $request->year)
-            ->where('month', $monthNumber);
+            ->where('month', $month);
 
         // Add company name filter if provided
         if ($request->has('companyName') && !empty($request->companyName)) {
@@ -348,7 +351,7 @@ class EmployeePayrollSalaryProcessApiController extends Controller
                     'empCode' => $structure->empCode,
                     'companyName' => $structure->companyName,
                     'year' => $request->year,
-                    'month' => $request->month,
+                    'month' => $month, // Use normalized month name
                     'grossList' => $structure->grossList,
                     'otherAllowances' => $structure->otherAlowances,
                     'otherBenefits' => $structure->otherBenifits,
@@ -1912,13 +1915,16 @@ class EmployeePayrollSalaryProcessApiController extends Controller
             $processedEmployees = [];
 
             // Check if any payroll already exists for this period and these employees
-                // Normalize month to numeric for comparisons
-                $monthNumber = is_numeric($request->month) ? (int)$request->month : (int)date('n', strtotime($request->month));
+                // Normalize month to month name for consistency
+                $month = $request->month;
+                if (is_numeric($month) && $month >= 1 && $month <= 12) {
+                    $month = date('F', mktime(0, 0, 0, (int)$month, 1));
+                }
 
                 $existingPayrollQuery = EmployeePayrollSalaryProcess::where('corpId', $request->corpId)
                     ->where('companyName', $request->companyName)
                     ->where('year', $request->year)
-                    ->where('month', $monthNumber)
+                    ->where('month', $month)
                     ->whereIn('empCode', $request->empCodes);
 
             $existingPayrolls = $existingPayrollQuery->get();
@@ -1965,7 +1971,7 @@ class EmployeePayrollSalaryProcessApiController extends Controller
                         'empCode' => $structure->empCode,
                         'companyName' => $structure->companyName,
                         'year' => $request->year,
-                            'month' => $monthNumber,
+                        'month' => $month, // Use normalized month name
                         'grossList' => $structure->grossList,
                         'otherAllowances' => $structure->otherAlowances,
                         'otherBenefits' => $structure->otherBenifits,
