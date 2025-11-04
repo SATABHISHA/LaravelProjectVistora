@@ -1164,16 +1164,37 @@ class EmployeePayrollSalaryProcessApiController extends Controller
                 ->where('year', $request->year)
                 ->where('month', $month);
 
+            // Log the SQL query for debugging
+            \Log::info('Release Salary Query', [
+                'corpId' => $request->corpId,
+                'companyName' => $request->companyName,
+                'year' => $request->year,
+                'month_original' => $request->month,
+                'month_normalized' => $month,
+                'sql' => $payrollQuery->toSql(),
+                'bindings' => $payrollQuery->getBindings()
+            ]);
+
             $payrollRecords = $payrollQuery->get();
 
             if ($payrollRecords->isEmpty()) {
                 $filterDescription = "corpId: {$request->corpId}, companyName: {$request->companyName}, year: {$request->year}, month: {$month}";
                 
+                // Log for debugging
+                \Log::warning('No payroll records found', [
+                    'filter' => $filterDescription,
+                    'query_result_count' => $payrollRecords->count()
+                ]);
+                
                 return response()->json([
                     'status' => false,
                     'message' => 'No payroll entries found for the specified period',
                     'filter' => $filterDescription,
-                    'records_found' => 0
+                    'records_found' => 0,
+                    'debug_info' => [
+                        'month_received' => $request->month,
+                        'month_used' => $month
+                    ]
                 ], 404);
             }
 
