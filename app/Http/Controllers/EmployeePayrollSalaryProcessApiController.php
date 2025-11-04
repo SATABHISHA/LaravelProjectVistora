@@ -677,6 +677,235 @@ class EmployeePayrollSalaryProcessApiController extends Controller
     }
 
     /**
+     * Export released payroll data to Excel (only Released status records)
+     *
+     * @param Request $request
+     * @return \Symfony\Component\HttpFoundation\BinaryFileResponse
+     */
+    public function exportReleasedPayrollExcel(Request $request)
+    {
+        // Validate required fields
+        $request->validate([
+            'corpId' => 'required|string|max:10',
+            'companyName' => 'required|string|max:100',
+            'year' => 'required|string|max:4',
+            'month' => 'required|string|max:50',
+            'subBranch' => 'nullable|string|max:100', // Optional SubBranch filter
+        ]);
+
+        try {
+            // Get payroll records with Released status only
+            $payrollRecords = EmployeePayrollSalaryProcess::where('corpId', $request->corpId)
+                ->where('companyName', $request->companyName)
+                ->where('year', $request->year)
+                ->where('month', $request->month)
+                ->where('status', 'Released') // Filter only Released status
+                ->get();
+
+            if ($payrollRecords->isEmpty()) {
+                abort(404, 'No released payroll records found for the specified period');
+            }
+
+            // Get all employee codes from payroll records
+            $empCodes = $payrollRecords->pluck('empCode')->unique()->toArray();
+            
+            // Fetch employee details and employment details with SubBranch filter
+            $employeeDetails = EmployeeDetail::whereIn('EmpCode', $empCodes)->get()->keyBy('EmpCode');
+            
+            $employmentDetailsQuery = EmploymentDetail::whereIn('EmpCode', $empCodes);
+            
+            // Apply SubBranch filter if provided
+            if ($request->has('subBranch') && !empty($request->subBranch)) {
+                $employmentDetailsQuery->where('SubBranch', $request->subBranch);
+            }
+            
+            $employmentDetails = $employmentDetailsQuery->get()->keyBy('EmpCode');
+
+            // Filter payroll records based on employment details (if SubBranch filter applied)
+            if ($request->has('subBranch') && !empty($request->subBranch)) {
+                $filteredEmpCodes = $employmentDetails->pluck('EmpCode')->toArray();
+                $payrollRecords = $payrollRecords->whereIn('empCode', $filteredEmpCodes);
+            }
+
+            if ($payrollRecords->isEmpty()) {
+                abort(404, 'No released payroll records found for the specified SubBranch and period');
+            }
+
+            $excelData = [];
+            $dynamicHeaders = [];
+            $totals = []; // For calculating column totals
+            $serialNo = 1; // For serial number
+
+            // FIRST PASS: Collect ALL possible dynamic headers from ALL records
+            foreach ($payrollRecords as $record) {
+                $grossList = $this->safeJsonDecode($record->grossList);
+                $recurringDeductions = $this->safeJsonDecode($record->recurringDeduction);
+
+                // Build complete list of dynamic headers from all records
+                foreach ($grossList as $item) {
+                    $componentName = $item['componentName'] ?? 'Unknown Component';
+                    $headerKey = 'gross_' . str_replace(' ', '_', strtolower($componentName));
+                    $dynamicHeaders[$headerKey] = $componentName;
+                }
+                
+                foreach ($recurringDeductions as $item) {
+                    $componentName = $item['componentName'] ?? 'Unknown Component';
+                    $headerKey = 'deduction_' . str_replace(' ', '_', strtolower($componentName));
+                    $dynamicHeaders[$headerKey] = $componentName;
+                }
+            }
+
+            // SECOND PASS: Process each record and ensure all dynamic columns have values
+            foreach ($payrollRecords as $record) {
+                // Get employee details and employment details
+                $employeeDetail = $employeeDetails->get($record->empCode);
+                $employmentDetail = $employmentDetails->get($record->empCode);
+                
+                // Build full name using the helper method
+                $fullName = $this->getFullEmployeeName($employeeDetail);
+
+                // Parse JSON fields safely - REMOVED otherAllowances and otherBenefits
+                $grossList = $this->safeJsonDecode($record->grossList);
+                $recurringDeductions = $this->safeJsonDecode($record->recurringDeduction);
+
+                // Calculate totals - REMOVED ALL benefits calculation
+                $monthlyTotalGross = 0;
+                $monthlyTotalDeductions = 0;
+
+                // Calculate gross total
+                foreach ($grossList as $item) {
+                    if (isset($item['calculatedValue']) && is_numeric($item['calculatedValue'])) {
+                        $monthlyTotalGross += (float)$item['calculatedValue'];
+                    }
+                }
+
+                // Calculate deductions total
+                foreach ($recurringDeductions as $item) {
+                    if (isset($item['calculatedValue']) && is_numeric($item['calculatedValue'])) {
+                        $monthlyTotalDeductions += (float)$item['calculatedValue'];
+                    }
+                }
+
+                // Calculate net salary - REMOVED benefits from calculation
+                $netTakeHomeMonthly = $monthlyTotalGross - $monthlyTotalDeductions;
+
+                // Build row data as associative array (with serial number and paid days)
+                $row = [
+                    'serialNo' => $serialNo++,
+                    'empCode' => $record->empCode ?? '',
+                    'empName' => $fullName ?: 'N/A',
+                    'designation' => $employmentDetail->Designation ?? 'N/A',
+                    'paidDays' => 0, // Currently set to 0 as attendance not calculated
+                    'dateOfJoining' => $employmentDetail->dateOfJoining ?? 'N/A',
+                    'monthlyTotalGross' => round($monthlyTotalGross, 2),
+                    'monthlyTotalRecurringDeductions' => round($monthlyTotalDeductions, 2),
+                    'netTakeHomeMonthly' => round($netTakeHomeMonthly, 2),
+                    'status' => $record->status, // Will always be 'Released'
+                ];
+
+                // Initialize ALL dynamic headers with 0 first
+                foreach ($dynamicHeaders as $headerKey => $headerName) {
+                    $row[$headerKey] = 0;
+                    if (!isset($totals[$headerKey])) {
+                        $totals[$headerKey] = 0;
+                    }
+                }
+
+                // Now populate actual values for gross components that exist
+                foreach ($grossList as $item) {
+                    $componentName = $item['componentName'] ?? 'Unknown Component';
+                    $headerKey = 'gross_' . str_replace(' ', '_', strtolower($componentName));
+                    $value = 0;
+                    if (isset($item['calculatedValue']) && is_numeric($item['calculatedValue'])) {
+                        $value = (float)$item['calculatedValue'];
+                    }
+                    $row[$headerKey] = $value;
+                    $totals[$headerKey] += $value;
+                }
+                
+                // Now populate actual values for deduction components that exist
+                foreach ($recurringDeductions as $item) {
+                    $componentName = $item['componentName'] ?? 'Unknown Component';
+                    $headerKey = 'deduction_' . str_replace(' ', '_', strtolower($componentName));
+                    $value = 0;
+                    if (isset($item['calculatedValue']) && is_numeric($item['calculatedValue'])) {
+                        $value = (float)$item['calculatedValue'];
+                    }
+                    $row[$headerKey] = $value;
+                    $totals[$headerKey] += $value;
+                }
+
+                // Add totals for summary columns - REMOVED all benefits-related totals
+                $totals['monthlyTotalGross'] = ($totals['monthlyTotalGross'] ?? 0) + $monthlyTotalGross;
+                $totals['monthlyTotalRecurringDeductions'] = ($totals['monthlyTotalRecurringDeductions'] ?? 0) + $monthlyTotalDeductions;
+                $totals['netTakeHomeMonthly'] = ($totals['netTakeHomeMonthly'] ?? 0) + $netTakeHomeMonthly;
+                $totals['paidDays'] = ($totals['paidDays'] ?? 0) + 0; // Sum of paid days (0 for now)
+
+                $excelData[] = $row;
+            }
+
+            // Create totals row - REMOVED all benefits-related fields
+            $totalsRow = [
+                'serialNo' => '',
+                'empCode' => 'TOTAL',
+                'empName' => '',
+                'designation' => '',
+                'paidDays' => round($totals['paidDays'] ?? 0, 0),
+                'dateOfJoining' => '',
+                'monthlyTotalGross' => round($totals['monthlyTotalGross'] ?? 0, 2),
+                'monthlyTotalRecurringDeductions' => round($totals['monthlyTotalRecurringDeductions'] ?? 0, 2),
+                'netTakeHomeMonthly' => round($totals['netTakeHomeMonthly'] ?? 0, 2),
+                'status' => '',
+            ];
+
+            // Add dynamic totals with 0 default values
+            foreach ($dynamicHeaders as $key => $value) {
+                $totalsRow[$key] = round($totals[$key] ?? 0, 2);
+            }
+
+            // Add totals row to data
+            $excelData[] = $totalsRow;
+
+            // Company information for the heading
+            $companyInfo = [
+                'companyName' => $request->companyName,
+                'year' => $request->year,
+                'month' => $request->month,
+                'subBranch' => $request->subBranch ?? 'All SubBranches'
+            ];
+
+            // Generate filename with Released indicator
+            $subBranchSuffix = $request->has('subBranch') && !empty($request->subBranch) ? "_{$request->subBranch}" : '';
+            $fileName = "SalarySheet_{$request->companyName}_{$request->month}_{$request->year}{$subBranchSuffix}.xlsx";
+
+            // Use the ReleasedPayrollExport class
+            return Excel::download(new ReleasedPayrollExport($excelData, $dynamicHeaders, $companyInfo), $fileName);
+
+        } catch (\Exception $e) {
+            abort(500, 'Error in exporting released payroll data: ' . $e->getMessage());
+        }
+    }
+
+    /**
+     * Safely decode JSON to array
+     */
+    private function safeJsonDecode($jsonString)
+    {
+        if (empty($jsonString) || !is_string($jsonString)) {
+            return [];
+        }
+
+        $decoded = json_decode($jsonString, true);
+        
+        // If json_decode fails or returns non-array, return empty array
+        if (!is_array($decoded)) {
+            return [];
+        }
+
+        return $decoded;
+    }
+
+    /**
      * Get list of all branches for a company (for filtering purposes)
      *
      * @param Request $request
@@ -832,6 +1061,258 @@ class EmployeePayrollSalaryProcessApiController extends Controller
         }
 
         return trim($words) . ' Only';
+    }
+
+    /**
+     * Check if payroll has been initiated for a specific period
+     *
+     * @param string $corpId
+     * @param string $companyName
+     * @param string $year
+     * @param string $month
+     * @return \Illuminate\Http\JsonResponse
+     */
+    public function checkPayrollInitiated($corpId, $companyName, $year, $month)
+    {
+        try {
+            // Check if payroll exists for this period
+            $payrollExists = EmployeePayrollSalaryProcess::where('corpId', $corpId)
+                ->where('companyName', $companyName)
+                ->where('year', $year)
+                ->where('month', $month)
+                ->exists();
+
+            $filterDescription = "corpId: {$corpId}, companyName: {$companyName}, year: {$year}, month: {$month}";
+
+            if ($payrollExists) {
+                // Get count of records for additional info
+                $recordsCount = EmployeePayrollSalaryProcess::where('corpId', $corpId)
+                    ->where('companyName', $companyName)
+                    ->where('year', $year)
+                    ->where('month', $month)
+                    ->count();
+
+                return response()->json([
+                    'status' => true,
+                    'initiated' => true,
+                    'message' => 'Payroll has been initiated for this period',
+                    'filter' => $filterDescription,
+                    'records_count' => $recordsCount
+                ]);
+            } else {
+                return response()->json([
+                    'status' => true,
+                    'initiated' => false,
+                    'message' => 'Payroll has not been initiated for this period',
+                    'filter' => $filterDescription,
+                    'records_count' => 0
+                ]);
+            }
+
+        } catch (\Exception $e) {
+            return response()->json([
+                'status' => false,
+                'initiated' => false,
+                'message' => 'Error checking payroll status: ' . $e->getMessage(),
+                'filter' => "corpId: {$corpId}, companyName: {$companyName}, year: {$year}, month: {$month}"
+            ], 500);
+        }
+    }
+
+    /**
+     * Release salary for all employees in a specific period
+     *
+     * @param Request $request
+     * @return \Illuminate\Http\JsonResponse
+     */
+    public function releaseSalary(Request $request)
+    {
+        // Validate required fields
+        $request->validate([
+            'corpId' => 'required|string|max:10',
+            'companyName' => 'required|string|max:100',
+            'year' => 'required|string|max:4',
+            'month' => 'required|string|max:50',
+        ]);
+
+        try {
+            // Check if payroll entries exist for this period
+            $payrollQuery = EmployeePayrollSalaryProcess::where('corpId', $request->corpId)
+                ->where('companyName', $request->companyName)
+                ->where('year', $request->year)
+                ->where('month', $request->month);
+
+            $payrollRecords = $payrollQuery->get();
+
+            if ($payrollRecords->isEmpty()) {
+                $filterDescription = "corpId: {$request->corpId}, companyName: {$request->companyName}, year: {$request->year}, month: {$request->month}";
+                
+                return response()->json([
+                    'status' => false,
+                    'message' => 'No payroll entries found for the specified period',
+                    'filter' => $filterDescription,
+                    'records_found' => 0
+                ], 404);
+            }
+
+            // Get current status breakdown before update
+            $statusBreakdown = $payrollRecords->groupBy('status')->map(function ($group) {
+                return $group->count();
+            })->toArray();
+
+            // Count records that are already released
+            $alreadyReleasedCount = $payrollRecords->where('status', 'Released')->count();
+            $toBeUpdatedCount = $payrollRecords->where('status', '!=', 'Released')->count();
+
+            // Update all records to 'Released' status
+            $updatedCount = EmployeePayrollSalaryProcess::where('corpId', $request->corpId)
+                ->where('companyName', $request->companyName)
+                ->where('year', $request->year)
+                ->where('month', $request->month)
+                ->where('status', '!=', 'Released') // Only update non-released records
+                ->update([
+                    'status' => 'Released',
+                    'updated_at' => now()
+                ]);
+
+            $filterDescription = "corpId: {$request->corpId}, companyName: {$request->companyName}, year: {$request->year}, month: {$request->month}";
+
+            // Prepare response message
+            if ($updatedCount > 0) {
+                $message = "Successfully released salary for {$updatedCount} employees";
+                if ($alreadyReleasedCount > 0) {
+                    $message .= ". {$alreadyReleasedCount} employees were already in 'Released' status";
+                }
+            } else {
+                $message = "All {$payrollRecords->count()} employees are already in 'Released' status";
+            }
+
+            return response()->json([
+                'status' => true,
+                'message' => $message,
+                'filter' => $filterDescription,
+                'summary' => [
+                    'total_records' => $payrollRecords->count(),
+                    'updated_to_released' => $updatedCount,
+                    'already_released' => $alreadyReleasedCount,
+                    'previous_status_breakdown' => $statusBreakdown
+                ]
+            ]);
+
+        } catch (\Exception $e) {
+            return response()->json([
+                'status' => false,
+                'message' => 'Error releasing salary: ' . $e->getMessage(),
+                'filter' => "corpId: {$request->corpId}, companyName: {$request->companyName}, year: {$request->year}, month: {$request->month}"
+            ], 500);
+        }
+    }
+
+    /**
+     * Release salary only for records with 'Initiated' status
+     *
+     * @param Request $request
+     * @return \Illuminate\Http\JsonResponse
+     */
+    public function releaseSalaryInitiatedOnly(Request $request)
+    {
+        // Validate required fields
+        $request->validate([
+            'corpId' => 'required|string|max:10',
+            'companyName' => 'required|string|max:100',
+            'year' => 'required|string|max:4',
+            'month' => 'required|string|max:50',
+        ]);
+
+        try {
+            // Check if payroll entries exist for this period
+            $payrollQuery = EmployeePayrollSalaryProcess::where('corpId', $request->corpId)
+                ->where('companyName', $request->companyName)
+                ->where('year', $request->year)
+                ->where('month', $request->month);
+
+            $allPayrollRecords = $payrollQuery->get();
+
+            if ($allPayrollRecords->isEmpty()) {
+                $filterDescription = "corpId: {$request->corpId}, companyName: {$request->companyName}, year: {$request->year}, month: {$request->month}";
+                
+                return response()->json([
+                    'status' => false,
+                    'message' => 'No payroll entries found for the specified period',
+                    'filter' => $filterDescription,
+                    'records_found' => 0
+                ], 404);
+            }
+
+            // Get records with 'Initiated' status only
+            $initiatedRecords = $allPayrollRecords->where('status', 'Initiated');
+
+            if ($initiatedRecords->isEmpty()) {
+                $filterDescription = "corpId: {$request->corpId}, companyName: {$request->companyName}, year: {$request->year}, month: {$request->month}";
+                
+                // Get current status breakdown
+                $statusBreakdown = $allPayrollRecords->groupBy('status')->map(function ($group) {
+                    return $group->count();
+                })->toArray();
+
+                return response()->json([
+                    'status' => false,
+                    'message' => 'No payroll entries with "Initiated" status found for the specified period',
+                    'filter' => $filterDescription,
+                    'total_records' => $allPayrollRecords->count(),
+                    'initiated_records' => 0,
+                    'current_status_breakdown' => $statusBreakdown
+                ], 404);
+            }
+
+            // Get current status breakdown before update
+            $statusBreakdown = $allPayrollRecords->groupBy('status')->map(function ($group) {
+                return $group->count();
+            })->toArray();
+
+            // Update only 'Initiated' records to 'Released' status
+            $updatedCount = EmployeePayrollSalaryProcess::where('corpId', $request->corpId)
+                ->where('companyName', $request->companyName)
+                ->where('year', $request->year)
+                ->where('month', $request->month)
+                ->where('status', 'Initiated') // Only update 'Initiated' records
+                ->update([
+                    'status' => 'Released',
+                    'updated_at' => now()
+                ]);
+
+            $filterDescription = "corpId: {$request->corpId}, companyName: {$request->companyName}, year: {$request->year}, month: {$request->month}";
+
+            // Count records by other statuses (excluding the ones we just updated)
+            $otherStatusCount = $allPayrollRecords->where('status', '!=', 'Initiated')->count();
+
+            $message = "Successfully released salary for {$updatedCount} employees with 'Initiated' status";
+            if ($otherStatusCount > 0) {
+                $message .= ". {$otherStatusCount} employees with other statuses were not affected";
+            }
+
+            return response()->json([
+                'status' => true,
+                'message' => $message,
+                'filter' => $filterDescription,
+                'summary' => [
+                    'total_records' => $allPayrollRecords->count(),
+                    'initiated_records_updated' => $updatedCount,
+                    'other_status_records' => $otherStatusCount,
+                    'previous_status_breakdown' => $statusBreakdown,
+                    'updated_from' => 'Initiated',
+                    'updated_to' => 'Released'
+                ]
+            ]);
+
+        } catch (\Exception $e) {
+            return response()->json([
+                'status' => false,
+                'message' => 'Error releasing salary: ' . $e->getMessage(),
+                'filter' => "corpId: {$request->corpId}, companyName: {$request->companyName}, year: {$request->year}, month: {$request->month}"
+            ], 500);
+            
+        }
     }
 
     /**
