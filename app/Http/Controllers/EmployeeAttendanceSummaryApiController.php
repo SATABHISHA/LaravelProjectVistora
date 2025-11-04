@@ -6,6 +6,7 @@ use Illuminate\Http\Request;
 use App\Models\EmployeeAttendanceSummary;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Validator;
+use Illuminate\Support\Facades\Log;
 use Carbon\Carbon;
 
 class EmployeeAttendanceSummaryApiController extends Controller
@@ -1096,7 +1097,7 @@ class EmployeeAttendanceSummaryApiController extends Controller
             ]);
 
         } catch (\Exception $e) {
-            \Log::error("Recalculation Error: " . $e->getMessage());
+            Log::error("Recalculation Error: " . $e->getMessage());
             return response()->json(['status' => false, 'message' => 'An error occurred during recalculation.', 'error' => $e->getMessage()], 500);
         }
     }
