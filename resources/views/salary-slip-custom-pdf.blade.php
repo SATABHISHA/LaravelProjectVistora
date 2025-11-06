@@ -166,7 +166,7 @@
             </tr>
             <tr>
                 <td>Location</td>
-                <td>{{ $employment->Location ?? 'N/A' }}</td>
+                <td>{{ $employment->SubBranch ?? 'N/A' }}</td>
                 <td>PF Account Number</td>
                 <td>{{ $statutory->pfNo ?? 'N/A' }}</td>
             </tr>
