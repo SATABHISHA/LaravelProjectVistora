@@ -2401,8 +2401,9 @@ class EmployeePayrollSalaryProcessApiController extends Controller
             }
 
             if ($request->has('month') && !empty($request->month)) {
-                $monthNumber = is_numeric($request->month) ? (int)$request->month : (int)date('n', strtotime($request->month));
-                $payrollQuery->where('month', $monthNumber);
+                //$monthNumber = is_numeric($request->month) ? (int)$request->month : (int)date('n', strtotime($request->month));
+                //$payrollQuery->where('month', $monthNumber);
+                 $payrollQuery->where('month', $request->month);
             }
 
             if ($request->has('status') && !empty($request->status)) {
