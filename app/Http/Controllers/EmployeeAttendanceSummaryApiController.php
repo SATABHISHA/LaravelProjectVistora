@@ -8,6 +8,10 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Facades\Log;
 use Carbon\Carbon;
+use Maatwebsite\Excel\Facades\Excel;
+use PhpOffice\PhpSpreadsheet\Spreadsheet;
+use PhpOffice\PhpSpreadsheet\Writer\Xlsx;
+use PhpOffice\PhpSpreadsheet\IOFactory;
 
 class EmployeeAttendanceSummaryApiController extends Controller
 {
@@ -1099,6 +1103,311 @@ class EmployeeAttendanceSummaryApiController extends Controller
         } catch (\Exception $e) {
             Log::error("Recalculation Error: " . $e->getMessage());
             return response()->json(['status' => false, 'message' => 'An error occurred during recalculation.', 'error' => $e->getMessage()], 500);
+        }
+    }
+
+    /**
+     * Export employee attendance summary to Excel
+     *
+     * @param Request $request
+     * @return \Symfony\Component\HttpFoundation\BinaryFileResponse
+     */
+    public function exportAttendanceSummary(Request $request)
+    {
+        // Validate required fields
+        $validator = Validator::make($request->all(), [
+            'corpId' => 'required|string|max:10',
+            'companyName' => 'required|string|max:100',
+            'year' => 'required|string|max:4',
+            'month' => 'required|string|max:50',
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json([
+                'status' => false,
+                'message' => 'Validation failed',
+                'errors' => $validator->errors()
+            ], 422);
+        }
+
+        try {
+            $corpId = $request->input('corpId');
+            $companyName = $request->input('companyName');
+            $year = $request->input('year');
+            $month = $request->input('month');
+
+            // Fetch attendance summary data with employee details
+            $attendanceData = DB::table('employee_attendance_summary as eas')
+                ->leftJoin('employee_details as ed', function($join) {
+                    $join->on('eas.empCode', '=', 'ed.EmpCode')
+                         ->on('eas.corpId', '=', 'ed.corp_id');
+                })
+                ->leftJoin('employment_details as emp', function($join) {
+                    $join->on('eas.empCode', '=', 'emp.EmpCode')
+                         ->on('eas.corpId', '=', 'emp.corp_id');
+                })
+                ->select(
+                    'eas.id',
+                    'eas.corpId',
+                    'eas.empCode',
+                    'eas.companyName',
+                    DB::raw("TRIM(CONCAT(COALESCE(ed.FirstName, ''), ' ', COALESCE(ed.MiddleName, ''), ' ', COALESCE(ed.LastName, ''))) as employeeName"),
+                    'emp.Designation',
+                    'emp.Department',
+                    'eas.totalPresent',
+                    'eas.workingDays',
+                    'eas.holidays',
+                    'eas.weekOff',
+                    'eas.leave',
+                    'eas.paidDays',
+                    'eas.absent',
+                    'eas.month',
+                    'eas.year'
+                )
+                ->where('eas.corpId', $corpId)
+                ->where('eas.companyName', $companyName)
+                ->where('eas.year', $year)
+                ->where('eas.month', $month)
+                ->orderBy('eas.empCode')
+                ->get();
+
+            if ($attendanceData->isEmpty()) {
+                return response()->json([
+                    'status' => false,
+                    'message' => 'No attendance summary found for the specified criteria',
+                    'filter' => "corpId: {$corpId}, companyName: {$companyName}, year: {$year}, month: {$month}"
+                ], 404);
+            }
+
+            // Create a new spreadsheet
+            $spreadsheet = new Spreadsheet();
+            $sheet = $spreadsheet->getActiveSheet();
+
+            // Set header row
+            $headers = [
+                'ID',
+                'Corp ID',
+                'Employee Code',
+                'Employee Name',
+                'Designation',
+                'Department',
+                'Company Name',
+                'Total Present',
+                'Working Days',
+                'Holidays',
+                'Week Off',
+                'Leave',
+                'Paid Days',
+                'Absent',
+                'Month',
+                'Year'
+            ];
+
+            $sheet->fromArray($headers, null, 'A1');
+
+            // Style header row
+            $headerStyle = [
+                'font' => ['bold' => true, 'color' => ['rgb' => 'FFFFFF']],
+                'fill' => ['fillType' => \PhpOffice\PhpSpreadsheet\Style\Fill::FILL_SOLID, 'startColor' => ['rgb' => '4472C4']],
+                'alignment' => ['horizontal' => \PhpOffice\PhpSpreadsheet\Style\Alignment::HORIZONTAL_CENTER],
+            ];
+            $sheet->getStyle('A1:P1')->applyFromArray($headerStyle);
+
+            // Add data rows
+            $row = 2;
+            foreach ($attendanceData as $data) {
+                $sheet->fromArray([
+                    $data->id,
+                    $data->corpId,
+                    $data->empCode,
+                    $data->employeeName ?: 'N/A',
+                    $data->Designation ?: 'N/A',
+                    $data->Department ?: 'N/A',
+                    $data->companyName,
+                    $data->totalPresent,
+                    $data->workingDays,
+                    $data->holidays,
+                    $data->weekOff,
+                    $data->leave,
+                    $data->paidDays,
+                    $data->absent,
+                    $data->month,
+                    $data->year
+                ], null, 'A' . $row);
+                $row++;
+            }
+
+            // Auto-size columns
+            foreach (range('A', 'P') as $col) {
+                $sheet->getColumnDimension($col)->setAutoSize(true);
+            }
+
+            // Create Excel file
+            $writer = new Xlsx($spreadsheet);
+            $filename = "Attendance_Summary_{$corpId}_{$companyName}_{$month}_{$year}.xlsx";
+            $tempFile = tempnam(sys_get_temp_dir(), 'attendance_export_');
+            $writer->save($tempFile);
+
+            return response()->download($tempFile, $filename, [
+                'Content-Type' => 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+            ])->deleteFileAfterSend(true);
+
+        } catch (\Exception $e) {
+            Log::error('Error exporting attendance summary: ' . $e->getMessage());
+            return response()->json([
+                'status' => false,
+                'message' => 'An error occurred while exporting attendance summary',
+                'error' => $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * Import and update employee attendance summary from Excel
+     *
+     * @param Request $request
+     * @return \Illuminate\Http\JsonResponse
+     */
+    public function importAttendanceSummary(Request $request)
+    {
+        // Validate the uploaded file
+        $validator = Validator::make($request->all(), [
+            'file' => 'required|file|mimes:xlsx,xls|max:10240', // Max 10MB
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json([
+                'status' => false,
+                'message' => 'Validation failed',
+                'errors' => $validator->errors()
+            ], 422);
+        }
+
+        try {
+            $file = $request->file('file');
+
+            // Load the spreadsheet from the uploaded file (without saving it)
+            $spreadsheet = IOFactory::load($file->getRealPath());
+            $sheet = $spreadsheet->getActiveSheet();
+            $rows = $sheet->toArray();
+
+            if (count($rows) < 2) {
+                return response()->json([
+                    'status' => false,
+                    'message' => 'The uploaded file is empty or contains no data rows'
+                ], 400);
+            }
+
+            // Extract header row and data rows
+            $headers = array_shift($rows); // Remove first row (headers)
+            
+            // Validate headers
+            $expectedHeaders = [
+                'ID', 'Corp ID', 'Employee Code', 'Employee Name', 'Designation', 
+                'Department', 'Company Name', 'Total Present', 'Working Days', 
+                'Holidays', 'Week Off', 'Leave', 'Paid Days', 'Absent', 'Month', 'Year'
+            ];
+
+            if ($headers !== $expectedHeaders) {
+                return response()->json([
+                    'status' => false,
+                    'message' => 'Invalid file format. Headers do not match expected format.',
+                    'expected_headers' => $expectedHeaders,
+                    'received_headers' => $headers
+                ], 400);
+            }
+
+            $updatedCount = 0;
+            $errorCount = 0;
+            $errors = [];
+            $updatedRecords = [];
+
+            foreach ($rows as $index => $row) {
+                try {
+                    // Skip empty rows
+                    if (empty(array_filter($row))) {
+                        continue;
+                    }
+
+                    $id = $row[0];
+                    $corpId = $row[1];
+                    $empCode = $row[2];
+                    $companyName = $row[6];
+                    $totalPresent = $row[7];
+                    $workingDays = $row[8];
+                    $holidays = $row[9];
+                    $weekOff = $row[10];
+                    $leave = $row[11];
+                    $paidDays = $row[12];
+                    $absent = $row[13];
+                    $month = $row[14];
+                    $year = $row[15];
+
+                    // Find the attendance summary record
+                    $attendanceSummary = EmployeeAttendanceSummary::where('id', $id)
+                        ->where('corpId', $corpId)
+                        ->where('empCode', $empCode)
+                        ->first();
+
+                    if (!$attendanceSummary) {
+                        $errorCount++;
+                        $errors[] = [
+                            'row' => $index + 2, // +2 because we removed header and array is 0-indexed
+                            'empCode' => $empCode,
+                            'error' => 'Record not found in database'
+                        ];
+                        continue;
+                    }
+
+                    // Update the record
+                    $attendanceSummary->update([
+                        'totalPresent' => $totalPresent ?? 0,
+                        'workingDays' => $workingDays ?? 0,
+                        'holidays' => $holidays ?? 0,
+                        'weekOff' => $weekOff ?? 0,
+                        'leave' => $leave ?? 0,
+                        'paidDays' => $paidDays ?? 0,
+                        'absent' => $absent ?? 0,
+                        'month' => $month,
+                        'year' => $year,
+                    ]);
+
+                    $updatedCount++;
+                    $updatedRecords[] = [
+                        'id' => $id,
+                        'empCode' => $empCode,
+                        'companyName' => $companyName
+                    ];
+
+                } catch (\Exception $e) {
+                    $errorCount++;
+                    $errors[] = [
+                        'row' => $index + 2,
+                        'empCode' => $row[2] ?? 'N/A',
+                        'error' => $e->getMessage()
+                    ];
+                }
+            }
+
+            return response()->json([
+                'status' => true,
+                'message' => "Successfully updated {$updatedCount} attendance records",
+                'summary' => [
+                    'total_rows_processed' => count($rows),
+                    'successfully_updated' => $updatedCount,
+                    'errors' => $errorCount
+                ],
+                'updated_records' => $updatedRecords,
+                'errors' => $errors
+            ]);
+
+        } catch (\Exception $e) {
+            Log::error('Error importing attendance summary: ' . $e->getMessage());
+            return response()->json([
+                'status' => false,
+                'message' => 'An error occurred while importing attendance summary',
+                'error' => $e->getMessage()
+            ], 500);
         }
     }
 }
