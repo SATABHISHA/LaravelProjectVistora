@@ -708,3 +708,6 @@ Route::get('/esi/{id}', [EsiController::class, 'getEsiById']);
 
 // Debug statutory data
 Route::get('/debug/statutory/{corpId}/{empCode}/{companyName}', [PaygroupConfigurationApiController::class, 'debugStatutoryData']);
+
+// Import and update attendance summary from Excel
+Route::post('/attendance-summary/import', [EmployeeAttendanceSummaryApiController::class, 'importAttendanceSummary']);
