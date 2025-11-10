@@ -678,11 +678,14 @@ Route::get('/check-attendance-summary/check-exists/{corpId}/{companyName}/{month
 // Recalculate attendance summaries for a specific period
 Route::post('/attendance-summary/recalculate', [EmployeeAttendanceSummaryApiController::class, 'recalculateAttendanceSummaries']);
 
-// Export attendance summary to Excel
+// Export attendance summary (POST method)
 Route::post('/attendance-summary/export', [EmployeeAttendanceSummaryApiController::class, 'exportAttendanceSummary']);
 
-// Import and update attendance summary from Excel
-Route::post('/attendance-summary/import', [EmployeeAttendanceSummaryApiController::class, 'importAttendanceSummary']);
+// Export attendance summary (GET method) - Creates the file and returns a download link
+Route::get('/attendance-summary/export/{corpId}/{companyName}/{year}/{month}', [EmployeeAttendanceSummaryApiController::class, 'exportAttendanceSummaryGet']);
+
+// Download the exported file (and delete it after sending)
+Route::get('/attendance-summary/download/{corpId}/{companyName}/{year}/{month}', [EmployeeAttendanceSummaryApiController::class, 'downloadExportedAttendanceSummary'])->name('attendance-summary.download-file');
 
 // Test Routes
 Route::get('/test-professional-tax', [App\Http\Controllers\ProfessionalTaxTestController::class, 'test']);

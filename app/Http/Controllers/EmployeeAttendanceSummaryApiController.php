@@ -1263,6 +1263,177 @@ class EmployeeAttendanceSummaryApiController extends Controller
     }
 
     /**
+     * Export employee attendance summary to Excel (GET method with URL parameters)
+     * Returns JSON with a link to download the file.
+     *
+     * @param string $corpId
+     * @param string $companyName
+     * @param string $year
+     * @param string $month
+     * @return \Illuminate\Http\JsonResponse
+     */
+    public function exportAttendanceSummaryGet($corpId, $companyName, $year, $month)
+    {
+        try {
+            // URL decode the company name as it may contain spaces
+            $companyName = urldecode($companyName);
+
+            // Fetch attendance summary data with employee details
+            $attendanceData = DB::table('employee_attendance_summary as eas')
+                ->leftJoin('employee_details as ed', function($join) {
+                    $join->on('eas.empCode', '=', 'ed.EmpCode')
+                         ->on('eas.corpId', '=', 'ed.corp_id');
+                })
+                ->leftJoin('employment_details as emp', function($join) {
+                    $join->on('eas.empCode', '=', 'emp.EmpCode')
+                         ->on('eas.corpId', '=', 'emp.corp_id');
+                })
+                ->select(
+                    'eas.id',
+                    'eas.corpId',
+                    'eas.empCode',
+                    'eas.companyName',
+                    DB::raw("TRIM(CONCAT(COALESCE(ed.FirstName, ''), ' ', COALESCE(ed.MiddleName, ''), ' ', COALESCE(ed.LastName, ''))) as employeeName"),
+                    'emp.Designation',
+                    'emp.Department',
+                    'eas.totalPresent',
+                    'eas.workingDays',
+                    'eas.holidays',
+                    'eas.weekOff',
+                    'eas.leave',
+                    'eas.paidDays',
+                    'eas.absent',
+                    'eas.month',
+                    'eas.year'
+                )
+                ->where('eas.corpId', $corpId)
+                ->where('eas.companyName', $companyName)
+                ->where('eas.year', $year)
+                ->where('eas.month', $month)
+                ->orderBy('eas.empCode')
+                ->get();
+
+            if ($attendanceData->isEmpty()) {
+                return response()->json([
+                    'status' => false,
+                    'message' => 'No attendance summary found for the specified criteria',
+                    'filter' => "corpId: {$corpId}, companyName: {$companyName}, year: {$year}, month: {$month}"
+                ], 404);
+            }
+
+            // Create a new spreadsheet
+            $spreadsheet = new Spreadsheet();
+            $sheet = $spreadsheet->getActiveSheet();
+
+            // Set header row
+            $headers = [
+                'ID', 'Corp ID', 'Employee Code', 'Employee Name', 'Designation', 'Department', 'Company Name',
+                'Total Present', 'Working Days', 'Holidays', 'Week Off', 'Leave', 'Paid Days', 'Absent', 'Month', 'Year'
+            ];
+            $sheet->fromArray($headers, null, 'A1');
+
+            // Style header row
+            $headerStyle = [
+                'font' => ['bold' => true, 'color' => ['rgb' => 'FFFFFF']],
+                'fill' => ['fillType' => \PhpOffice\PhpSpreadsheet\Style\Fill::FILL_SOLID, 'startColor' => ['rgb' => '4472C4']],
+                'alignment' => ['horizontal' => \PhpOffice\PhpSpreadsheet\Style\Alignment::HORIZONTAL_CENTER],
+            ];
+            $sheet->getStyle('A1:P1')->applyFromArray($headerStyle);
+
+            // Add data rows
+            $row = 2;
+            foreach ($attendanceData as $data) {
+                $sheet->fromArray([
+                    $data->id, $data->corpId, $data->empCode, $data->employeeName ?: 'N/A', $data->Designation ?: 'N/A',
+                    $data->Department ?: 'N/A', $data->companyName, $data->totalPresent, $data->workingDays,
+                    $data->holidays, $data->weekOff, $data->leave, $data->paidDays, $data->absent, $data->month, $data->year
+                ], null, 'A' . $row);
+                $row++;
+            }
+
+            // Auto-size columns
+            foreach (range('A', 'P') as $col) {
+                $sheet->getColumnDimension($col)->setAutoSize(true);
+            }
+
+            // Create Excel file and save to a public directory
+            $writer = new Xlsx($spreadsheet);
+            $filename = "Attendance_Summary_{$corpId}_{$companyName}_{$month}_{$year}.xlsx";
+            $exportPath = 'exports';
+            $fullPath = storage_path("app/public/{$exportPath}");
+
+            if (!file_exists($fullPath)) {
+                mkdir($fullPath, 0755, true);
+            }
+            $filePath = "{$fullPath}/{$filename}";
+            $writer->save($filePath);
+
+            // Generate a named route URL for downloading the file
+            $downloadUrl = route('attendance-summary.download-file', [
+                'corpId' => $corpId,
+                'companyName' => urlencode($companyName),
+                'year' => $year,
+                'month' => $month
+            ]);
+
+            return response()->json([
+                'status' => true,
+                'message' => 'Attendance summary export is ready for download.',
+                'data' => [
+                    'file_name' => $filename,
+                    'download_url' => $downloadUrl,
+                    'note' => 'File will be automatically deleted from the server after download.'
+                ]
+            ]);
+
+        } catch (\Exception $e) {
+            Log::error('Error exporting attendance summary (GET): ' . $e->getMessage());
+            return response()->json([
+                'status' => false,
+                'message' => 'An error occurred while exporting attendance summary',
+                'error' => $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * Download the exported attendance summary file and delete it afterwards.
+     *
+     * @param string $corpId
+     * @param string $companyName
+     * @param string $year
+     * @param string $month
+     * @return \Symfony\Component\HttpFoundation\BinaryFileResponse|\Illuminate\Http\JsonResponse
+     */
+    public function downloadExportedAttendanceSummary($corpId, $companyName, $year, $month)
+    {
+        try {
+            $companyName = urldecode($companyName);
+            $filename = "Attendance_Summary_{$corpId}_{$companyName}_{$month}_{$year}.xlsx";
+            $filePath = storage_path("app/public/exports/{$filename}");
+
+            if (!file_exists($filePath)) {
+                return response()->json([
+                    'status' => false,
+                    'message' => 'File not found or has already been downloaded and deleted.'
+                ], 404);
+            }
+
+            return response()->download($filePath, $filename, [
+                'Content-Type' => 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+            ])->deleteFileAfterSend(true);
+
+        } catch (\Exception $e) {
+            Log::error('Error downloading exported file: ' . $e->getMessage());
+            return response()->json([
+                'status' => false,
+                'message' => 'An error occurred while downloading the file.',
+                'error' => $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
      * Import and update employee attendance summary from Excel
      *
      * @param Request $request
