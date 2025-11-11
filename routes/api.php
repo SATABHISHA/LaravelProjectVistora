@@ -82,6 +82,7 @@ use App\Http\Controllers\UtilityApiController;
 use App\Http\Controllers\CompanyShiftPolicyApiController;
 use App\Http\Controllers\LeaveRequestApiController;
 use App\Http\Controllers\EmployeeAttendanceSummaryApiController;
+use App\Http\Controllers\NewsFeedController;
 
 /*
 |--------------------------------------------------------------------------
@@ -711,3 +712,9 @@ Route::get('/debug/statutory/{corpId}/{empCode}/{companyName}', [PaygroupConfigu
 
 // Import and update attendance summary from Excel
 Route::post('/attendance-summary/import', [EmployeeAttendanceSummaryApiController::class, 'importAttendanceSummary']);
+
+// NewsFeed Routes
+Route::post('/newsfeed', [NewsFeedController::class, 'store']);
+Route::post('/newsfeed-reviews', [NewsFeedController::class, 'storeReview']);
+Route::delete('/newsfeed-reviews/{puid}', [NewsFeedController::class, 'deleteReview']);
+Route::get('/newsfeed-with-reviews', [NewsFeedController::class, 'getWithReviews']);
