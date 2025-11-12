@@ -209,23 +209,51 @@ class NewsFeedController extends Controller
 
     /**
      * Get all news feeds with their reviews and calculated duration
-     * GET /newsfeed-with-reviews
+     * GET /newsfeed-with-reviews?corpId={corpId}&companyName={companyName}
      *
      * @param Request $request
      * @return \Illuminate\Http\JsonResponse
      */
     public function getWithReviews(Request $request)
     {
+        // Validate query parameters
+        $validator = Validator::make($request->query(), [
+            'corpId' => 'required|string|max:10',
+            'companyName' => 'nullable|string|max:100',
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json([
+                'status' => false,
+                'message' => 'Validation failed',
+                'errors' => $validator->errors()
+            ], 422);
+        }
+
         try {
-            // Get all news feeds with their reviews
-            $newsFeeds = NewsFeed::with('reviews')
-                ->orderBy('created_at', 'desc')
-                ->get();
+            $corpId = $request->query('corpId');
+            $companyName = $request->query('companyName');
+
+            // Build query with filters
+            $query = NewsFeed::with('reviews')
+                ->where('corpId', $corpId);
+
+            // Add optional companyName filter
+            if ($companyName) {
+                $query->where('companyName', $companyName);
+            }
+
+            // Get filtered news feeds
+            $newsFeeds = $query->orderBy('created_at', 'desc')->get();
 
             if ($newsFeeds->isEmpty()) {
                 return response()->json([
                     'status' => true,
                     'message' => 'No news feeds found',
+                    'filters' => [
+                        'corpId' => $corpId,
+                        'companyName' => $companyName
+                    ],
                     'data' => []
                 ]);
             }
@@ -274,6 +302,10 @@ class NewsFeedController extends Controller
             return response()->json([
                 'status' => true,
                 'message' => 'News feeds retrieved successfully',
+                'filters' => [
+                    'corpId' => $corpId,
+                    'companyName' => $companyName
+                ],
                 'count' => $formattedData->count(),
                 'data' => $formattedData
             ]);
