@@ -104,7 +104,7 @@ class NewsFeedController extends Controller
             'puid' => 'required|string|max:100',
             'EmpCode' => 'required|string|max:20',
             'companyName' => 'required|string|max:100',
-            'isLiked' => 'required|string|in:0,1',
+            'isLiked' => 'nullable|string|in:0,1',
             'comment' => 'nullable|string',
             'date' => 'required|string|max:20',
             'time' => 'required|string|max:20',
@@ -160,14 +160,24 @@ class NewsFeedController extends Controller
 
             if ($existingReview) {
                 // Update existing review
-                $existingReview->update([
+                $updateData = [
                     'companyName' => $request->companyName,
                     'employeeFullName' => $employeeFullName,
-                    'isLiked' => $request->isLiked,
-                    'comment' => $request->comment,
                     'date' => $request->date,
                     'time' => $request->time,
-                ]);
+                ];
+
+                // Only update isLiked if provided
+                if ($request->has('isLiked')) {
+                    $updateData['isLiked'] = $request->isLiked;
+                }
+
+                // Only update comment if provided
+                if ($request->has('comment')) {
+                    $updateData['comment'] = $request->comment;
+                }
+
+                $existingReview->update($updateData);
 
                 return response()->json([
                     'status' => true,
@@ -184,7 +194,7 @@ class NewsFeedController extends Controller
                 'EmpCode' => $request->EmpCode,
                 'companyName' => $request->companyName,
                 'employeeFullName' => $employeeFullName,
-                'isLiked' => $request->isLiked,
+                'isLiked' => $request->isLiked ?? '0',
                 'comment' => $request->comment,
                 'date' => $request->date,
                 'time' => $request->time,
