@@ -273,8 +273,8 @@ class NewsFeedController extends Controller
                 // Calculate duration for news feed
                 $duration = $this->calculateDuration($newsFeed->date, $newsFeed->time);
 
-                // Count likes
-                $likesCount = $newsFeed->reviews()->where('isLiked', '1')->count();
+                // Count likes from loaded reviews collection
+                $likesCount = $newsFeed->reviews->where('isLiked', '1')->count();
 
                 // Format reviews
                 $reviews = $newsFeed->reviews->map(function ($review) {
