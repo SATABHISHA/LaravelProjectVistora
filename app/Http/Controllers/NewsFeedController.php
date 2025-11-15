@@ -230,6 +230,8 @@ class NewsFeedController extends Controller
         $validator = Validator::make($request->query(), [
             'corpId' => 'required|string|max:10',
             'companyName' => 'nullable|string|max:100',
+            'page' => 'nullable|integer|min:1',
+            'per_page' => 'nullable|integer|min:1|max:100',
         ]);
 
         if ($validator->fails()) {
@@ -243,6 +245,8 @@ class NewsFeedController extends Controller
         try {
             $corpId = $request->query('corpId');
             $companyName = $request->query('companyName');
+            $perPage = $request->query('per_page', 10);
+            $page = $request->query('page', 1);
 
             // Build query with filters
             $query = NewsFeed::with('reviews')
@@ -253,8 +257,8 @@ class NewsFeedController extends Controller
                 $query->where('companyName', $companyName);
             }
 
-            // Get filtered news feeds
-            $newsFeeds = $query->orderBy('created_at', 'desc')->get();
+            // Get paginated news feeds
+            $newsFeeds = $query->orderBy('created_at', 'desc')->paginate($perPage, ['*'], 'page', $page);
 
             if ($newsFeeds->isEmpty()) {
                 return response()->json([
@@ -263,6 +267,14 @@ class NewsFeedController extends Controller
                     'filters' => [
                         'corpId' => $corpId,
                         'companyName' => $companyName
+                    ],
+                    'pagination' => [
+                        'total' => 0,
+                        'per_page' => $perPage,
+                        'current_page' => $page,
+                        'last_page' => 0,
+                        'from' => null,
+                        'to' => null
                     ],
                     'data' => []
                 ]);
@@ -273,8 +285,9 @@ class NewsFeedController extends Controller
                 // Calculate duration for news feed
                 $duration = $this->calculateDuration($newsFeed->date, $newsFeed->time);
 
-                // Count likes from loaded reviews collection
+                // Count likes and comments from loaded reviews collection
                 $likesCount = $newsFeed->reviews->where('isLiked', '1')->count();
+                $commentsCount = $newsFeed->reviews->where('comment', '!=', null)->where('comment', '!=', '')->count();
 
                 // Format reviews
                 $reviews = $newsFeed->reviews->map(function ($review) {
@@ -287,8 +300,8 @@ class NewsFeedController extends Controller
                         'employeeFullName' => $review->employeeFullName,
                         'isLiked' => $review->isLiked,
                         'comment' => $review->comment,
-                        'date' => $review->date,
-                        'time' => $review->time,
+                        'date' => $this->formatDate($review->date),
+                        'time' => $this->formatTime($review->time),
                         'duration' => $this->calculateDuration($review->date, $review->time),
                     ];
                 });
@@ -301,10 +314,11 @@ class NewsFeedController extends Controller
                     'companyName' => $newsFeed->companyName,
                     'employeeFullName' => $newsFeed->employeeFullName,
                     'body' => $newsFeed->body,
-                    'date' => $newsFeed->date,
-                    'time' => $newsFeed->time,
+                    'date' => $this->formatDate($newsFeed->date),
+                    'time' => $this->formatTime($newsFeed->time),
                     'duration' => $duration,
                     'likesCount' => $likesCount,
+                    'commentsCount' => $commentsCount,
                     'reviews' => $reviews,
                 ];
             });
@@ -315,6 +329,14 @@ class NewsFeedController extends Controller
                 'filters' => [
                     'corpId' => $corpId,
                     'companyName' => $companyName
+                ],
+                'pagination' => [
+                    'total' => $newsFeeds->total(),
+                    'per_page' => $newsFeeds->perPage(),
+                    'current_page' => $newsFeeds->currentPage(),
+                    'last_page' => $newsFeeds->lastPage(),
+                    'from' => $newsFeeds->firstItem(),
+                    'to' => $newsFeeds->lastItem()
                 ],
                 'count' => $formattedData->count(),
                 'data' => $formattedData
@@ -347,15 +369,18 @@ class NewsFeedController extends Controller
             $postDateTime = Carbon::parse($dateTimeString);
             $now = Carbon::now();
 
-            // Calculate difference in hours
+            // Calculate differences
+            $diffInSeconds = $postDateTime->diffInSeconds($now);
+            $diffInMinutes = $postDateTime->diffInMinutes($now);
             $diffInHours = $postDateTime->diffInHours($now);
             $diffInDays = $postDateTime->diffInDays($now);
 
-            if ($diffInHours < 1) {
-                $diffInMinutes = $postDateTime->diffInMinutes($now);
-                if ($diffInMinutes < 1) {
+            if ($diffInSeconds < 60) {
+                if ($diffInSeconds < 5) {
                     return 'Just now';
                 }
+                return $diffInSeconds . ' second' . ($diffInSeconds > 1 ? 's' : '') . ' ago';
+            } elseif ($diffInMinutes < 60) {
                 return $diffInMinutes . ' minute' . ($diffInMinutes > 1 ? 's' : '') . ' ago';
             } elseif ($diffInHours < 24) {
                 return $diffInHours . ' hour' . ($diffInHours > 1 ? 's' : '') . ' ago';
@@ -377,6 +402,36 @@ class NewsFeedController extends Controller
         } catch (\Exception $e) {
             Log::error('Error calculating duration: ' . $e->getMessage());
             return 'Unknown';
+        }
+    }
+
+    /**
+     * Format date to "15 November 2025" format
+     *
+     * @param string $date
+     * @return string
+     */
+    private function formatDate($date)
+    {
+        try {
+            return Carbon::parse($date)->format('d F Y');
+        } catch (\Exception $e) {
+            return $date;
+        }
+    }
+
+    /**
+     * Format time to "02:30 PM" format
+     *
+     * @param string $time
+     * @return string
+     */
+    private function formatTime($time)
+    {
+        try {
+            return Carbon::parse($time)->format('h:i A');
+        } catch (\Exception $e) {
+            return $time;
         }
     }
 
