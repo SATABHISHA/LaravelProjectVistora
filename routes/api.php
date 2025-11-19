@@ -83,6 +83,7 @@ use App\Http\Controllers\CompanyShiftPolicyApiController;
 use App\Http\Controllers\LeaveRequestApiController;
 use App\Http\Controllers\EmployeeAttendanceSummaryApiController;
 use App\Http\Controllers\NewsFeedController;
+use App\Http\Controllers\CompanyStorageController;
 
 /*
 |--------------------------------------------------------------------------
@@ -721,3 +722,11 @@ Route::get('/newsfeed-with-reviews', [NewsFeedController::class, 'getWithReviews
 
 // Utility Routes
 Route::get('/current-datetime', [UtilityApiController::class, 'currentDateTime']);
+
+// Company Storage Routes
+Route::get('/company-storage', [CompanyStorageController::class, 'index']);
+Route::post('/company-storage/{corpId}', [CompanyStorageController::class, 'store']);
+Route::put('/company-storage/{corpId}/{id}', [CompanyStorageController::class, 'update']);
+Route::delete('/company-storage/{corpId}/{id}', [CompanyStorageController::class, 'destroy']);
+Route::get('/company-storage/summary/{corpId}', [CompanyStorageController::class, 'summary']);
+Route::delete('/company-storage/all/{corpId}', [CompanyStorageController::class, 'destroyAll']);
