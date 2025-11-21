@@ -84,6 +84,7 @@ use App\Http\Controllers\LeaveRequestApiController;
 use App\Http\Controllers\EmployeeAttendanceSummaryApiController;
 use App\Http\Controllers\NewsFeedController;
 use App\Http\Controllers\CompanyStorageController;
+use App\Http\Controllers\FmsController;
 
 /*
 |--------------------------------------------------------------------------
@@ -730,3 +731,9 @@ Route::put('/company-storage/{corpId}/{id}', [CompanyStorageController::class, '
 Route::delete('/company-storage/{corpId}/{id}', [CompanyStorageController::class, 'destroy']);
 Route::get('/company-storage/summary/{corpId}', [CompanyStorageController::class, 'summary']);
 Route::delete('/company-storage/all/{corpId}', [CompanyStorageController::class, 'destroyAll']);
+
+// FMS (File Management System) Routes
+Route::post('/fms/upload-document', [FmsController::class, 'uploadDocument']);
+Route::get('/fms/summary-by-company', [FmsController::class, 'summaryByCompany']);
+Route::get('/fms/files-by-category', [FmsController::class, 'filesByCategory']);
+Route::get('/fms/company-storage-overview', [FmsController::class, 'companyStorageOverview']);
