@@ -85,6 +85,7 @@ use App\Http\Controllers\EmployeeAttendanceSummaryApiController;
 use App\Http\Controllers\NewsFeedController;
 use App\Http\Controllers\CompanyStorageController;
 use App\Http\Controllers\FmsController;
+use App\Http\Controllers\EmployeeListApiController;
 
 /*
 |--------------------------------------------------------------------------
@@ -737,3 +738,6 @@ Route::post('/fms/upload-document', [FmsController::class, 'uploadDocument']);
 Route::get('/fms/summary-by-company', [FmsController::class, 'summaryByCompany']);
 Route::get('/fms/files-by-category', [FmsController::class, 'filesByCategory']);
 Route::get('/fms/company-storage-overview', [FmsController::class, 'companyStorageOverview']);
+
+// Employee List Route
+Route::get('/employee-list', [EmployeeListApiController::class, 'index']);
