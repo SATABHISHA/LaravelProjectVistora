@@ -169,6 +169,7 @@ class FmsController extends Controller
             'corpId' => 'required|string|max:10',
             'companyName' => 'required|string|max:100',
             'fileCategory' => 'required|string|max:50',
+            'empCode' => 'nullable|string|max:20',
         ]);
 
         if ($validator->fails()) {
@@ -179,11 +180,16 @@ class FmsController extends Controller
             ], 422);
         }
 
-        $files = FmsEmployeeDocument::where('corpId', $request->corpId)
+        $query = FmsEmployeeDocument::where('corpId', $request->corpId)
             ->where('companyName', $request->companyName)
-            ->where('fileCategory', $request->fileCategory)
-            ->orderBy('created_at', 'desc')
-            ->get();
+            ->where('fileCategory', $request->fileCategory);
+
+        // Add optional empCode filter
+        if ($request->filled('empCode')) {
+            $query->where('empCode', $request->empCode);
+        }
+
+        $files = $query->orderBy('created_at', 'desc')->get();
 
         $fileList = $files->map(function ($file) {
             $extension = pathinfo($file->filename, PATHINFO_EXTENSION);

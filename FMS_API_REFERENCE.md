@@ -127,12 +127,23 @@ $response | ConvertTo-Json -Depth 8
 GET /fms/files-by-category
 ```
 
-### cURL Example
+### Query Parameters
+- `corpId` (required): Corporation ID
+- `companyName` (required): Company name
+- `fileCategory` (required): File category
+- `empCode` (optional): Employee code filter
+
+### cURL Example (All files in category)
 ```bash
 curl -X GET "http://127.0.0.1:8000/api/fms/files-by-category?corpId=TEST001&companyName=TechCorp+Solutions&fileCategory=Resume"
 ```
 
-### PowerShell Example
+### cURL Example (Filter by employee)
+```bash
+curl -X GET "http://127.0.0.1:8000/api/fms/files-by-category?corpId=TEST001&companyName=TechCorp+Solutions&fileCategory=Resume&empCode=EMP123"
+```
+
+### PowerShell Example (All files)
 ```powershell
 $response = Invoke-RestMethod -Uri "http://127.0.0.1:8000/api/fms/files-by-category" `
   -Method GET `
@@ -144,23 +155,85 @@ $response = Invoke-RestMethod -Uri "http://127.0.0.1:8000/api/fms/files-by-categ
 $response | ConvertTo-Json -Depth 8
 ```
 
-### Response
+### PowerShell Example (Filter by employee)
+```powershell
+$response = Invoke-RestMethod -Uri "http://127.0.0.1:8000/api/fms/files-by-category" `
+  -Method GET `
+  -Body @{
+    corpId = "TEST001"
+    companyName = "TechCorp Solutions"
+    fileCategory = "Resume"
+    empCode = "EMP123"
+  }
+$response | ConvertTo-Json -Depth 8
+```
+
+### Response (All files - 3 total)
 ```json
 {
   "status": true,
   "corpId": "TEST001",
   "companyName": "TechCorp Solutions",
   "fileCategory": "Resume",
-  "totalFiles": 1,
+  "totalFiles": 3,
   "files": [
     {
-      "id": 1,
-      "filename": "resume_1mb.pdf",
+      "id": 3,
+      "filename": "resume_emp001_v2.pdf",
       "fileType": "PDF",
-      "empCode": "EMP123",
-      "file_size": "1 MB",
-      "downloadUrl": "http://127.0.0.1:8000/storage/fms_documents/1763687960_resume_1mb.pdf",
-      "uploaded_at": "2025-11-21T01:19:21.000000Z"
+      "empCode": "EMP001",
+      "file_size": "0.1 MB",
+      "downloadUrl": "http://127.0.0.1:8000/storage/fms_documents/1763687990_resume_emp001_v2.pdf",
+      "uploaded_at": "2025-11-21T01:19:50.000000Z"
+    },
+    {
+      "id": 2,
+      "filename": "resume_emp002.pdf",
+      "fileType": "PDF",
+      "empCode": "EMP002",
+      "file_size": "0.1 MB",
+      "downloadUrl": "http://127.0.0.1:8000/storage/fms_documents/1763687985_resume_emp002.pdf",
+      "uploaded_at": "2025-11-21T01:19:45.000000Z"
+    },
+    {
+      "id": 1,
+      "filename": "resume_emp001_v1.pdf",
+      "fileType": "PDF",
+      "empCode": "EMP001",
+      "file_size": "0.1 MB",
+      "downloadUrl": "http://127.0.0.1:8000/storage/fms_documents/1763687960_resume_emp001_v1.pdf",
+      "uploaded_at": "2025-11-21T01:19:20.000000Z"
+    }
+  ]
+}
+```
+
+### Response (Filtered by empCode=EMP001 - 2 files)
+```json
+{
+  "status": true,
+  "corpId": "TEST001",
+  "companyName": "TechCorp Solutions",
+  "fileCategory": "Resume",
+  "totalFiles": 2,
+  "files": [
+    {
+      "id": 3,
+      "filename": "resume_emp001_v2.pdf",
+      "fileType": "PDF",
+      "empCode": "EMP001",
+      "file_size": "0.1 MB",
+      "downloadUrl": "http://127.0.0.1:8000/storage/fms_documents/1763687990_resume_emp001_v2.pdf",
+      "uploaded_at": "2025-11-21T01:19:50.000000Z"
+    },
+    {
+      "id": 1,
+      "filename": "resume_emp001_v1.pdf",
+      "fileType": "PDF",
+      "empCode": "EMP001",
+      "file_size": "0.1 MB",
+      "downloadUrl": "http://127.0.0.1:8000/storage/fms_documents/1763687960_resume_emp001_v1.pdf",
+      "uploaded_at": "2025-11-21T01:19:20.000000Z"
     }
   ]
 }
