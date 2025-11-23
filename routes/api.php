@@ -85,6 +85,7 @@ use App\Http\Controllers\EmployeeAttendanceSummaryApiController;
 use App\Http\Controllers\NewsFeedController;
 use App\Http\Controllers\CompanyStorageController;
 use App\Http\Controllers\FmsController;
+use App\Http\Controllers\FmsCategoryController;
 use App\Http\Controllers\EmployeeListApiController;
 
 /*
@@ -741,3 +742,9 @@ Route::get('/fms/company-storage-overview', [FmsController::class, 'companyStora
 
 // Employee List Route
 Route::get('/employee-list', [EmployeeListApiController::class, 'index']);
+
+// FMS Category CRUD & Summary Routes
+Route::post('/fms/category', [FmsCategoryController::class, 'store']);
+Route::put('/fms/category/{id}', [FmsCategoryController::class, 'update']);
+Route::delete('/fms/category/{id}', [FmsCategoryController::class, 'destroy']);
+Route::get('/fms/category-summary', [FmsCategoryController::class, 'summary']);
