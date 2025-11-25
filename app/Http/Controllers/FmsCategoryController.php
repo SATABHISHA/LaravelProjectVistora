@@ -141,36 +141,61 @@ class FmsCategoryController extends Controller
         $corpId = $request->corpId;
         $companyName = $request->companyName;
 
-        $query = FmsEmployeeDocument::query()
-            ->where('corpId', $corpId)
+        // Build category filter query
+        $categoryQuery = FmsCategory::where('corpId', $corpId)
             ->where('companyName', $companyName);
 
         if ($request->filled('empCode')) {
-            $query->where('empCode', $request->empCode);
+            $categoryQuery->where('empCode', $request->empCode);
         }
         if ($request->filled('fileCategory')) {
-            $query->where('fileCategory', $request->fileCategory);
+            $categoryQuery->where('fileCategory', $request->fileCategory);
         }
 
-        $aggregated = $query->select(
-            'fileCategory',
-            DB::raw('COUNT(*) as totalFiles'),
-            DB::raw('SUM(file_size) as totalFileSizeBytes')
-        )
-        ->groupBy('fileCategory')
-        ->orderBy('fileCategory')
-        ->get();
+        // Get distinct categories
+        $categories = $categoryQuery->select('fileCategory')
+            ->distinct()
+            ->pluck('fileCategory');
 
-        $data = $aggregated->map(function ($row) {
-            $bytes = (int)$row->totalFileSizeBytes;
+        // If no categories found, return empty
+        if ($categories->isEmpty()) {
+            return response()->json([
+                'status' => true,
+                'message' => 'No categories found',
+                'filters' => [
+                    'corpId' => $corpId,
+                    'companyName' => $companyName,
+                    'empCode' => $request->empCode ?? null,
+                    'fileCategory' => $request->fileCategory ?? null,
+                ],
+                'totalCategories' => 0,
+                'data' => []
+            ]);
+        }
+
+        // Build aggregation for each category
+        $data = $categories->map(function ($category) use ($corpId, $companyName, $request) {
+            $docQuery = FmsEmployeeDocument::where('corpId', $corpId)
+                ->where('companyName', $companyName)
+                ->where('fileCategory', $category);
+
+            if ($request->filled('empCode')) {
+                $docQuery->where('empCode', $request->empCode);
+            }
+
+            $stats = $docQuery->selectRaw('COUNT(*) as totalFiles, COALESCE(SUM(file_size), 0) as totalFileSizeBytes')
+                ->first();
+
+            $bytes = (int)($stats->totalFileSizeBytes ?? 0);
             $mb = $bytes > 0 ? round($bytes / 1048576, 4) : 0;
+
             return [
-                'fileCategory' => $row->fileCategory,
-                'totalFiles' => (int)$row->totalFiles,
+                'fileCategory' => $category,
+                'totalFiles' => (int)($stats->totalFiles ?? 0),
                 'totalFileSizeBytes' => $bytes,
                 'totalFileSizeMB' => $mb,
             ];
-        });
+        })->sortBy('fileCategory')->values();
 
         return response()->json([
             'status' => true,
