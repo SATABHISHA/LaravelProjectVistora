@@ -152,10 +152,9 @@ class FmsCategoryController extends Controller
             $categoryQuery->where('fileCategory', $request->fileCategory);
         }
 
-        // Get distinct categories
-        $categories = $categoryQuery->select('fileCategory')
-            ->distinct()
-            ->pluck('fileCategory');
+        // Get distinct categories with id
+        $categories = $categoryQuery->select('id', 'fileCategory')
+            ->get();
 
         // If no categories found, return empty
         if ($categories->isEmpty()) {
@@ -177,7 +176,7 @@ class FmsCategoryController extends Controller
         $data = $categories->map(function ($category) use ($corpId, $companyName, $request) {
             $docQuery = FmsEmployeeDocument::where('corpId', $corpId)
                 ->where('companyName', $companyName)
-                ->where('fileCategory', $category);
+                ->where('fileCategory', $category->fileCategory);
 
             if ($request->filled('empCode')) {
                 $docQuery->where('empCode', $request->empCode);
@@ -190,7 +189,8 @@ class FmsCategoryController extends Controller
             $mb = $bytes > 0 ? round($bytes / 1048576, 4) : 0;
 
             return [
-                'fileCategory' => $category,
+                'id' => $category->id,
+                'fileCategory' => $category->fileCategory,
                 'totalFiles' => (int)($stats->totalFiles ?? 0),
                 'totalFileSizeBytes' => $bytes,
                 'totalFileSizeMB' => $mb,
