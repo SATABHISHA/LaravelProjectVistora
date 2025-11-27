@@ -3288,5 +3288,231 @@ class EmployeePayrollSalaryProcessApiController extends Controller
         
         return $sum;
     }
+
+    /**
+     * Rollback/Delete initiated salary process for selected employees
+     * Deletes payroll records with status 'Initiated'
+     * 
+     * @param Request $request
+     * @return \Illuminate\Http\JsonResponse
+     */
+    public function rollbackInitiatedSalary(Request $request)
+    {
+        $request->validate([
+            'corpId' => 'required|string|max:10',
+            'companyName' => 'required|string|max:100',
+            'year' => 'required|string|max:4',
+            'month' => 'required|string|max:50',
+            'empCodes' => 'required|array|min:1',
+            'empCodes.*' => 'required|string|max:20',
+        ]);
+
+        try {
+            // Normalize month to month name
+            $month = $request->month;
+            if (is_numeric($month) && $month >= 1 && $month <= 12) {
+                $month = date('F', mktime(0, 0, 0, (int)$month, 1));
+            }
+
+            // Find initiated salary records for the specified employees
+            $initiatedRecords = EmployeePayrollSalaryProcess::where('corpId', $request->corpId)
+                ->where('companyName', $request->companyName)
+                ->where('year', $request->year)
+                ->where('month', $month)
+                ->where('status', 'Initiated')
+                ->whereIn('empCode', $request->empCodes)
+                ->get();
+
+            if ($initiatedRecords->isEmpty()) {
+                return response()->json([
+                    'status' => false,
+                    'message' => 'No initiated salary records found for the specified employees',
+                    'filter' => "corpId: {$request->corpId}, companyName: {$request->companyName}, year: {$request->year}, month: {$month}",
+                    'requested_employees' => $request->empCodes,
+                    'found_employees' => []
+                ], 404);
+            }
+
+            $deletedEmpCodes = $initiatedRecords->pluck('empCode')->toArray();
+            $notFoundEmpCodes = array_diff($request->empCodes, $deletedEmpCodes);
+            
+            // Delete the records
+            $deletedCount = EmployeePayrollSalaryProcess::where('corpId', $request->corpId)
+                ->where('companyName', $request->companyName)
+                ->where('year', $request->year)
+                ->where('month', $month)
+                ->where('status', 'Initiated')
+                ->whereIn('empCode', $request->empCodes)
+                ->delete();
+
+            return response()->json([
+                'status' => true,
+                'message' => "Successfully rolled back initiated salary for {$deletedCount} employees",
+                'filter' => "corpId: {$request->corpId}, companyName: {$request->companyName}, year: {$request->year}, month: {$month}",
+                'summary' => [
+                    'requested_employees' => count($request->empCodes),
+                    'successfully_deleted' => $deletedCount,
+                    'not_found' => count($notFoundEmpCodes)
+                ],
+                'deleted_employees' => $deletedEmpCodes,
+                'not_found_employees' => $notFoundEmpCodes
+            ]);
+
+        } catch (\Exception $e) {
+            return response()->json([
+                'status' => false,
+                'message' => 'Error rolling back initiated salary: ' . $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * Rollback/Delete released salary process for selected employees
+     * Deletes payroll records with status 'Released'
+     * 
+     * @param Request $request
+     * @return \Illuminate\Http\JsonResponse
+     */
+    public function rollbackReleasedSalary(Request $request)
+    {
+        $request->validate([
+            'corpId' => 'required|string|max:10',
+            'companyName' => 'required|string|max:100',
+            'year' => 'required|string|max:4',
+            'month' => 'required|string|max:50',
+            'empCodes' => 'required|array|min:1',
+            'empCodes.*' => 'required|string|max:20',
+        ]);
+
+        try {
+            // Normalize month to month name
+            $month = $request->month;
+            if (is_numeric($month) && $month >= 1 && $month <= 12) {
+                $month = date('F', mktime(0, 0, 0, (int)$month, 1));
+            }
+
+            // Find released salary records for the specified employees
+            $releasedRecords = EmployeePayrollSalaryProcess::where('corpId', $request->corpId)
+                ->where('companyName', $request->companyName)
+                ->where('year', $request->year)
+                ->where('month', $month)
+                ->where('status', 'Released')
+                ->whereIn('empCode', $request->empCodes)
+                ->get();
+
+            if ($releasedRecords->isEmpty()) {
+                return response()->json([
+                    'status' => false,
+                    'message' => 'No released salary records found for the specified employees',
+                    'filter' => "corpId: {$request->corpId}, companyName: {$request->companyName}, year: {$request->year}, month: {$month}",
+                    'requested_employees' => $request->empCodes,
+                    'found_employees' => []
+                ], 404);
+            }
+
+            $deletedEmpCodes = $releasedRecords->pluck('empCode')->toArray();
+            $notFoundEmpCodes = array_diff($request->empCodes, $deletedEmpCodes);
+            
+            // Delete the records
+            $deletedCount = EmployeePayrollSalaryProcess::where('corpId', $request->corpId)
+                ->where('companyName', $request->companyName)
+                ->where('year', $request->year)
+                ->where('month', $month)
+                ->where('status', 'Released')
+                ->whereIn('empCode', $request->empCodes)
+                ->delete();
+
+            return response()->json([
+                'status' => true,
+                'message' => "Successfully rolled back released salary for {$deletedCount} employees",
+                'filter' => "corpId: {$request->corpId}, companyName: {$request->companyName}, year: {$request->year}, month: {$month}",
+                'summary' => [
+                    'requested_employees' => count($request->empCodes),
+                    'successfully_deleted' => $deletedCount,
+                    'not_found' => count($notFoundEmpCodes)
+                ],
+                'deleted_employees' => $deletedEmpCodes,
+                'not_found_employees' => $notFoundEmpCodes
+            ]);
+
+        } catch (\Exception $e) {
+            return response()->json([
+                'status' => false,
+                'message' => 'Error rolling back released salary: ' . $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * Delete entire salary process for a specific month (all employees, all statuses)
+     * 
+     * @param Request $request
+     * @return \Illuminate\Http\JsonResponse
+     */
+    public function deleteSalaryProcessByMonth(Request $request)
+    {
+        $request->validate([
+            'corpId' => 'required|string|max:10',
+            'companyName' => 'required|string|max:100',
+            'year' => 'required|string|max:4',
+            'month' => 'required|string|max:50',
+        ]);
+
+        try {
+            // Normalize month to month name
+            $month = $request->month;
+            if (is_numeric($month) && $month >= 1 && $month <= 12) {
+                $month = date('F', mktime(0, 0, 0, (int)$month, 1));
+            }
+
+            // Get all records for this month before deletion
+            $monthRecords = EmployeePayrollSalaryProcess::where('corpId', $request->corpId)
+                ->where('companyName', $request->companyName)
+                ->where('year', $request->year)
+                ->where('month', $month)
+                ->get();
+
+            if ($monthRecords->isEmpty()) {
+                return response()->json([
+                    'status' => false,
+                    'message' => 'No salary records found for the specified month',
+                    'filter' => "corpId: {$request->corpId}, companyName: {$request->companyName}, year: {$request->year}, month: {$month}"
+                ], 404);
+            }
+
+            // Get status breakdown before deletion
+            $statusBreakdown = $monthRecords->groupBy('status')->map(function ($records) {
+                return [
+                    'count' => $records->count(),
+                    'employees' => $records->pluck('empCode')->toArray()
+                ];
+            });
+
+            $totalRecords = $monthRecords->count();
+            
+            // Delete all records for this month
+            $deletedCount = EmployeePayrollSalaryProcess::where('corpId', $request->corpId)
+                ->where('companyName', $request->companyName)
+                ->where('year', $request->year)
+                ->where('month', $month)
+                ->delete();
+
+            return response()->json([
+                'status' => true,
+                'message' => "Successfully deleted entire salary process for {$month} {$request->year}",
+                'filter' => "corpId: {$request->corpId}, companyName: {$request->companyName}, year: {$request->year}, month: {$month}",
+                'summary' => [
+                    'total_records_deleted' => $deletedCount,
+                    'status_breakdown' => $statusBreakdown
+                ]
+            ]);
+
+        } catch (\Exception $e) {
+            return response()->json([
+                'status' => false,
+                'message' => 'Error deleting salary process: ' . $e->getMessage()
+            ], 500);
+        }
+    }
 }
 

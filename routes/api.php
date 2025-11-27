@@ -598,6 +598,15 @@ Route::post('/employee-payroll/bulk-process', [EmployeePayrollSalaryProcessApiCo
 // NEW: Initiate salary for selected employees using empcode list
 Route::post('/employee-payroll/initiate-selected', [EmployeePayrollSalaryProcessApiController::class, 'initiateSelectedEmployeeSalary']);
 
+// NEW: Rollback/Delete initiated salary process for selected employees
+Route::delete('/employee-payroll/rollback-initiated', [EmployeePayrollSalaryProcessApiController::class, 'rollbackInitiatedSalary']);
+
+// NEW: Rollback/Delete released salary process for selected employees
+Route::delete('/employee-payroll/rollback-released', [EmployeePayrollSalaryProcessApiController::class, 'rollbackReleasedSalary']);
+
+// NEW: Delete entire salary process for a specific month
+Route::delete('/employee-payroll/delete-month', [EmployeePayrollSalaryProcessApiController::class, 'deleteSalaryProcessByMonth']);
+
 // NEW: Get employee details with salary status
 Route::post('/employee-payroll/employee-status', [EmployeePayrollSalaryProcessApiController::class, 'getEmployeeDetailsWithStatus']);
 
