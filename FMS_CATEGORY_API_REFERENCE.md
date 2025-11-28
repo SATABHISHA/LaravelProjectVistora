@@ -63,18 +63,39 @@ curl -X PUT http://127.0.0.1:8000/api/fms/category/15 \
 ## 3. Delete Category
 DELETE /api/fms/category/{id}
 
+Deletes the category record from `fms_categories` table AND all associated documents from `fms_employee_documents` table (filtered by corpId, companyName, empCode, fileCategory).
+
 Response 200:
 {
   "status": true,
-  "message": "Category deleted successfully"
+  "message": "Category and associated documents deleted successfully",
+  "summary": {
+    "category_deleted": true,
+    "documents_deleted": 3
+  }
 }
 
-404 if missing.
+Response fields:
+- `category_deleted`: Always true when category is found and deleted
+- `documents_deleted`: Number of documents deleted from fms_employee_documents table (can be 0)
+
+404 if category not found:
+{
+  "status": false,
+  "message": "Category not found"
+}
 
 Curl:
 ```
 curl -X DELETE http://127.0.0.1:8000/api/fms/category/15
 ```
+
+**Important Notes:**
+- This is a cascading delete operation
+- Deletes category metadata from fms_categories
+- Deletes all matching files from fms_employee_documents (matching on corpId, companyName, empCode, fileCategory)
+- Returns count of deleted documents for verification
+- Cannot be undone - ensure confirmation before deletion
 
 ---
 ## 4. Category Summary
@@ -146,8 +167,14 @@ Notes:
 2. Attempt duplicate create (should 409).
 3. Update fullName only (should succeed).
 4. Update fileCategory to existing one (should 409).
-5. Delete a category and ensure summary excludes its fileCategory if no documents exist.
+5. Delete a category and verify:
+   - Category removed from fms_categories
+   - Associated documents removed from fms_employee_documents
+   - Response shows count of deleted documents
+   - Summary API no longer shows the deleted category
 6. Run summary with/without empCode and fileCategory filters.
+7. Test delete with category that has multiple documents (verify all deleted).
+8. Test delete with category that has no documents (verify documents_deleted: 0).
 
 ---
 ## Migration Reference

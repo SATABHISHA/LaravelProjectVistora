@@ -103,7 +103,7 @@ class FmsCategoryController extends Controller
         ]);
     }
 
-    // Delete category record
+    // Delete category record and associated documents
     public function destroy($id)
     {
         $category = FmsCategory::find($id);
@@ -113,10 +113,24 @@ class FmsCategoryController extends Controller
                 'message' => 'Category not found'
             ], 404);
         }
+
+        // Delete associated documents from fms_employee_documents table
+        $deletedDocuments = FmsEmployeeDocument::where('corpId', $category->corpId)
+            ->where('companyName', $category->companyName)
+            ->where('empCode', $category->empCode)
+            ->where('fileCategory', $category->fileCategory)
+            ->delete();
+
+        // Delete the category record
         $category->delete();
+
         return response()->json([
             'status' => true,
-            'message' => 'Category deleted successfully'
+            'message' => 'Category and associated documents deleted successfully',
+            'summary' => [
+                'category_deleted' => true,
+                'documents_deleted' => $deletedDocuments
+            ]
         ]);
     }
 
