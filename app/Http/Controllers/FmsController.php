@@ -273,4 +273,135 @@ class FmsController extends Controller
             'companies' => $overview,
         ]);
     }
+
+    /**
+     * Delete a document from fms_employee_documents
+     */
+    public function deleteDocument($id)
+    {
+        $document = FmsEmployeeDocument::find($id);
+        
+        if (!$document) {
+            return response()->json([
+                'status' => false,
+                'message' => 'Document not found'
+            ], 404);
+        }
+
+        // Store file info before deletion
+        $corpId = $document->corpId;
+        $fileSize = $document->file_size;
+        $fileName = $document->filename;
+        $filePath = $document->file;
+
+        // Delete physical file from storage if path exists
+        if ($filePath && Storage::disk('public')->exists($filePath)) {
+            Storage::disk('public')->delete($filePath);
+        }
+
+        // Delete database record
+        $document->delete();
+
+        return response()->json([
+            'status' => true,
+            'message' => 'Document deleted successfully',
+            'deletedDocument' => [
+                'id' => $id,
+                'filename' => $fileName,
+                'corpId' => $corpId,
+                'fileSize' => round($fileSize / 1048576, 2) . ' MB'
+            ]
+        ]);
+    }
+
+    /**
+     * Get storage statistics: total files, total GB used, available space
+     */
+    public function storageStatistics(Request $request)
+    {
+        $validator = Validator::make($request->all(), [
+            'corpId' => 'required|string|max:10',
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json([
+                'status' => false,
+                'message' => 'Validation failed',
+                'errors' => $validator->errors()
+            ], 422);
+        }
+
+        $corpId = $request->corpId;
+
+        // Get total files count
+        $totalFiles = FmsEmployeeDocument::where('corpId', $corpId)->count();
+
+        // Get total storage used (in bytes) from fms_employee_documents
+        $totalUsedBytes = FmsEmployeeDocument::where('corpId', $corpId)
+            ->sum('file_size');
+
+        // Get storage quota from company_storage (aggregate all records for this corpId)
+        $companyStorages = CompanyStorage::where('corpId', $corpId)->get();
+        
+        if ($companyStorages->isEmpty()) {
+            return response()->json([
+                'status' => false,
+                'message' => 'Company storage record not found for this corpId'
+            ], 404);
+        }
+
+        // Calculate total quota in bytes
+        $totalQuotaBytes = 0;
+        foreach ($companyStorages as $storage) {
+            $size = $storage->size;
+            $unit = strtoupper($storage->sizeUit);
+            
+            if ($unit === 'GB') {
+                $totalQuotaBytes += $size * 1073741824; // GB to bytes
+            } elseif ($unit === 'MB') {
+                $totalQuotaBytes += $size * 1048576; // MB to bytes
+            } elseif ($unit === 'KB') {
+                $totalQuotaBytes += $size * 1024; // KB to bytes
+            } else {
+                $totalQuotaBytes += $size; // Already in bytes
+            }
+        }
+
+        $availableBytes = max(0, $totalQuotaBytes - $totalUsedBytes);
+
+        // Convert to GB
+        $totalUsedGB = round($totalUsedBytes / 1073741824, 4);
+        $totalQuotaGB = round($totalQuotaBytes / 1073741824, 4);
+        $availableGB = round($availableBytes / 1073741824, 4);
+
+        // Convert to MB as well
+        $totalUsedMB = round($totalUsedBytes / 1048576, 2);
+        $totalQuotaMB = round($totalQuotaBytes / 1048576, 2);
+        $availableMB = round($availableBytes / 1048576, 2);
+
+        // Calculate usage percentage
+        $usagePercentage = $totalQuotaBytes > 0 ? round(($totalUsedBytes / $totalQuotaBytes) * 100, 2) : 0;
+
+        return response()->json([
+            'status' => true,
+            'corpId' => $corpId,
+            'statistics' => [
+                'totalFiles' => $totalFiles,
+                'storage' => [
+                    'usedGB' => $totalUsedGB,
+                    'quotaGB' => $totalQuotaGB,
+                    'availableGB' => $availableGB,
+                    'usedMB' => $totalUsedMB,
+                    'quotaMB' => $totalQuotaMB,
+                    'availableMB' => $availableMB,
+                    'usagePercentage' => $usagePercentage . '%'
+                ],
+                'bytes' => [
+                    'used' => $totalUsedBytes,
+                    'quota' => $totalQuotaBytes,
+                    'available' => $availableBytes
+                ]
+            ]
+        ]);
+    }
 }

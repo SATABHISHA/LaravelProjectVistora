@@ -748,6 +748,8 @@ Route::post('/fms/upload-document', [FmsController::class, 'uploadDocument']);
 Route::get('/fms/summary-by-company', [FmsController::class, 'summaryByCompany']);
 Route::get('/fms/files-by-category', [FmsController::class, 'filesByCategory']);
 Route::get('/fms/company-storage-overview', [FmsController::class, 'companyStorageOverview']);
+Route::delete('/fms/document/{id}', [FmsController::class, 'deleteDocument']);
+Route::get('/fms/storage-statistics', [FmsController::class, 'storageStatistics']);
 
 // Employee List Route
 Route::get('/employee-list', [EmployeeListApiController::class, 'index']);

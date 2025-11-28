@@ -358,6 +358,116 @@ http://127.0.0.1:8000/storage/fms_documents/1763687960_resume_1mb.pdf
 
 ---
 
+## 5. Delete Document
+```bash
+DELETE /fms/document/{id}
+```
+
+Deletes a document from the `fms_employee_documents` table and removes the physical file from storage.
+
+### Path Parameters
+- `id` (required): Document ID
+
+### cURL Example
+```bash
+curl -X DELETE http://127.0.0.1:8000/api/fms/document/15
+```
+
+### PowerShell Example
+```powershell
+Invoke-RestMethod -Uri "http://127.0.0.1:8000/api/fms/document/15" -Method Delete
+```
+
+### Response (Success - 200)
+```json
+{
+  "status": true,
+  "message": "Document deleted successfully",
+  "deletedDocument": {
+    "id": "15",
+    "filename": "resume1.pdf",
+    "corpId": "TEST001",
+    "fileSize": "2 MB"
+  }
+}
+```
+
+### Response (Not Found - 404)
+```json
+{
+  "status": false,
+  "message": "Document not found"
+}
+```
+
+---
+
+## 6. Storage Statistics
+```bash
+GET /fms/storage-statistics
+```
+
+Returns total files count, storage used, storage quota, and available space for a given corpId.
+
+### Query Parameters
+- `corpId` (required): Corporation ID
+
+### cURL Example
+```bash
+curl -X GET "http://127.0.0.1:8000/api/fms/storage-statistics?corpId=TEST001"
+```
+
+### PowerShell Example
+```powershell
+$response = Invoke-RestMethod -Uri "http://127.0.0.1:8000/api/fms/storage-statistics" `
+  -Method GET `
+  -Body @{
+    corpId = "TEST001"
+  }
+$response | ConvertTo-Json -Depth 5
+```
+
+### Response (Success - 200)
+```json
+{
+  "status": true,
+  "corpId": "TEST001",
+  "statistics": {
+    "totalFiles": 2,
+    "storage": {
+      "usedGB": 0.0044,
+      "quotaGB": 0.0977,
+      "availableGB": 0.0933,
+      "usedMB": 4.5,
+      "quotaMB": 100,
+      "availableMB": 95.5,
+      "usagePercentage": "4.5%"
+    },
+    "bytes": {
+      "used": 4718592,
+      "quota": 104857600,
+      "available": 100139008
+    }
+  }
+}
+```
+
+### Response (Not Found - 404)
+```json
+{
+  "status": false,
+  "message": "Company storage record not found for this corpId"
+}
+```
+
+**Notes**:
+- Storage quota is calculated from all `company_storage` records for the given corpId
+- Storage used is calculated from the sum of all file sizes in `fms_employee_documents`
+- Supports multiple storage units (KB, MB, GB) and aggregates them
+- Usage percentage shows how much of the allocated quota is being used
+
+---
+
 ## Database Schema
 
 ### fms_employee_documents
