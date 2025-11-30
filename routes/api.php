@@ -757,6 +757,9 @@ Route::get('/fms/storage-statistics', [FmsController::class, 'storageStatistics'
 // Employee List Route
 Route::get('/employee-list', [EmployeeListApiController::class, 'index']);
 
+// Employee Birthdays Route
+Route::get('/birthdays/today', [EmployeeListApiController::class, 'getTodaysBirthdays']);
+
 // FMS Category CRUD & Summary Routes
 Route::post('/fms/category', [FmsCategoryController::class, 'store']);
 Route::put('/fms/category/{id}', [FmsCategoryController::class, 'update']);
