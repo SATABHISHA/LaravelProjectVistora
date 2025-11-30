@@ -522,8 +522,24 @@ class AttendanceApiController extends Controller
             // Create a map of holidays by date for quick lookup
             $holidaysByDate = [];
             foreach ($holidays as $holiday) {
-                $holidayDate = Carbon::parse($holiday->holidayDate)->format('Y-m-d');
-                $holidaysByDate[$holidayDate] = $holiday;
+                try {
+                    // Try to parse the holiday date - handle multiple formats
+                    $holidayDate = $holiday->holidayDate;
+                    
+                    // Check if date is in dd/mm/yyyy format
+                    if (preg_match('/^(\d{2})\/(\d{2})\/(\d{4})$/', $holidayDate, $matches)) {
+                        // Convert dd/mm/yyyy to yyyy-mm-dd
+                        $holidayDate = $matches[3] . '-' . $matches[2] . '-' . $matches[1];
+                    } else {
+                        // Use Carbon to parse other formats
+                        $holidayDate = Carbon::parse($holidayDate)->format('Y-m-d');
+                    }
+                    
+                    $holidaysByDate[$holidayDate] = $holiday;
+                } catch (\Exception $e) {
+                    // Skip this holiday if date parsing fails
+                    continue;
+                }
             }
             
             // Build attendance query
@@ -572,15 +588,31 @@ class AttendanceApiController extends Controller
             // Create a map of leave requests by empCode and date
             $leavesByEmpCodeAndDate = [];
             foreach ($leaveRequests as $leave) {
-                $fromDate = Carbon::parse($leave->from_date);
-                $toDate = Carbon::parse($leave->to_date);
-                
-                // Iterate through each date in the leave period
-                for ($date = $fromDate->copy(); $date->lte($toDate); $date->addDay()) {
-                    $dateKey = $date->format('Y-m-d');
-                    if ($date->gte(Carbon::parse($startDate)) && $date->lte(Carbon::parse($endDate))) {
-                        $leavesByEmpCodeAndDate[$leave->empcode][$dateKey] = $leave->status;
+                try {
+                    // Parse from_date - handle multiple formats
+                    $fromDateStr = $leave->from_date;
+                    if (preg_match('/^(\d{2})\/(\d{2})\/(\d{4})$/', $fromDateStr, $matches)) {
+                        $fromDateStr = $matches[3] . '-' . $matches[2] . '-' . $matches[1];
                     }
+                    $fromDate = Carbon::parse($fromDateStr);
+                    
+                    // Parse to_date - handle multiple formats
+                    $toDateStr = $leave->to_date;
+                    if (preg_match('/^(\d{2})\/(\d{2})\/(\d{4})$/', $toDateStr, $matches)) {
+                        $toDateStr = $matches[3] . '-' . $matches[2] . '-' . $matches[1];
+                    }
+                    $toDate = Carbon::parse($toDateStr);
+                    
+                    // Iterate through each date in the leave period
+                    for ($date = $fromDate->copy(); $date->lte($toDate); $date->addDay()) {
+                        $dateKey = $date->format('Y-m-d');
+                        if ($date->gte(Carbon::parse($startDate)) && $date->lte(Carbon::parse($endDate))) {
+                            $leavesByEmpCodeAndDate[$leave->empcode][$dateKey] = $leave->status;
+                        }
+                    }
+                } catch (\Exception $e) {
+                    // Skip this leave request if date parsing fails
+                    continue;
                 }
             }
             
