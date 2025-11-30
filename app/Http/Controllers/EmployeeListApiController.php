@@ -200,5 +200,148 @@ class EmployeeListApiController extends Controller
             ], 500);
         }
     }
+
+    /**
+     * Get employee leave summary including leave balance, absences, and sick leave
+     * Filtered by corp_id, company_name, and empcode
+     * 
+     * GET /api/employee/leave-summary?corp_id=xxx&company_name=xxx&empcode=xxx
+     */
+    public function getLeaveSummary(Request $request)
+    {
+        $validator = Validator::make($request->all(), [
+            'corp_id' => 'required|string',
+            'company_name' => 'required|string',
+            'empcode' => 'required|string',
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json([
+                'status' => false,
+                'message' => 'Validation failed',
+                'errors' => $validator->errors()
+            ], 422);
+        }
+
+        try {
+            $corpId = $request->corp_id;
+            $companyName = $request->company_name;
+            $empcode = $request->empcode;
+
+            // Get current month start and end dates
+            $now = Carbon::now('Asia/Kolkata');
+            $monthStart = $now->copy()->startOfMonth()->format('Y-m-d');
+            $monthEnd = $now->copy()->endOfMonth()->format('Y-m-d');
+            $currentMonth = $now->format('F Y');
+
+            // Calculate total absences for current month from attendances table
+            $totalAbsences = DB::table('attendances')
+                ->where('corpId', $corpId)
+                ->where('empCode', $empcode)
+                ->whereBetween('date', [$monthStart, $monthEnd])
+                ->where(function($query) {
+                    $query->where('attendanceStatus', 'Absent')
+                          ->orWhere('status', 'ABSENT');
+                })
+                ->count();
+
+            // Get leave policies for this corp
+            $leavePolicies = DB::table('leave_policy')
+                ->where('corpid', $corpId)
+                ->get();
+
+            // Calculate total leave entitlement and used leaves
+            $totalLeaveEntitlement = 0;
+            $sickLeaveEntitlement = 0;
+            
+            foreach ($leavePolicies as $policy) {
+                $days = (float) $policy->toDays;
+                $totalLeaveEntitlement += $days;
+                
+                // Check if this policy includes sick leave
+                $leaveTypes = explode(',', $policy->leaveType);
+                foreach ($leaveTypes as $type) {
+                    if (stripos(trim($type), 'Sick') !== false) {
+                        $sickLeaveEntitlement += $days;
+                    }
+                }
+            }
+
+            // Get approved leave requests for this employee (all time)
+            $approvedLeaves = DB::table('leave_request')
+                ->where('corp_id', $corpId)
+                ->where('company_name', $companyName)
+                ->where('empcode', $empcode)
+                ->where('status', 'Approved')
+                ->get();
+
+            // Calculate total used leave days
+            $totalUsedLeaves = 0;
+            $sickLeaveUsed = 0;
+
+            foreach ($approvedLeaves as $leave) {
+                try {
+                    // Parse dates - handle dd/mm/yyyy format
+                    $fromDateStr = $leave->from_date;
+                    $toDateStr = $leave->to_date;
+                    
+                    if (preg_match('/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/', $fromDateStr)) {
+                        $fromDate = Carbon::createFromFormat('d/m/Y', $fromDateStr);
+                        $toDate = Carbon::createFromFormat('d/m/Y', $toDateStr);
+                    } else {
+                        $fromDate = Carbon::parse($fromDateStr);
+                        $toDate = Carbon::parse($toDateStr);
+                    }
+                    
+                    $days = $fromDate->diffInDays($toDate) + 1;
+                    $totalUsedLeaves += $days;
+                    
+                    // Check if it's sick leave
+                    if (stripos($leave->reason, 'Sick') !== false) {
+                        $sickLeaveUsed += $days;
+                    }
+                } catch (\Exception $e) {
+                    // Skip if date parsing fails
+                    continue;
+                }
+            }
+
+            // Calculate balances
+            $totalLeaveBalance = max(0, $totalLeaveEntitlement - $totalUsedLeaves);
+            $sickLeaveBalance = max(0, $sickLeaveEntitlement - $sickLeaveUsed);
+
+            return response()->json([
+                'status' => true,
+                'message' => 'Leave summary retrieved successfully',
+                'corp_id' => $corpId,
+                'company_name' => $companyName,
+                'empcode' => $empcode,
+                'current_month' => $currentMonth,
+                'data' => [
+                    'leave_balance' => [
+                        'total_entitlement' => $totalLeaveEntitlement,
+                        'total_used' => $totalUsedLeaves,
+                        'total_balance' => $totalLeaveBalance
+                    ],
+                    'sick_leave' => [
+                        'total_entitlement' => $sickLeaveEntitlement,
+                        'total_used' => $sickLeaveUsed,
+                        'total_balance' => $sickLeaveBalance
+                    ],
+                    'current_month_absences' => [
+                        'month' => $currentMonth,
+                        'total_absent_days' => $totalAbsences
+                    ]
+                ]
+            ], 200);
+
+        } catch (\Exception $e) {
+            return response()->json([
+                'status' => false,
+                'message' => 'An error occurred while fetching leave summary',
+                'error' => $e->getMessage()
+            ], 500);
+        }
+    }
 }
 

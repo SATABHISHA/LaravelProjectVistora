@@ -760,6 +760,9 @@ Route::get('/employee-list', [EmployeeListApiController::class, 'index']);
 // Employee Birthdays Route
 Route::get('/birthdays/today', [EmployeeListApiController::class, 'getTodaysBirthdays']);
 
+// Employee Leave Summary Route
+Route::get('/employee/leave-summary', [EmployeeListApiController::class, 'getLeaveSummary']);
+
 // FMS Category CRUD & Summary Routes
 Route::post('/fms/category', [FmsCategoryController::class, 'store']);
 Route::put('/fms/category/{id}', [FmsCategoryController::class, 'update']);
