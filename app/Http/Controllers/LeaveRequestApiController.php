@@ -694,4 +694,120 @@ class LeaveRequestApiController extends Controller
             ], 500);
         }
     }
+
+    /**
+     * Fetch employee's own leave requests filtered by status
+     * No admin authorization required - employees can only see their own requests
+     *
+     * @param  \Illuminate\Http\Request  $request
+     * @param  string  $status
+     * @param  string  $corp_id
+     * @param  string  $company_name
+     * @param  string  $empcode
+     * @return \Illuminate\Http\JsonResponse
+     */
+    public function fetchEmployeeLeavesByStatus(Request $request, $status, $corp_id, $company_name, $empcode)
+    {
+        try {
+            // Sanitize the status input (e.g., convert 'pending' to 'Pending')
+            $formattedStatus = ucfirst(strtolower($status));
+
+            // Validate status
+            $validStatuses = ['Pending', 'Approved', 'Rejected', 'Returned'];
+            if (!in_array($formattedStatus, $validStatuses)) {
+                return response()->json([
+                    'status' => false,
+                    'message' => "Invalid status. Valid statuses are: " . implode(', ', $validStatuses)
+                ], 400);
+            }
+
+            // Get total count for this specific status, corp_id, company_name, and empcode
+            $totalCount = LeaveRequest::where('corp_id', $corp_id)
+                ->where('company_name', $company_name)
+                ->where('empcode', $empcode)
+                ->where('status', $formattedStatus)
+                ->count();
+
+            // Fetch paginated leave requests filtered by status
+            $perPage = $request->input('per_page', 15);
+
+            $leaveRequests = LeaveRequest::where('corp_id', $corp_id)
+                ->where('company_name', $company_name)
+                ->where('empcode', $empcode)
+                ->where('status', $formattedStatus)
+                ->orderBy('created_at', 'desc')
+                ->paginate($perPage);
+
+            if ($leaveRequests->isEmpty()) {
+                return response()->json([
+                    'status' => true,
+                    'message' => "No {$formattedStatus} leave requests found.",
+                    'total_count' => $totalCount,
+                    'data' => []
+                ], 200);
+            }
+
+            // Calculate totalNoDays and nameInitials for each leave request
+            $leaveRequests->getCollection()->transform(function ($leaveRequest) {
+                try {
+                    // Parse dates - handle dd/mm/yyyy format
+                    $fromDateStr = $leaveRequest->from_date;
+                    $toDateStr = $leaveRequest->to_date;
+                    
+                    // Try dd/mm/yyyy format first
+                    if (preg_match('/^(\d{2})\/(\d{2})\/(\d{4})$/', $fromDateStr)) {
+                        $fromDate = Carbon::createFromFormat('d/m/Y', $fromDateStr);
+                        $toDate = Carbon::createFromFormat('d/m/Y', $toDateStr);
+                    } else {
+                        // Fallback to standard parsing
+                        $fromDate = Carbon::parse($fromDateStr);
+                        $toDate = Carbon::parse($toDateStr);
+                    }
+                    
+                    $leaveRequest->totalNoDays = $fromDate->diffInDays($toDate) + 1;
+                } catch (\Exception $e) {
+                    $leaveRequest->totalNoDays = 1; // Default to 1 day if date parsing fails
+                }
+
+                // Calculate nameInitials from employee details
+                try {
+                    $employeeDetails = DB::table('employee_details')
+                        ->where('corp_id', $leaveRequest->corp_id)
+                        ->where('EmpCode', $leaveRequest->empcode)
+                        ->first();
+                    
+                    if ($employeeDetails) {
+                        $firstInitial = $employeeDetails->FirstName ? strtoupper(substr($employeeDetails->FirstName, 0, 1)) : '';
+                        $lastInitial = $employeeDetails->LastName ? strtoupper(substr($employeeDetails->LastName, 0, 1)) : '';
+                        $leaveRequest->nameInitials = $firstInitial . $lastInitial;
+                    } else {
+                        $leaveRequest->nameInitials = 'NA';
+                    }
+                } catch (\Exception $e) {
+                    $leaveRequest->nameInitials = 'NA';
+                }
+
+                return $leaveRequest;
+            });
+
+            return response()->json([
+                'status' => true,
+                'message' => "{$formattedStatus} leave requests retrieved successfully.",
+                'corp_id' => $corp_id,
+                'company_name' => $company_name,
+                'empcode' => $empcode,
+                'request_status' => $formattedStatus,
+                'total_count' => $totalCount,
+                'data' => $leaveRequests
+            ], 200);
+
+        } catch (\Exception $e) {
+            return response()->json([
+                'status' => false,
+                'message' => 'An error occurred while fetching leave requests.',
+                'error' => $e->getMessage()
+            ], 500);
+        }
+    }
 }
+

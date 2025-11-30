@@ -665,7 +665,7 @@ Route::get('/company-shift-policy/corp/{corp_id}', [CompanyShiftPolicyApiControl
 // Route for submitting a leave request
 Route::post('/leave-request', [LeaveRequestApiController::class, 'store']);
 
-// Dynamic route to fetch leave requests by status
+// Dynamic route to fetch leave requests by status (Admin/Supervisor only)
 Route::get('/leave-requests/{status}/{corp_id}/{empcode}', [LeaveRequestApiController::class, 'fetchRequestsByStatus']);
 
 // New route to update the status of a leave request
@@ -673,6 +673,9 @@ Route::patch('/leave-request/{id}', [LeaveRequestApiController::class, 'updateSt
 
 // New route to fetch all leave requests for a specific employee
 Route::get('/leave-requests/employee/{corp_id}/{company_name}/{empcode}', [LeaveRequestApiController::class, 'fetchForEmployee']);
+
+// Employee-specific route to fetch their own leave requests by status (No admin authorization required)
+Route::get('/employee/leave-requests/{status}/{corp_id}/{company_name}/{empcode}', [LeaveRequestApiController::class, 'fetchEmployeeLeavesByStatus']);
 
 // Get people on leave today (Approved status)
 Route::get('/people-on-leave-today/{corp_id}/{empcode}', [LeaveRequestApiController::class, 'getPeopleOnLeaveToday']);
