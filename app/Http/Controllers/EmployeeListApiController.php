@@ -245,6 +245,15 @@ class EmployeeListApiController extends Controller
                 ->distinct()
                 ->count('date');
 
+            // Calculate total present days for current month
+            $totalPresent = DB::table('attendances')
+                ->where('corpId', $corpId)
+                ->where('empCode', $empcode)
+                ->whereBetween('date', [$monthStart, $monthEnd])
+                ->where('attendanceStatus', 'Present')
+                ->distinct()
+                ->count('date');
+
             // For debugging: get sample absence records
             $sampleAbsences = DB::table('attendances')
                 ->where('corpId', $corpId)
@@ -340,8 +349,9 @@ class EmployeeListApiController extends Controller
                         'total_used' => $sickLeaveUsed,
                         'total_balance' => $sickLeaveBalance
                     ],
-                    'current_month_absences' => [
+                    'current_month_attendance' => [
                         'month' => $currentMonth,
+                        'total_present_days' => $totalPresent,
                         'total_absent_days' => $totalAbsences,
                         'date_range' => $monthStart . ' to ' . $monthEnd,
                         'sample_absence_dates' => $sampleAbsences->pluck('date')->toArray()
