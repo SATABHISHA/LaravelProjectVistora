@@ -235,15 +235,27 @@ class EmployeeListApiController extends Controller
             $currentMonth = $now->format('F Y');
 
             // Calculate total absences for current month from attendances table
+            // Only count records where attendanceStatus is specifically 'Absent'
+            // Use DISTINCT to avoid counting duplicate records for the same date
             $totalAbsences = DB::table('attendances')
                 ->where('corpId', $corpId)
                 ->where('empCode', $empcode)
                 ->whereBetween('date', [$monthStart, $monthEnd])
-                ->where(function($query) {
-                    $query->where('attendanceStatus', 'Absent')
-                          ->orWhere('status', 'ABSENT');
-                })
-                ->count();
+                ->where('attendanceStatus', 'Absent')
+                ->distinct()
+                ->count('date');
+
+            // For debugging: get sample absence records
+            $sampleAbsences = DB::table('attendances')
+                ->where('corpId', $corpId)
+                ->where('empCode', $empcode)
+                ->whereBetween('date', [$monthStart, $monthEnd])
+                ->where('attendanceStatus', 'Absent')
+                ->distinct()
+                ->select('date', 'attendanceStatus', 'status')
+                ->orderBy('date')
+                ->limit(5)
+                ->get();
 
             // Get leave policies for this corp
             $leavePolicies = DB::table('leave_policy')
@@ -330,7 +342,9 @@ class EmployeeListApiController extends Controller
                     ],
                     'current_month_absences' => [
                         'month' => $currentMonth,
-                        'total_absent_days' => $totalAbsences
+                        'total_absent_days' => $totalAbsences,
+                        'date_range' => $monthStart . ' to ' . $monthEnd,
+                        'sample_absence_dates' => $sampleAbsences->pluck('date')->toArray()
                     ]
                 ]
             ], 200);
