@@ -709,39 +709,55 @@ class LeaveRequestApiController extends Controller
     public function fetchEmployeeLeavesByStatus(Request $request, $status, $corp_id, $company_name, $empcode)
     {
         try {
-            // Sanitize the status input (e.g., convert 'pending' to 'Pending')
+            // Sanitize the status input (e.g., convert 'pending' to 'Pending', or 'all' to 'All')
             $formattedStatus = ucfirst(strtolower($status));
 
-            // Validate status
-            $validStatuses = ['Pending', 'Approved', 'Rejected', 'Returned'];
-            if (!in_array($formattedStatus, $validStatuses)) {
-                return response()->json([
-                    'status' => false,
-                    'message' => "Invalid status. Valid statuses are: " . implode(', ', $validStatuses)
-                ], 400);
+            // Check if status is 'All' - return all statuses
+            $showAllStatuses = ($formattedStatus === 'All');
+
+            // Validate status if not 'All'
+            if (!$showAllStatuses) {
+                $validStatuses = ['Pending', 'Approved', 'Rejected', 'Returned'];
+                if (!in_array($formattedStatus, $validStatuses)) {
+                    return response()->json([
+                        'status' => false,
+                        'message' => "Invalid status. Valid statuses are: " . implode(', ', $validStatuses) . ", All"
+                    ], 400);
+                }
             }
 
-            // Get total count for this specific status, corp_id, company_name, and empcode
-            $totalCount = LeaveRequest::where('corp_id', $corp_id)
+            // Build base query
+            $query = LeaveRequest::where('corp_id', $corp_id)
                 ->where('company_name', $company_name)
-                ->where('empcode', $empcode)
-                ->where('status', $formattedStatus)
-                ->count();
+                ->where('empcode', $empcode);
 
-            // Fetch paginated leave requests filtered by status
+            // Add status filter only if not 'All'
+            if (!$showAllStatuses) {
+                $query->where('status', $formattedStatus);
+            }
+
+            // Get total count
+            $totalCount = $query->count();
+
+            // Fetch paginated leave requests
             $perPage = $request->input('per_page', 15);
 
             $leaveRequests = LeaveRequest::where('corp_id', $corp_id)
                 ->where('company_name', $company_name)
-                ->where('empcode', $empcode)
-                ->where('status', $formattedStatus)
-                ->orderBy('created_at', 'desc')
+                ->where('empcode', $empcode);
+
+            // Add status filter only if not 'All'
+            if (!$showAllStatuses) {
+                $leaveRequests->where('status', $formattedStatus);
+            }
+
+            $leaveRequests = $leaveRequests->orderBy('created_at', 'desc')
                 ->paginate($perPage);
 
             if ($leaveRequests->isEmpty()) {
                 return response()->json([
                     'status' => true,
-                    'message' => "No {$formattedStatus} leave requests found.",
+                    'message' => $showAllStatuses ? "No leave requests found." : "No {$formattedStatus} leave requests found.",
                     'total_count' => $totalCount,
                     'data' => []
                 ], 200);
@@ -792,11 +808,11 @@ class LeaveRequestApiController extends Controller
 
             return response()->json([
                 'status' => true,
-                'message' => "{$formattedStatus} leave requests retrieved successfully.",
+                'message' => $showAllStatuses ? "All leave requests retrieved successfully." : "{$formattedStatus} leave requests retrieved successfully.",
                 'corp_id' => $corp_id,
                 'company_name' => $company_name,
                 'empcode' => $empcode,
-                'request_status' => $formattedStatus,
+                'request_status' => $showAllStatuses ? 'All' : $formattedStatus,
                 'total_count' => $totalCount,
                 'data' => $leaveRequests
             ], 200);
