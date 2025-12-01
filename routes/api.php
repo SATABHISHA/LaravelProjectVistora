@@ -753,6 +753,7 @@ Route::get('/fms/files-by-category', [FmsController::class, 'filesByCategory']);
 Route::get('/fms/company-storage-overview', [FmsController::class, 'companyStorageOverview']);
 Route::delete('/fms/document/{id}', [FmsController::class, 'deleteDocument']);
 Route::get('/fms/storage-statistics', [FmsController::class, 'storageStatistics']);
+Route::get('/fms/employee-file-summary', [FmsController::class, 'employeeFileSummary']);
 
 // Employee List Route
 Route::get('/employee-list', [EmployeeListApiController::class, 'index']);

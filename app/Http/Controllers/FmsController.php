@@ -404,4 +404,49 @@ class FmsController extends Controller
             ]
         ]);
     }
+    /**
+     * Get total files and total GB used by filtering corpId, companyName, empCode, fileCategory
+     * If fileCategory is 'ALL', calculates for all categories
+     * GET /api/fms/employee-file-summary
+     */
+    public function employeeFileSummary(Request $request)
+    {
+        $validator = Validator::make($request->all(), [
+            'corpId' => 'required|string|max:10',
+            'companyName' => 'required|string|max:100',
+            'empCode' => 'required|string|max:20',
+            'fileCategory' => 'required|string|max:50',
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json([
+                'status' => false,
+                'message' => 'Validation failed',
+                'errors' => $validator->errors()
+            ], 422);
+        }
+
+        $query = FmsEmployeeDocument::where('corpId', $request->corpId)
+            ->where('companyName', $request->companyName)
+            ->where('empCode', $request->empCode);
+
+        if (strtoupper($request->fileCategory) !== 'ALL') {
+            $query->where('fileCategory', $request->fileCategory);
+        }
+
+        $totalFiles = $query->count();
+        $totalSizeBytes = $query->sum('file_size');
+        $totalSizeGB = $totalSizeBytes / 1073741824;
+
+        return response()->json([
+            'status' => true,
+            'corpId' => $request->corpId,
+            'companyName' => $request->companyName,
+            'empCode' => $request->empCode,
+            'fileCategory' => $request->fileCategory,
+            'totalFiles' => $totalFiles,
+            'totalSizeGB' => round($totalSizeGB, 4),
+            'totalSizeBytes' => $totalSizeBytes,
+        ]);
+    }
 }
