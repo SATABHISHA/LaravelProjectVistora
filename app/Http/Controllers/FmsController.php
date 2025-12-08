@@ -200,7 +200,7 @@ class FmsController extends Controller
                 'fileType' => strtoupper($extension),
                 'empCode' => $file->empCode,
                 'file_size' => round($file->file_size / 1048576, 2) . ' MB',
-                'downloadUrl' => url('storage/' . $file->file),
+                'downloadUrl' => asset('storage/' . $file->file),
                 'uploaded_at' => $file->created_at,
             ];
         });
