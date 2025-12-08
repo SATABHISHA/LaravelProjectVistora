@@ -194,13 +194,17 @@ class FmsController extends Controller
         $fileList = $files->map(function ($file) {
             $extension = pathinfo($file->filename, PATHINFO_EXTENSION);
             
+            // Generate proper download URL
+            $baseUrl = rtrim(config('app.url'), '/');
+            $downloadUrl = $baseUrl . '/storage/' . $file->file;
+            
             return [
                 'id' => $file->id,
                 'filename' => $file->filename,
                 'fileType' => strtoupper($extension),
                 'empCode' => $file->empCode,
                 'file_size' => round($file->file_size / 1048576, 2) . ' MB',
-                'downloadUrl' => url('storage/' . $file->file),
+                'downloadUrl' => $downloadUrl,
                 'uploaded_at' => $file->created_at,
             ];
         });
