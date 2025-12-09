@@ -453,4 +453,65 @@ class FmsController extends Controller
             'totalSizeBytes' => $totalSizeBytes,
         ]);
     }
+
+    /**
+     * Diagnostic endpoint to check file paths and symlink setup
+     */
+    public function diagnosticCheck(Request $request)
+    {
+        $fileId = $request->query('fileId');
+        
+        $diagnostics = [
+            'server_info' => [
+                'app_url' => config('app.url'),
+                'storage_path' => storage_path('app/public'),
+                'public_path' => public_path(),
+                'base_path' => base_path(),
+            ],
+            'symlink_check' => [
+                'public_folder_exists' => is_dir(base_path('public')),
+                'public_folder_is_link' => is_link(base_path('public')),
+                'storage_app_public_exists' => is_dir(storage_path('app/public')),
+                'fms_documents_folder_exists' => is_dir(storage_path('app/public/fms_documents')),
+            ],
+        ];
+
+        // Check symlink target if it exists
+        if (is_link(base_path('public'))) {
+            $diagnostics['symlink_check']['public_symlink_target'] = readlink(base_path('public'));
+        }
+
+        // If fileId provided, check specific file
+        if ($fileId) {
+            $document = FmsEmployeeDocument::find($fileId);
+            
+            if ($document) {
+                $storagePath = storage_path('app/public/' . $document->file);
+                $baseUrl = rtrim(config('app.url'), '/');
+                
+                $diagnostics['file_info'] = [
+                    'id' => $document->id,
+                    'filename' => $document->filename,
+                    'db_file_path' => $document->file,
+                    'full_storage_path' => $storagePath,
+                    'file_exists' => file_exists($storagePath),
+                    'download_url' => $baseUrl . '/public/' . $document->file,
+                ];
+
+                // List files in fms_documents folder
+                $fmsDocPath = storage_path('app/public/fms_documents');
+                if (is_dir($fmsDocPath)) {
+                    $files = scandir($fmsDocPath);
+                    $diagnostics['fms_documents_files'] = array_values(array_diff($files, ['.', '..']));
+                }
+            } else {
+                $diagnostics['file_info'] = ['error' => 'File not found with ID: ' . $fileId];
+            }
+        }
+
+        return response()->json([
+            'status' => true,
+            'diagnostics' => $diagnostics,
+        ]);
+    }
 }
