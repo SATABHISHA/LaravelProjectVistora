@@ -194,9 +194,9 @@ class FmsController extends Controller
         $fileList = $files->map(function ($file) {
             $extension = pathinfo($file->filename, PATHINFO_EXTENSION);
             
-            // Generate proper download URL
+            // Generate download URL using API route (works without symlink)
             $baseUrl = rtrim(config('app.url'), '/');
-            $downloadUrl = $baseUrl . '/storage/' . $file->file;
+            $downloadUrl = $baseUrl . '/api/fms/download/' . $file->id;
             
             return [
                 'id' => $file->id,
@@ -452,5 +452,94 @@ class FmsController extends Controller
             'totalSizeGB' => round($totalSizeGB, 4),
             'totalSizeBytes' => $totalSizeBytes,
         ]);
+    }
+
+    /**
+     * Download a file directly (works without symlink)
+     * This serves files through Laravel instead of relying on storage symlink
+     */
+    public function downloadFile($id)
+    {
+        $document = FmsEmployeeDocument::find($id);
+        
+        if (!$document) {
+            return response()->json([
+                'status' => false,
+                'message' => 'File not found'
+            ], 404);
+        }
+
+        $filePath = storage_path('app/public/' . $document->file);
+        
+        if (!file_exists($filePath)) {
+            return response()->json([
+                'status' => false,
+                'message' => 'File does not exist on server'
+            ], 404);
+        }
+
+        $extension = pathinfo($document->filename, PATHINFO_EXTENSION);
+        $mimeTypes = [
+            'pdf' => 'application/pdf',
+            'doc' => 'application/msword',
+            'docx' => 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+            'xls' => 'application/vnd.ms-excel',
+            'xlsx' => 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+            'png' => 'image/png',
+            'jpg' => 'image/jpeg',
+            'jpeg' => 'image/jpeg',
+            'gif' => 'image/gif',
+            'txt' => 'text/plain',
+        ];
+
+        $mimeType = $mimeTypes[strtolower($extension)] ?? 'application/octet-stream';
+
+        return response()->file($filePath, [
+            'Content-Type' => $mimeType,
+            'Content-Disposition' => 'inline; filename="' . $document->filename . '"'
+        ]);
+    }
+
+    /**
+     * Download a file by filename (alternative route)
+     */
+    public function downloadByFilename($filename)
+    {
+        // Find document by the stored file path
+        $document = FmsEmployeeDocument::where('file', 'LIKE', '%' . $filename)->first();
+        
+        if (!$document) {
+            // Try direct path
+            $filePath = storage_path('app/public/fms_documents/' . $filename);
+            
+            if (file_exists($filePath)) {
+                $extension = pathinfo($filename, PATHINFO_EXTENSION);
+                $mimeTypes = [
+                    'pdf' => 'application/pdf',
+                    'doc' => 'application/msword',
+                    'docx' => 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+                    'xls' => 'application/vnd.ms-excel',
+                    'xlsx' => 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+                    'png' => 'image/png',
+                    'jpg' => 'image/jpeg',
+                    'jpeg' => 'image/jpeg',
+                    'gif' => 'image/gif',
+                    'txt' => 'text/plain',
+                ];
+                $mimeType = $mimeTypes[strtolower($extension)] ?? 'application/octet-stream';
+
+                return response()->file($filePath, [
+                    'Content-Type' => $mimeType,
+                    'Content-Disposition' => 'inline; filename="' . $filename . '"'
+                ]);
+            }
+            
+            return response()->json([
+                'status' => false,
+                'message' => 'File not found'
+            ], 404);
+        }
+
+        return $this->downloadFile($document->id);
     }
 }
