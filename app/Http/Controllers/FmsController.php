@@ -194,8 +194,8 @@ class FmsController extends Controller
         $fileList = $files->map(function ($file) {
             $extension = pathinfo($file->filename, PATHINFO_EXTENSION);
             
-            // Generate download URL using Laravel's standard /storage symlink
-            $downloadUrl = asset('storage/' . $file->file);
+            // Generate download URL using API route (works without symlink)
+            $downloadUrl = url('api/fms/download/' . $file->id);
             
             return [
                 'id' => $file->id,
@@ -450,6 +450,37 @@ class FmsController extends Controller
             'totalFiles' => $totalFiles,
             'totalSizeGB' => round($totalSizeGB, 4),
             'totalSizeBytes' => $totalSizeBytes,
+        ]);
+    }
+
+    /**
+     * Download file by ID - serves file directly without symlink
+     */
+    public function downloadFile($id)
+    {
+        $document = FmsEmployeeDocument::find($id);
+
+        if (!$document) {
+            return response()->json([
+                'status' => false,
+                'message' => 'File not found'
+            ], 404);
+        }
+
+        // Check if file exists in storage
+        if (!Storage::disk('public')->exists($document->file)) {
+            return response()->json([
+                'status' => false,
+                'message' => 'File not found in storage'
+            ], 404);
+        }
+
+        $filePath = Storage::disk('public')->path($document->file);
+        $mimeType = Storage::disk('public')->mimeType($document->file);
+
+        return response()->file($filePath, [
+            'Content-Type' => $mimeType,
+            'Content-Disposition' => 'inline; filename="' . $document->filename . '"',
         ]);
     }
 }
