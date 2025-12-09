@@ -755,8 +755,6 @@ Route::delete('/fms/document/{id}', [FmsController::class, 'deleteDocument']);
 Route::get('/fms/storage-statistics', [FmsController::class, 'storageStatistics']);
 Route::get('/fms/employee-file-summary', [FmsController::class, 'employeeFileSummary']);
 
-Route::get('/fms/check-storage-diagnostic', [FmsController::class, 'diagnosticCheck']);
-
 // Employee List Route
 Route::get('/employee-list', [EmployeeListApiController::class, 'index']);
 
