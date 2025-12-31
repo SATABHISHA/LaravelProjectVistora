@@ -629,4 +629,171 @@ class EmployeeLeaveBalanceApiController extends Controller
             'data' => $summary
         ]);
     }
+
+    /**
+     * Get leave names for employees by corp_id and optional emp_code
+     * If emp_code is not provided or is 'ALL', returns all employees' leave names
+     */
+    public function getLeaveNames(Request $request, $corpId, $empCode = null)
+    {
+        $year = $request->query('year', Carbon::now()->year);
+        
+        // Build query
+        $query = EmployeeLeaveBalance::where('corp_id', $corpId)
+            ->where('year', $year);
+        
+        // If emp_code is provided and not 'ALL', filter by emp_code
+        if ($empCode && strtoupper($empCode) !== 'ALL') {
+            $query->where('emp_code', $empCode);
+        }
+        
+        $leaveBalances = $query->select('emp_code', 'emp_full_name', 'leave_code', 'leave_name', 'leave_type_puid')
+            ->orderBy('emp_code')
+            ->orderBy('leave_name')
+            ->get();
+        
+        if ($leaveBalances->isEmpty()) {
+            return response()->json([
+                'status' => false,
+                'message' => 'No leave balances found for the given criteria.',
+                'data' => []
+            ]);
+        }
+        
+        // Group by employee
+        $result = [];
+        foreach ($leaveBalances as $balance) {
+            $empKey = $balance->emp_code;
+            
+            if (!isset($result[$empKey])) {
+                $result[$empKey] = [
+                    'emp_code' => $balance->emp_code,
+                    'emp_full_name' => $balance->emp_full_name,
+                    'leave_types' => []
+                ];
+            }
+            
+            $result[$empKey]['leave_types'][] = [
+                'leave_code' => $balance->leave_code,
+                'leave_name' => $balance->leave_name,
+                'leave_type_puid' => $balance->leave_type_puid
+            ];
+        }
+        
+        return response()->json([
+            'status' => true,
+            'message' => 'Leave names retrieved successfully.',
+            'year' => $year,
+            'total_employees' => count($result),
+            'data' => array_values($result)
+        ]);
+    }
+
+    /**
+     * Deduct leave from employee balance based on leave request
+     * Calculates days from leave_request table using puid, from_date, to_date
+     */
+    public function deductLeaveByRequest(Request $request)
+    {
+        $request->validate([
+            'corp_id' => 'required|string',
+            'emp_code' => 'required|string',
+            'leave_name' => 'required|string',
+            'leave_request_puid' => 'required|string',
+            'year' => 'nullable|integer'
+        ]);
+
+        $corpId = $request->corp_id;
+        $empCode = $request->emp_code;
+        $leaveName = $request->leave_name;
+        $leaveRequestPuid = $request->leave_request_puid;
+        $year = $request->year ?? Carbon::now()->year;
+
+        // Get the leave request to calculate days
+        $leaveRequest = DB::table('leave_request')
+            ->where('puid', $leaveRequestPuid)
+            ->where('corp_id', $corpId)
+            ->where('empcode', $empCode)
+            ->first();
+
+        if (!$leaveRequest) {
+            return response()->json([
+                'status' => false,
+                'message' => 'Leave request not found with the given puid, corp_id, and emp_code.'
+            ], 404);
+        }
+
+        // Calculate number of days from from_date to to_date
+        try {
+            // Handle DD/MM/YYYY format
+            $fromDate = Carbon::createFromFormat('d/m/Y', $leaveRequest->from_date);
+            $toDate = Carbon::createFromFormat('d/m/Y', $leaveRequest->to_date);
+            $daysToDeduct = $fromDate->diffInDays($toDate) + 1; // +1 to include both start and end dates
+        } catch (\Exception $e) {
+            // Try alternative parsing if the format is different
+            try {
+                $fromDate = Carbon::parse($leaveRequest->from_date);
+                $toDate = Carbon::parse($leaveRequest->to_date);
+                $daysToDeduct = $fromDate->diffInDays($toDate) + 1;
+            } catch (\Exception $e2) {
+                return response()->json([
+                    'status' => false,
+                    'message' => 'Invalid date format in leave request. From: ' . $leaveRequest->from_date . ', To: ' . $leaveRequest->to_date
+                ], 400);
+            }
+        }
+
+        // Find the employee leave balance by leave_name
+        $leaveBalance = EmployeeLeaveBalance::where('corp_id', $corpId)
+            ->where('emp_code', $empCode)
+            ->where('leave_name', $leaveName)
+            ->where('year', $year)
+            ->first();
+
+        if (!$leaveBalance) {
+            return response()->json([
+                'status' => false,
+                'message' => "Leave balance not found for employee '{$empCode}' with leave type '{$leaveName}' for year {$year}."
+            ], 404);
+        }
+
+        // Check if sufficient balance is available
+        if ($leaveBalance->balance < $daysToDeduct) {
+            return response()->json([
+                'status' => false,
+                'message' => "Insufficient leave balance. Required: {$daysToDeduct} days, Available: {$leaveBalance->balance} days."
+            ], 400);
+        }
+
+        // Deduct the leave
+        $previousBalance = $leaveBalance->balance;
+        $previousUsed = $leaveBalance->used;
+
+        $leaveBalance->update([
+            'used' => $leaveBalance->used + $daysToDeduct,
+            'balance' => $leaveBalance->balance - $daysToDeduct
+        ]);
+
+        return response()->json([
+            'status' => true,
+            'message' => 'Leave deducted successfully.',
+            'data' => [
+                'corp_id' => $corpId,
+                'emp_code' => $empCode,
+                'emp_full_name' => $leaveBalance->emp_full_name,
+                'leave_name' => $leaveName,
+                'leave_code' => $leaveBalance->leave_code,
+                'leave_request_puid' => $leaveRequestPuid,
+                'from_date' => $leaveRequest->from_date,
+                'to_date' => $leaveRequest->to_date,
+                'days_deducted' => $daysToDeduct,
+                'previous_balance' => $previousBalance,
+                'new_balance' => $leaveBalance->balance,
+                'previous_used' => $previousUsed,
+                'new_used' => $leaveBalance->used,
+                'total_allotted' => $leaveBalance->total_allotted,
+                'year' => $year
+            ]
+        ]);
+    }
 }

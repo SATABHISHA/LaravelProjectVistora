@@ -17,6 +17,8 @@ The Employee Leave Balance API provides functionality to manage employee leave a
 5. [Update Leave Used](#5-update-leave-used)
 6. [Revert Leave Used](#6-revert-leave-used)
 7. [Get Leave Summary](#7-get-leave-summary)
+8. [Get Leave Names](#8-get-leave-names)
+9. [Deduct Leave by Request](#9-deduct-leave-by-request)
 
 ---
 
@@ -668,6 +670,277 @@ curl -X GET "http://localhost:8000/api/employee-leave-balance/summary/test?year=
     "data": []
 }
 ```
+
+---
+
+## 8. Get Leave Names
+
+Get leave names (leave types) for employees by corp_id. Can fetch for all employees or a specific employee.
+
+### Endpoint
+
+```
+GET /api/employee-leave-balance/leave-names/{corpId}/{empCode?}
+```
+
+### URL Parameters
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| corpId | string | Yes | Corporate ID |
+| empCode | string | No | Employee code. If omitted or set to "ALL", returns all employees |
+
+### Query Parameters
+
+| Parameter | Type | Required | Default | Description |
+|-----------|------|----------|---------|-------------|
+| year | integer | No | Current Year | Year for leave names |
+
+### cURL Examples
+
+**Get all employees' leave names:**
+```bash
+curl -X GET "http://localhost:8000/api/employee-leave-balance/leave-names/test" \
+  -H "Accept: application/json"
+```
+
+**Get all employees using "ALL":**
+```bash
+curl -X GET "http://localhost:8000/api/employee-leave-balance/leave-names/test/ALL" \
+  -H "Accept: application/json"
+```
+
+**Get specific employee's leave names:**
+```bash
+curl -X GET "http://localhost:8000/api/employee-leave-balance/leave-names/test/EMP001" \
+  -H "Accept: application/json"
+```
+
+### Success Response - All Employees (200 OK)
+
+```json
+{
+    "status": true,
+    "message": "Leave names retrieved successfully.",
+    "year": 2025,
+    "total_employees": 4,
+    "data": [
+        {
+            "emp_code": "EMP001",
+            "emp_full_name": "Rajesh Kr Patel",
+            "leave_types": [
+                {
+                    "leave_code": "CL",
+                    "leave_name": "Causal Leave",
+                    "leave_type_puid": "9f1fd7d9-3015-4787-814e-15992e681ba3"
+                },
+                {
+                    "leave_code": "SL",
+                    "leave_name": "Sick Leave",
+                    "leave_type_puid": "4df3d8b7-8e9f-4e27-b7fa-2db84a99e545"
+                }
+            ]
+        },
+        {
+            "emp_code": "EMP002",
+            "emp_full_name": "Indranil Shah",
+            "leave_types": [
+                {
+                    "leave_code": "CL",
+                    "leave_name": "Causal Leave",
+                    "leave_type_puid": "9f1fd7d9-3015-4787-814e-15992e681ba3"
+                },
+                {
+                    "leave_code": "SL",
+                    "leave_name": "Sick Leave",
+                    "leave_type_puid": "4df3d8b7-8e9f-4e27-b7fa-2db84a99e545"
+                }
+            ]
+        }
+    ]
+}
+```
+
+### Success Response - Single Employee (200 OK)
+
+```json
+{
+    "status": true,
+    "message": "Leave names retrieved successfully.",
+    "year": 2025,
+    "total_employees": 1,
+    "data": [
+        {
+            "emp_code": "EMP001",
+            "emp_full_name": "Rajesh Kr Patel",
+            "leave_types": [
+                {
+                    "leave_code": "CL",
+                    "leave_name": "Causal Leave",
+                    "leave_type_puid": "9f1fd7d9-3015-4787-814e-15992e681ba3"
+                },
+                {
+                    "leave_code": "SL",
+                    "leave_name": "Sick Leave",
+                    "leave_type_puid": "4df3d8b7-8e9f-4e27-b7fa-2db84a99e545"
+                }
+            ]
+        }
+    ]
+}
+```
+
+### Error Response - No Data Found
+
+```json
+{
+    "status": false,
+    "message": "No leave balances found for the given criteria.",
+    "data": []
+}
+```
+
+---
+
+## 9. Deduct Leave by Request
+
+Deduct leave from employee balance based on a leave request. The number of days to deduct is automatically calculated from the `from_date` and `to_date` columns in the `leave_request` table.
+
+### Endpoint
+
+```
+POST /api/employee-leave-balance/deduct-by-request
+```
+
+### Headers
+
+| Header | Value | Required |
+|--------|-------|----------|
+| Content-Type | application/json | Yes |
+| Accept | application/json | Yes |
+
+### Request Body Parameters
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| corp_id | string | Yes | Corporate ID |
+| emp_code | string | Yes | Employee code |
+| leave_name | string | Yes | Leave name (e.g., "Causal Leave", "Sick Leave") |
+| leave_request_puid | string | Yes | The PUID of the leave request from `leave_request` table |
+| year | integer | No | Year (default: current year) |
+
+### Request Example
+
+```json
+{
+    "corp_id": "test",
+    "emp_code": "EMP001",
+    "leave_name": "Causal Leave",
+    "leave_request_puid": "LR_68dfcc0f8ea7b2.58151249",
+    "year": 2025
+}
+```
+
+### cURL Example
+
+```bash
+curl -X POST "http://localhost:8000/api/employee-leave-balance/deduct-by-request" \
+  -H "Content-Type: application/json" \
+  -H "Accept: application/json" \
+  -d '{
+    "corp_id": "test",
+    "emp_code": "EMP001",
+    "leave_name": "Causal Leave",
+    "leave_request_puid": "LR_68dfcc0f8ea7b2.58151249",
+    "year": 2025
+  }'
+```
+
+### Success Response - Single Day Leave (200 OK)
+
+```json
+{
+    "status": true,
+    "message": "Leave deducted successfully.",
+    "data": {
+        "corp_id": "test",
+        "emp_code": "EMP001",
+        "emp_full_name": "Rajesh Kr Patel",
+        "leave_name": "Causal Leave",
+        "leave_code": "CL",
+        "leave_request_puid": "LR_68dfcc0f8ea7b2.58151249",
+        "from_date": "03/10/2025",
+        "to_date": "03/10/2025",
+        "days_deducted": 1,
+        "previous_balance": "24.00",
+        "new_balance": "23.00",
+        "previous_used": "0.00",
+        "new_used": "1.00",
+        "total_allotted": "24.00",
+        "year": 2025
+    }
+}
+```
+
+### Success Response - Multi-Day Leave (200 OK)
+
+```json
+{
+    "status": true,
+    "message": "Leave deducted successfully.",
+    "data": {
+        "corp_id": "test",
+        "emp_code": "EMP001",
+        "emp_full_name": "Rajesh Kr Patel",
+        "leave_name": "Causal Leave",
+        "leave_code": "CL",
+        "leave_request_puid": "LR_68e28c6352dfb7.07229878",
+        "from_date": "10/10/2025",
+        "to_date": "14/10/2025",
+        "days_deducted": 5,
+        "previous_balance": "23.00",
+        "new_balance": "18.00",
+        "previous_used": "1.00",
+        "new_used": "6.00",
+        "total_allotted": "24.00",
+        "year": 2025
+    }
+}
+```
+
+### Error Response - Leave Request Not Found (404)
+
+```json
+{
+    "status": false,
+    "message": "Leave request not found with the given puid, corp_id, and emp_code."
+}
+```
+
+### Error Response - Leave Balance Not Found (404)
+
+```json
+{
+    "status": false,
+    "message": "Leave balance not found for employee 'EMP001' with leave type 'Causal Leave' for year 2025."
+}
+```
+
+### Error Response - Insufficient Balance (400)
+
+```json
+{
+    "status": false,
+    "message": "Insufficient leave balance. Required: 10 days, Available: 5 days."
+}
+```
+
+### Business Logic
+
+- Days to deduct is calculated as: `(to_date - from_date) + 1` (inclusive of both dates)
+- The leave request must match the `corp_id` and `emp_code` provided
+- The `leave_name` must match an existing leave type in the employee's leave balance
+- Date format in leave_request table: `DD/MM/YYYY`
 
 ---
 
