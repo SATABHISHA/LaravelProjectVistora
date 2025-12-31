@@ -358,16 +358,22 @@ class EmployeeLeaveBalanceApiController extends Controller
     }
 
     /**
-     * B) Get list of all employees with their leave balances by corp_id
+     * B) Get list of all employees with their leave balances by corp_id and optional emp_code
      */
-    public function getEmployeeLeaveList(Request $request, $corpId)
+    public function getEmployeeLeaveList(Request $request, $corpId, $empCode = null)
     {
         $year = $request->query('year', Carbon::now()->year);
 
-        // Get all leave balances for the corp_id and year
-        $leaveBalances = EmployeeLeaveBalance::where('corp_id', $corpId)
-            ->where('year', $year)
-            ->orderBy('emp_code')
+        // Build query for leave balances
+        $query = EmployeeLeaveBalance::where('corp_id', $corpId)
+            ->where('year', $year);
+        
+        // If emp_code is provided and not 'ALL', filter by emp_code
+        if ($empCode && strtoupper($empCode) !== 'ALL') {
+            $query->where('emp_code', $empCode);
+        }
+        
+        $leaveBalances = $query->orderBy('emp_code')
             ->orderBy('leave_code')
             ->get();
 

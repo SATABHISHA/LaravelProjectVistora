@@ -219,14 +219,14 @@ curl -X POST "http://localhost:8000/api/employee-leave-balance/process-monthly" 
 
 ---
 
-## 3. Get All Employees Leave List
+## 3. Get Employees Leave List
 
-Retrieve leave balances for all employees in a corporation.
+Retrieve leave balances for all employees or a specific employee in a corporation.
 
 ### Endpoint
 
 ```
-GET /api/employee-leave-balance/list/{corpId}
+GET /api/employee-leave-balance/list/{corpId}/{empCode?}
 ```
 
 ### URL Parameters
@@ -234,6 +234,7 @@ GET /api/employee-leave-balance/list/{corpId}
 | Parameter | Type | Required | Description |
 |-----------|------|----------|-------------|
 | corpId | string | Yes | Corporate ID |
+| empCode | string | No | Employee code. If omitted or set to "ALL", returns all employees |
 
 ### Query Parameters
 
@@ -241,14 +242,27 @@ GET /api/employee-leave-balance/list/{corpId}
 |-----------|------|----------|---------|-------------|
 | year | integer | No | Current Year | Year for which to retrieve leave balances |
 
-### cURL Example
+### cURL Examples
 
+**Get all employees:**
 ```bash
 curl -X GET "http://localhost:8000/api/employee-leave-balance/list/test?year=2025" \
   -H "Accept: application/json"
 ```
 
-### Success Response (200 OK)
+**Get all employees using "ALL":**
+```bash
+curl -X GET "http://localhost:8000/api/employee-leave-balance/list/test/ALL?year=2025" \
+  -H "Accept: application/json"
+```
+
+**Get specific employee:**
+```bash
+curl -X GET "http://localhost:8000/api/employee-leave-balance/list/test/EMP001?year=2025" \
+  -H "Accept: application/json"
+```
+
+### Success Response - All Employees (200 OK)
 
 ```json
 {
@@ -266,13 +280,13 @@ curl -X GET "http://localhost:8000/api/employee-leave-balance/list/test?year=202
                     "leave_code": "CL",
                     "leave_name": "Causal Leave",
                     "total_allotted": 24,
-                    "used": 0,
-                    "balance": 24,
+                    "used": 6,
+                    "balance": 18,
                     "carry_forward": 0,
                     "credit_type": "monthly",
                     "is_lapsed": false,
                     "created_at": "2025-12-31T10:44:58.000000Z",
-                    "updated_at": "2025-12-31T10:44:58.000000Z"
+                    "updated_at": "2025-12-31T12:23:29.000000Z"
                 },
                 {
                     "leave_code": "SL",
@@ -304,6 +318,50 @@ curl -X GET "http://localhost:8000/api/employee-leave-balance/list/test?year=202
                     "is_lapsed": false,
                     "created_at": "2025-12-31T10:44:58.000000Z",
                     "updated_at": "2025-12-31T10:44:58.000000Z"
+                },
+                {
+                    "leave_code": "SL",
+                    "leave_name": "Sick Leave",
+                    "total_allotted": 20,
+                    "used": 0,
+                    "balance": 20,
+                    "carry_forward": 0,
+                    "credit_type": "yearly",
+                    "is_lapsed": false,
+                    "created_at": "2025-12-31T10:44:58.000000Z",
+                    "updated_at": "2025-12-31T10:44:58.000000Z"
+                }
+            ]
+        }
+    ]
+}
+```
+
+### Success Response - Single Employee (200 OK)
+
+```json
+{
+    "status": true,
+    "message": "Employee leave list retrieved successfully.",
+    "total_employees": 1,
+    "year": 2025,
+    "data": [
+        {
+            "emp_code": "EMP001",
+            "emp_full_name": "Rajesh Kr Patel",
+            "year": 2025,
+            "leave_types": [
+                {
+                    "leave_code": "CL",
+                    "leave_name": "Causal Leave",
+                    "total_allotted": 24,
+                    "used": 6,
+                    "balance": 18,
+                    "carry_forward": 0,
+                    "credit_type": "monthly",
+                    "is_lapsed": false,
+                    "created_at": "2025-12-31T10:44:58.000000Z",
+                    "updated_at": "2025-12-31T12:23:29.000000Z"
                 },
                 {
                     "leave_code": "SL",

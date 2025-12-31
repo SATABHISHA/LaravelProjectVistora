@@ -778,7 +778,7 @@ Route::post('/employee-leave-balance/process-monthly', [EmployeeLeaveBalanceApiC
 Route::post('/employee-leave-balance/update-used', [EmployeeLeaveBalanceApiController::class, 'updateLeaveUsed']); // Update leave when used
 Route::post('/employee-leave-balance/revert-used', [EmployeeLeaveBalanceApiController::class, 'revertLeaveUsed']); // Revert leave when cancelled
 Route::post('/employee-leave-balance/deduct-by-request', [EmployeeLeaveBalanceApiController::class, 'deductLeaveByRequest']); // Deduct leave based on leave request puid
-Route::get('/employee-leave-balance/list/{corpId}', [EmployeeLeaveBalanceApiController::class, 'getEmployeeLeaveList']); // Get all employees leave list by corp_id
+Route::get('/employee-leave-balance/list/{corpId}/{empCode?}', [EmployeeLeaveBalanceApiController::class, 'getEmployeeLeaveList']); // Get employees leave list by corp_id and optional emp_code
 Route::get('/employee-leave-balance/summary/{corpId}', [EmployeeLeaveBalanceApiController::class, 'getLeaveSummary']); // Get leave summary for admin dashboard
 Route::get('/employee-leave-balance/leave-names/{corpId}/{empCode?}', [EmployeeLeaveBalanceApiController::class, 'getLeaveNames']); // Get leave names by corp_id and optional emp_code
 Route::get('/employee-leave-balance/{corpId}/{empCode}', [EmployeeLeaveBalanceApiController::class, 'getEmployeeLeaveBalance']); // Get individual employee leave balance
