@@ -12,7 +12,17 @@ class Kernel extends ConsoleKernel
      */
     protected function schedule(Schedule $schedule): void
     {
-        // $schedule->command('inspire')->hourly();
+        // Process monthly leave credits on the 1st of every month at 00:05 AM
+        $schedule->command('leave:process-monthly-credits')
+            ->monthlyOn(1, '00:05')
+            ->withoutOverlapping()
+            ->appendOutputTo(storage_path('logs/leave-credits-cron.log'))
+            ->emailOutputOnFailure(env('ADMIN_EMAIL'));
+
+        // Alternative: Run daily and let the command handle month logic
+        // $schedule->command('leave:process-monthly-credits')
+        //     ->dailyAt('00:05')
+        //     ->withoutOverlapping();
     }
 
     /**
