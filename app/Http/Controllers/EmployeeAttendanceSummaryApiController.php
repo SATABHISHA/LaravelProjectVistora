@@ -145,21 +145,15 @@ class EmployeeAttendanceSummaryApiController extends Controller
 
             // Get leave requests for the period
             $monthNumber = Carbon::parse($month)->month;
-            $startDate = Carbon::create($year, $monthNumber, 1)->format('Y-m-d');
-            $endDate = Carbon::create($year, $monthNumber, 1)->endOfMonth()->format('Y-m-d');
+            $startDateCarbon = Carbon::create($year, $monthNumber, 1)->startOfDay();
+            $endDateCarbon = Carbon::create($year, $monthNumber, 1)->endOfMonth()->endOfDay();
 
+            // Fetch all leave requests for this corp/company and filter in PHP
+            // because dates are stored as DD/MM/YYYY strings which don't work with SQL date comparisons
             $leaveRequests = DB::table('leave_request')
                 ->select('empcode', 'from_date', 'to_date', 'status')
                 ->where('corp_id', $corpId)
                 ->where('company_name', $companyName)
-                ->where(function ($query) use ($startDate, $endDate) {
-                    $query->whereBetween('from_date', [$startDate, $endDate])
-                        ->orWhereBetween('to_date', [$startDate, $endDate])
-                        ->orWhere(function ($q) use ($startDate, $endDate) {
-                            $q->where('from_date', '<=', $startDate)
-                                ->where('to_date', '>=', $endDate);
-                        });
-                })
                 ->get();
 
             // Create a map of leave status by empCode and date
@@ -168,23 +162,71 @@ class EmployeeAttendanceSummaryApiController extends Controller
                 $fromDateStr = $leave->from_date;
                 $toDateStr = $leave->to_date;
                 if (preg_match('/^\d{2}\/\d{2}\/\d{4}$/', $fromDateStr)) {
-                    $fromDate = Carbon::createFromFormat('d/m/Y', $fromDateStr);
+                    $fromDate = Carbon::createFromFormat('d/m/Y', $fromDateStr)->startOfDay();
                 } else {
-                    $fromDate = Carbon::parse($fromDateStr);
+                    $fromDate = Carbon::parse($fromDateStr)->startOfDay();
                 }
                 if (preg_match('/^\d{2}\/\d{2}\/\d{4}$/', $toDateStr)) {
-                    $toDate = Carbon::createFromFormat('d/m/Y', $toDateStr);
+                    $toDate = Carbon::createFromFormat('d/m/Y', $toDateStr)->startOfDay();
                 } else {
-                    $toDate = Carbon::parse($toDateStr);
+                    $toDate = Carbon::parse($toDateStr)->startOfDay();
+                }
+
+                // Check if this leave request overlaps with the target month
+                if ($toDate->lt($startDateCarbon) || $fromDate->gt($endDateCarbon)) {
+                    // Leave is entirely outside the target month, skip
+                    continue;
                 }
 
                 for ($date = $fromDate->copy(); $date->lte($toDate); $date->addDay()) {
                     $dateKey = $date->format('Y-m-d');
-                    if ($date->gte(Carbon::parse($startDate)) && $date->lte(Carbon::parse($endDate))) {
+                    // Only count days that fall within the target month
+                    if ($date->gte($startDateCarbon) && $date->lte($endDateCarbon)) {
                         $leaveStatusMap[$leave->empcode][$dateKey] = $leave->status;
                     }
                 }
             }
+
+            // Get actual holiday dates for the month (to skip them in processing)
+            $holidayDates = DB::table('holiday_lists')
+                ->where('corpId', $corpId)
+                ->whereRaw("DATE_FORMAT(holidayDate, '%M') = ?", [$month])
+                ->whereRaw("YEAR(holidayDate) = ?", [$year])
+                ->pluck('holidayDate')
+                ->map(function($date) {
+                    return Carbon::parse($date)->format('Y-m-d');
+                })
+                ->toArray();
+
+            // Get week-off days from shift policy (to skip them in processing)
+            $weekOffDays = DB::table('shift_policy_weekly_schedule')
+                ->select('day_name', 'week_no', 'time')
+                ->where('puid', $shiftPolicy->puid)
+                ->where('time', 'Full Day')
+                ->get();
+
+            // Calculate which dates in the month are week-offs
+            $monthNumber = Carbon::parse($month)->month;
+            $weekOffDates = [];
+            $firstDayOfMonth = Carbon::create($year, $monthNumber, 1);
+            $lastDayOfMonth = $firstDayOfMonth->copy()->endOfMonth();
+            
+            for ($date = $firstDayOfMonth->copy(); $date->lte($lastDayOfMonth); $date->addDay()) {
+                $dayName = $date->format('l'); // Get day name (Sunday, Monday, etc.)
+                $weekNumber = $date->weekOfMonth;
+                $weekNoString = 'Week ' . $weekNumber;
+                
+                // Check if this day is a week-off
+                foreach ($weekOffDays as $weekOff) {
+                    if ($weekOff->day_name === $dayName && $weekOff->week_no === $weekNoString) {
+                        $weekOffDates[] = $date->format('Y-m-d');
+                        break;
+                    }
+                }
+            }
+
+            // Combine holidays and week-offs to skip
+            $daysToSkip = array_unique(array_merge($holidayDates, $weekOffDates));
 
             // Get unique employee codes from attendance data
             $empCodes = $attendanceData->pluck('empCode')->unique();
@@ -197,8 +239,10 @@ class EmployeeAttendanceSummaryApiController extends Controller
                 $employeeAttendance = $attendanceData->where('empCode', $empCode);
 
                 $totalPresent = 0;
-                $totalLeave = 0;
-                $totalAbsent = 0;
+                $totalLeave = 0;           // Approved leaves (Paid)
+                $totalAbsent = 0;          // Total absent days
+                $absentWithLeave = 0;      // Absent with leave request (not approved but Paid)
+                $absentWithoutLeave = 0;   // Absent without leave request (LOP - Unpaid)
 
                 foreach ($employeeAttendance as $attendance) {
                     $dateString = $attendance->date;
@@ -210,33 +254,48 @@ class EmployeeAttendanceSummaryApiController extends Controller
                     }
                     $attendanceDate = $dateObj->format('Y-m-d');
 
+                    // Skip holidays and week-offs
+                    if (in_array($attendanceDate, $daysToSkip)) {
+                        continue;
+                    }
+
                     $leaveStatus = $leaveStatusMap[$empCode][$attendanceDate] ?? null;
 
-                    // Determine the status based on leave request
+                    // Determine the status based on leave request and attendance
                     if ($leaveStatus === 'Approved') {
-                        // Approved leave counts as Leave
+                        // Approved leave counts as Leave (Paid)
                         $totalLeave++;
                     } elseif (in_array($leaveStatus, ['Pending', 'Rejected', 'Returned'])) {
-                        // Pending/Rejected/Returned leave counts as Absent
+                        // Leave request exists but not approved - counts as Absent but still Paid
                         $totalAbsent++;
+                        $absentWithLeave++;
                     } elseif ($attendance->attendanceStatus === 'Present') {
-                        // No leave request or attendance is Present
+                        // Employee was present (Paid)
                         $totalPresent++;
                     } elseif ($attendance->attendanceStatus === 'Leave') {
-                        // Direct leave entry in attendance
+                        // Direct leave entry in attendance (Paid)
                         $totalLeave++;
                     } else {
-                        // Other cases count as Absent
+                        // Absent without any leave request - Loss of Pay (Unpaid)
                         $totalAbsent++;
+                        $absentWithoutLeave++;
                     }
                 }
 
-                // Calculate working days (total days in month - holidays - week-offs)
+                // Calculate working days correctly using actual non-working dates
                 $totalDaysInMonth = Carbon::createFromFormat('F Y', $month . ' ' . $year)->daysInMonth;
-                $workingDays = $totalDaysInMonth - $holidays - $weekOffCount;
+                $workingDays = $totalDaysInMonth - count($daysToSkip);
+                
+                // Store actual counts for the response
+                $actualHolidayCount = count($holidayDates);
+                $actualWeekOffCount = count($weekOffDates);
 
-                // Calculate paid days: working days - absent
-                $paidDays = $workingDays - $totalAbsent;
+                // Calculate paid days: Present + Approved Leave + Absent with Leave (not approved but applied)
+                // Only deduct absent without leave (LOP days)
+                $paidDays = $workingDays - $absentWithoutLeave;
+                
+                // Loss of Pay days = Absent without leave request
+                $lopDays = $absentWithoutLeave;
 
                 $summaryData[] = [
                     'corpId' => $corpId,
@@ -244,8 +303,8 @@ class EmployeeAttendanceSummaryApiController extends Controller
                     'companyName' => $companyName,
                     'totalPresent' => $totalPresent,
                     'workingDays' => $workingDays,
-                    'holidays' => $holidays,
-                    'weekOff' => $weekOffCount,
+                    'holidays' => $actualHolidayCount,
+                    'weekOff' => $actualWeekOffCount,
                     'leave' => $totalLeave,
                     'paidDays' => $paidDays,
                     'absent' => $totalAbsent,
@@ -269,8 +328,8 @@ class EmployeeAttendanceSummaryApiController extends Controller
                     'period' => "{$month} {$year}",
                     'company' => $companyName,
                     'corpId' => $corpId,
-                    'holidays_in_period' => $holidays,
-                    'week_off_days' => $weekOffCount,
+                    'holidays_in_period' => $actualHolidayCount ?? 0,
+                    'week_off_days' => $actualWeekOffCount ?? 0,
                     'working_days_calculated' => $workingDays ?? 0
                 ]
             ], 201);
@@ -644,21 +703,15 @@ class EmployeeAttendanceSummaryApiController extends Controller
 
             // Get leave requests for the period
             $monthNumber = Carbon::parse($month)->month;
-            $startDate = Carbon::create($year, $monthNumber, 1)->format('Y-m-d');
-            $endDate = Carbon::create($year, $monthNumber, 1)->endOfMonth()->format('Y-m-d');
+            $startDateCarbon = Carbon::create($year, $monthNumber, 1)->startOfDay();
+            $endDateCarbon = Carbon::create($year, $monthNumber, 1)->endOfMonth()->endOfDay();
 
+            // Fetch all leave requests for this corp/company and filter in PHP
+            // because dates are stored as DD/MM/YYYY strings which don't work with SQL date comparisons
             $leaveRequests = DB::table('leave_request')
                 ->select('empcode', 'from_date', 'to_date', 'status')
                 ->where('corp_id', $corpId)
                 ->where('company_name', $companyName)
-                ->where(function ($query) use ($startDate, $endDate) {
-                    $query->whereBetween('from_date', [$startDate, $endDate])
-                        ->orWhereBetween('to_date', [$startDate, $endDate])
-                        ->orWhere(function ($q) use ($startDate, $endDate) {
-                            $q->where('from_date', '<=', $startDate)
-                                ->where('to_date', '>=', $endDate);
-                        });
-                })
                 ->get();
 
             // Create a map of leave status by empCode and date
@@ -667,19 +720,26 @@ class EmployeeAttendanceSummaryApiController extends Controller
                 $fromDateStr = $leave->from_date;
                 $toDateStr = $leave->to_date;
                 if (preg_match('/^\d{2}\/\d{2}\/\d{4}$/', $fromDateStr)) {
-                    $fromDate = Carbon::createFromFormat('d/m/Y', $fromDateStr);
+                    $fromDate = Carbon::createFromFormat('d/m/Y', $fromDateStr)->startOfDay();
                 } else {
-                    $fromDate = Carbon::parse($fromDateStr);
+                    $fromDate = Carbon::parse($fromDateStr)->startOfDay();
                 }
                 if (preg_match('/^\d{2}\/\d{2}\/\d{4}$/', $toDateStr)) {
-                    $toDate = Carbon::createFromFormat('d/m/Y', $toDateStr);
+                    $toDate = Carbon::createFromFormat('d/m/Y', $toDateStr)->startOfDay();
                 } else {
-                    $toDate = Carbon::parse($toDateStr);
+                    $toDate = Carbon::parse($toDateStr)->startOfDay();
+                }
+
+                // Check if this leave request overlaps with the target month
+                if ($toDate->lt($startDateCarbon) || $fromDate->gt($endDateCarbon)) {
+                    // Leave is entirely outside the target month, skip
+                    continue;
                 }
 
                 for ($date = $fromDate->copy(); $date->lte($toDate); $date->addDay()) {
                     $dateKey = $date->format('Y-m-d');
-                    if ($date->gte(Carbon::parse($startDate)) && $date->lte(Carbon::parse($endDate))) {
+                    // Only count days that fall within the target month
+                    if ($date->gte($startDateCarbon) && $date->lte($endDateCarbon)) {
                         $leaveStatusMap[$leave->empcode][$dateKey] = $leave->status;
                     }
                 }
@@ -732,7 +792,10 @@ class EmployeeAttendanceSummaryApiController extends Controller
                 $employeeAttendance = $attendanceData->where('empCode', $empCode);
 
                 $totalPresent = 0;
-                $totalLeave = 0;
+                $totalLeave = 0;           // Approved leaves (Paid)
+                $totalAbsent = 0;          // Total absent days
+                $absentWithLeave = 0;      // Absent with leave request (not approved but Paid)
+                $absentWithoutLeave = 0;   // Absent without leave request (LOP - Unpaid)
 
                 foreach ($employeeAttendance as $attendance) {
                     $dateString = $attendance->date;
@@ -751,16 +814,30 @@ class EmployeeAttendanceSummaryApiController extends Controller
 
                     $leaveStatus = $leaveStatusMap[$empCode][$attendanceDate] ?? null;
 
+                    // Determine the status based on leave request and attendance
                     if ($leaveStatus === 'Approved') {
+                        // Approved leave counts as Leave (Paid)
                         $totalLeave++;
+                    } elseif (in_array($leaveStatus, ['Pending', 'Rejected', 'Returned'])) {
+                        // Leave request exists but not approved - counts as Absent but still Paid
+                        $totalAbsent++;
+                        $absentWithLeave++;
                     } elseif ($attendance->attendanceStatus === 'Present') {
+                        // Employee was present (Paid)
                         $totalPresent++;
+                    } elseif ($attendance->attendanceStatus === 'Leave') {
+                        // Direct leave entry in attendance (Paid)
+                        $totalLeave++;
+                    } else {
+                        // Absent without any leave request - Loss of Pay (Unpaid)
+                        $totalAbsent++;
+                        $absentWithoutLeave++;
                     }
                 }
 
-                // Correctly calculate absent and paid days
-                $totalAbsent = $workingDays - $totalPresent - $totalLeave;
-                $paidDays = $totalPresent + $totalLeave;
+                // Calculate paid days: Present + Approved Leave + Absent with Leave (not approved but applied)
+                // Only deduct absent without leave (LOP days)
+                $paidDays = $workingDays - $absentWithoutLeave;
 
                 $summaryData[] = [
                     'corpId' => $corpId,
@@ -934,23 +1011,24 @@ class EmployeeAttendanceSummaryApiController extends Controller
         // Get weekly schedule from shift policy
         $weeklySchedule = DB::table('shift_policy_weekly_schedule')
             ->where('puid', $puid)
-            ->get(); // Fetches all week rows for the policy
+            ->where('time', 'Full Day')  // Only get full day offs
+            ->get();
 
+        // Create a map: week_no => [day_names that are off]
         $scheduleMap = [];
         foreach ($weeklySchedule as $week) {
-            $scheduleMap[$week->week_no] = (array)$week;
+            if (!isset($scheduleMap[$week->week_no])) {
+                $scheduleMap[$week->week_no] = [];
+            }
+            $scheduleMap[$week->week_no][] = $week->day_name;
         }
 
         for ($date = $firstDay->copy(); $date->lte($lastDay); $date->addDay()) {
             $weekOfMonth = 'Week ' . $date->weekOfMonth;
-            $dayName = strtolower($date->format('l')); // sunday, monday, etc.
+            $dayName = $date->format('l'); // Sunday, Monday, etc.
 
-            if (isset($scheduleMap[$weekOfMonth])) {
-                $weekSchedule = $scheduleMap[$weekOfMonth];
-                // Check if the day is a full day off
-                if (isset($weekSchedule[$dayName]) && $weekSchedule[$dayName] === 'Full Day') {
-                    $dates[] = $date->format('Y-m-d');
-                }
+            if (isset($scheduleMap[$weekOfMonth]) && in_array($dayName, $scheduleMap[$weekOfMonth])) {
+                $dates[] = $date->format('Y-m-d');
             }
         }
 
@@ -1031,26 +1109,45 @@ class EmployeeAttendanceSummaryApiController extends Controller
                 ->get()->groupBy('empCode');
 
             $monthNumber = Carbon::parse($month)->month;
-            $startDate = Carbon::create($year, $monthNumber, 1)->format('Y-m-d');
-            $endDate = Carbon::create($year, $monthNumber, 1)->endOfMonth()->format('Y-m-d');
 
+            // Fetch all leave requests for this corp/company and filter in PHP
+            // because dates are stored as DD/MM/YYYY strings which don't work with SQL date comparisons
             $leaveRequests = DB::table('leave_request')
                 ->where('corp_id', $corpId)
                 ->where('company_name', $companyName)
-                ->where(function($query) use ($startDate, $endDate) {
-                    $query->whereBetween('from_date', [$startDate, $endDate])
-                          ->orWhereBetween('to_date', [$startDate, $endDate])
-                          ->orWhere(function($q) use ($startDate, $endDate) {
-                              $q->where('from_date', '<=', $startDate)->where('to_date', '>=', $endDate);
-                          });
-                })
                 ->get();
+
+            $startDateCarbon = Carbon::create($year, $monthNumber, 1)->startOfDay();
+            $endDateCarbon = Carbon::create($year, $monthNumber, 1)->endOfMonth()->endOfDay();
 
             $leaveStatusMap = [];
             foreach ($leaveRequests as $leave) {
-                for ($date = Carbon::parse($leave->from_date); $date->lte(Carbon::parse($leave->to_date)); $date->addDay()) {
+                // Parse from_date with DD/MM/YYYY format support
+                $fromDateStr = $leave->from_date;
+                if (preg_match('/^\d{2}\/\d{2}\/\d{4}$/', $fromDateStr)) {
+                    $fromDate = Carbon::createFromFormat('d/m/Y', $fromDateStr)->startOfDay();
+                } else {
+                    $fromDate = Carbon::parse($fromDateStr)->startOfDay();
+                }
+                
+                // Parse to_date with DD/MM/YYYY format support
+                $toDateStr = $leave->to_date;
+                if (preg_match('/^\d{2}\/\d{2}\/\d{4}$/', $toDateStr)) {
+                    $toDate = Carbon::createFromFormat('d/m/Y', $toDateStr)->startOfDay();
+                } else {
+                    $toDate = Carbon::parse($toDateStr)->startOfDay();
+                }
+                
+                // Check if this leave request overlaps with the target month
+                if ($toDate->lt($startDateCarbon) || $fromDate->gt($endDateCarbon)) {
+                    // Leave is entirely outside the target month, skip
+                    continue;
+                }
+                
+                for ($date = $fromDate->copy(); $date->lte($toDate); $date->addDay()) {
                     $dateKey = $date->format('Y-m-d');
-                    if ($date->gte(Carbon::parse($startDate)) && $date->lte(Carbon::parse($endDate))) {
+                    // Only count days that fall within the target month
+                    if ($date->gte($startDateCarbon) && $date->lte($endDateCarbon)) {
                         $leaveStatusMap[$leave->empcode][$dateKey] = $leave->status;
                     }
                 }
@@ -1062,7 +1159,10 @@ class EmployeeAttendanceSummaryApiController extends Controller
                 $employeeAttendance = $attendanceData->get($empCode) ?? collect();
 
                 $totalPresent = 0;
-                $totalLeave = 0;
+                $totalLeave = 0;           // Approved leaves (Paid)
+                $totalAbsent = 0;          // Total absent days
+                $absentWithLeave = 0;      // Absent with leave request (not approved but Paid)
+                $absentWithoutLeave = 0;   // Absent without leave request (LOP - Unpaid)
 
                 foreach ($employeeAttendance as $attendance) {
                     $attendanceDate = Carbon::parse($attendance->date)->format('Y-m-d');
@@ -1070,15 +1170,30 @@ class EmployeeAttendanceSummaryApiController extends Controller
 
                     $leaveStatus = $leaveStatusMap[$empCode][$attendanceDate] ?? null;
 
+                    // Determine the status based on leave request and attendance
                     if ($leaveStatus === 'Approved') {
+                        // Approved leave counts as Leave (Paid)
                         $totalLeave++;
+                    } elseif (in_array($leaveStatus, ['Pending', 'Rejected', 'Returned'])) {
+                        // Leave request exists but not approved - counts as Absent but still Paid
+                        $totalAbsent++;
+                        $absentWithLeave++;
                     } elseif ($attendance->attendanceStatus === 'Present') {
+                        // Employee was present (Paid)
                         $totalPresent++;
+                    } elseif ($attendance->attendanceStatus === 'Leave') {
+                        // Direct leave entry in attendance (Paid)
+                        $totalLeave++;
+                    } else {
+                        // Absent without any leave request - Loss of Pay (Unpaid)
+                        $totalAbsent++;
+                        $absentWithoutLeave++;
                     }
                 }
 
-                $totalAbsent = $workingDays - $totalPresent - $totalLeave;
-                $paidDays = $totalPresent + $totalLeave;
+                // Calculate paid days: Present + Approved Leave + Absent with Leave (not approved but applied)
+                // Only deduct absent without leave (LOP days)
+                $paidDays = $workingDays - $absentWithoutLeave;
 
                 // Update the record
                 $summary->update([
