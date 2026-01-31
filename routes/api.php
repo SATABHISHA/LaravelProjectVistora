@@ -759,10 +759,19 @@ Route::get('/newsfeed/{puid}/likes', [NewsFeedController::class, 'getLikes']);
 // Get likes count for a news feed post
 Route::get('/newsfeed/{puid}/likes-count', [NewsFeedController::class, 'getLikesCount']);
 
-// Create or update a review (comment)
+// Get all comments for a news feed post (paginated)
+Route::get('/newsfeed/{puid}/comments', [NewsFeedController::class, 'getComments']);
+
+// Add a new comment to a news feed post (allows multiple comments per user)
+Route::post('/newsfeed-comments', [NewsFeedController::class, 'storeComment']);
+
+// Delete a specific comment by ID
+Route::delete('/newsfeed-comments/{id}', [NewsFeedController::class, 'deleteComment']);
+
+// Legacy: Create or update a review (for backward compatibility)
 Route::post('/newsfeed-reviews', [NewsFeedController::class, 'storeReview']);
 
-// Delete a review (comment)
+// Legacy: Delete a review by puid
 Route::delete('/newsfeed-reviews/{puid}', [NewsFeedController::class, 'deleteReview']);
 
 // Utility Routes

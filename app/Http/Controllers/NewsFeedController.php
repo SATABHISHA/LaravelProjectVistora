@@ -90,7 +90,268 @@ class NewsFeedController extends Controller
     }
 
     /**
-     * Store a new news feed review
+     * Store a new comment on a news feed post
+     * POST /newsfeed-comments
+     * Allows multiple comments from the same user on the same post
+     *
+     * @param Request $request
+     * @return \Illuminate\Http\JsonResponse
+     */
+    public function storeComment(Request $request)
+    {
+        // Validate request
+        $validator = Validator::make($request->all(), [
+            'corpId' => 'required|string|max:10',
+            'puid' => 'required|string|max:100',
+            'EmpCode' => 'required|string|max:20',
+            'companyName' => 'required|string|max:100',
+            'comment' => 'required|string',
+            'date' => 'required|string|max:20',
+            'time' => 'required|string|max:20',
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json([
+                'status' => false,
+                'message' => 'Validation failed',
+                'errors' => $validator->errors()
+            ], 422);
+        }
+
+        try {
+            // Check if the news feed exists
+            $newsFeed = NewsFeed::where('puid', $request->puid)->first();
+
+            if (!$newsFeed) {
+                return response()->json([
+                    'status' => false,
+                    'message' => 'News feed not found with the provided puid',
+                    'puid' => $request->puid
+                ], 404);
+            }
+
+            // Fetch employee details from employee_details table
+            $employee = \DB::table('employee_details')
+                ->where('corp_id', $request->corpId)
+                ->where('EmpCode', $request->EmpCode)
+                ->first();
+
+            if (!$employee) {
+                return response()->json([
+                    'status' => false,
+                    'message' => 'Employee not found with the provided EmpCode',
+                    'corpId' => $request->corpId,
+                    'EmpCode' => $request->EmpCode
+                ], 404);
+            }
+
+            // Concatenate employee name
+            $employeeFullName = trim(
+                ($employee->FirstName ?? '') . ' ' . 
+                ($employee->MiddleName ?? '') . ' ' . 
+                ($employee->LastName ?? '')
+            );
+
+            // Create new comment (always creates new, never updates)
+            $comment = NewsFeedReview::create([
+                'corpId' => $request->corpId,
+                'puid' => $request->puid,
+                'EmpCode' => $request->EmpCode,
+                'companyName' => $request->companyName,
+                'employeeFullName' => $employeeFullName,
+                'isLiked' => '0',
+                'comment' => $request->comment,
+                'date' => $request->date,
+                'time' => $request->time,
+            ]);
+
+            // Get updated comments count
+            $commentsCount = NewsFeedReview::where('puid', $request->puid)
+                ->whereNotNull('comment')
+                ->where('comment', '!=', '')
+                ->count();
+
+            return response()->json([
+                'status' => true,
+                'message' => 'Comment added successfully',
+                'data' => $comment,
+                'commentsCount' => $commentsCount
+            ], 201);
+
+        } catch (\Exception $e) {
+            Log::error('Error adding comment: ' . $e->getMessage());
+            return response()->json([
+                'status' => false,
+                'message' => 'An error occurred while adding comment',
+                'error' => $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * Delete a specific comment by its ID
+     * DELETE /newsfeed-comments/{id}
+     *
+     * @param Request $request
+     * @param int $id
+     * @return \Illuminate\Http\JsonResponse
+     */
+    public function deleteComment(Request $request, $id)
+    {
+        // Validate query parameters
+        $validator = Validator::make($request->query(), [
+            'corpId' => 'required|string|max:10',
+            'EmpCode' => 'required|string|max:20',
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json([
+                'status' => false,
+                'message' => 'Validation failed',
+                'errors' => $validator->errors()
+            ], 422);
+        }
+
+        try {
+            $corpId = $request->query('corpId');
+            $empCode = $request->query('EmpCode');
+
+            // Find the comment by id, corpId, and EmpCode
+            $comment = NewsFeedReview::where('id', $id)
+                ->where('corpId', $corpId)
+                ->where('EmpCode', $empCode)
+                ->first();
+
+            if (!$comment) {
+                return response()->json([
+                    'status' => false,
+                    'message' => 'Comment not found or you do not have permission to delete it',
+                    'id' => $id
+                ], 404);
+            }
+
+            $puid = $comment->puid;
+
+            // Delete the comment
+            $comment->delete();
+
+            // Get updated comments count
+            $commentsCount = NewsFeedReview::where('puid', $puid)
+                ->whereNotNull('comment')
+                ->where('comment', '!=', '')
+                ->count();
+
+            return response()->json([
+                'status' => true,
+                'message' => 'Comment deleted successfully',
+                'id' => $id,
+                'commentsCount' => $commentsCount
+            ], 200);
+
+        } catch (\Exception $e) {
+            Log::error('Error deleting comment: ' . $e->getMessage());
+            return response()->json([
+                'status' => false,
+                'message' => 'An error occurred while deleting comment',
+                'error' => $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * Get all comments for a specific news feed post
+     * GET /newsfeed/{puid}/comments
+     *
+     * @param Request $request
+     * @param string $puid
+     * @return \Illuminate\Http\JsonResponse
+     */
+    public function getComments(Request $request, $puid)
+    {
+        // Validate query parameters
+        $validator = Validator::make($request->query(), [
+            'corpId' => 'required|string|max:10',
+            'page' => 'nullable|integer|min:1',
+            'per_page' => 'nullable|integer|min:1|max:100',
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json([
+                'status' => false,
+                'message' => 'Validation failed',
+                'errors' => $validator->errors()
+            ], 422);
+        }
+
+        try {
+            $corpId = $request->query('corpId');
+            $perPage = $request->query('per_page', 10);
+            $page = $request->query('page', 1);
+
+            // Check if the news feed exists
+            $newsFeed = NewsFeed::where('puid', $puid)
+                ->where('corpId', $corpId)
+                ->first();
+
+            if (!$newsFeed) {
+                return response()->json([
+                    'status' => false,
+                    'message' => 'News feed not found',
+                    'puid' => $puid
+                ], 404);
+            }
+
+            // Get all comments for this post (only those with actual comments)
+            $comments = NewsFeedReview::where('puid', $puid)
+                ->whereNotNull('comment')
+                ->where('comment', '!=', '')
+                ->orderBy('created_at', 'desc')
+                ->paginate($perPage, ['*'], 'page', $page);
+
+            // Format comments
+            $formattedComments = $comments->map(function ($comment) {
+                return [
+                    'id' => $comment->id,
+                    'corpId' => $comment->corpId,
+                    'puid' => $comment->puid,
+                    'EmpCode' => $comment->EmpCode,
+                    'companyName' => $comment->companyName,
+                    'employeeFullName' => $comment->employeeFullName,
+                    'comment' => $comment->comment,
+                    'date' => $this->formatDate($comment->date),
+                    'time' => $this->formatTime($comment->time),
+                    'duration' => $this->calculateDuration($comment->date, $comment->time),
+                ];
+            });
+
+            return response()->json([
+                'status' => true,
+                'message' => 'Comments retrieved successfully',
+                'puid' => $puid,
+                'pagination' => [
+                    'total' => $comments->total(),
+                    'per_page' => $comments->perPage(),
+                    'current_page' => $comments->currentPage(),
+                    'last_page' => $comments->lastPage(),
+                    'from' => $comments->firstItem(),
+                    'to' => $comments->lastItem()
+                ],
+                'count' => $formattedComments->count(),
+                'data' => $formattedComments
+            ]);
+
+        } catch (\Exception $e) {
+            Log::error('Error fetching comments: ' . $e->getMessage());
+            return response()->json([
+                'status' => false,
+                'message' => 'An error occurred while fetching comments',
+                'error' => $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * Store a new news feed review (legacy - for backward compatibility)
      * POST /newsfeed-reviews
      * If the same EmpCode already reviewed the same puid, it will update the existing review
      *
@@ -220,7 +481,7 @@ class NewsFeedController extends Controller
 
     /**
      * Get all news feeds with their reviews and calculated duration
-     * GET /newsfeed-with-reviews?corpId={corpId}&companyName={companyName}
+     * GET /newsfeed-with-reviews?corpId={corpId}&companyName={companyName}&startDate={startDate}&endDate={endDate}
      *
      * @param Request $request
      * @return \Illuminate\Http\JsonResponse
@@ -231,6 +492,8 @@ class NewsFeedController extends Controller
         $validator = Validator::make($request->query(), [
             'corpId' => 'required|string|max:10',
             'companyName' => 'nullable|string|max:100',
+            'startDate' => 'nullable|date_format:Y-m-d',
+            'endDate' => 'nullable|date_format:Y-m-d',
             'page' => 'nullable|integer|min:1',
             'per_page' => 'nullable|integer|min:1|max:100',
         ]);
@@ -246,6 +509,8 @@ class NewsFeedController extends Controller
         try {
             $corpId = $request->query('corpId');
             $companyName = $request->query('companyName');
+            $startDate = $request->query('startDate');
+            $endDate = $request->query('endDate');
             $perPage = $request->query('per_page', 10);
             $page = $request->query('page', 1);
 
@@ -258,6 +523,14 @@ class NewsFeedController extends Controller
                 $query->where('companyName', $companyName);
             }
 
+            // Add date range filter
+            if ($startDate) {
+                $query->where('date', '>=', $startDate);
+            }
+            if ($endDate) {
+                $query->where('date', '<=', $endDate);
+            }
+
             // Get paginated news feeds
             $newsFeeds = $query->orderBy('created_at', 'desc')->paginate($perPage, ['*'], 'page', $page);
 
@@ -267,7 +540,9 @@ class NewsFeedController extends Controller
                     'message' => 'No news feeds found',
                     'filters' => [
                         'corpId' => $corpId,
-                        'companyName' => $companyName
+                        'companyName' => $companyName,
+                        'startDate' => $startDate,
+                        'endDate' => $endDate
                     ],
                     'pagination' => [
                         'total' => 0,
@@ -329,7 +604,9 @@ class NewsFeedController extends Controller
                 'message' => 'News feeds retrieved successfully',
                 'filters' => [
                     'corpId' => $corpId,
-                    'companyName' => $companyName
+                    'companyName' => $companyName,
+                    'startDate' => $startDate,
+                    'endDate' => $endDate
                 ],
                 'pagination' => [
                     'total' => $newsFeeds->total(),
