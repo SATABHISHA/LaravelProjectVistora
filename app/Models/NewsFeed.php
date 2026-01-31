@@ -46,6 +46,14 @@ class NewsFeed extends Model
     }
 
     /**
+     * Get all likes for this news feed entry
+     */
+    public function likes()
+    {
+        return $this->hasMany(NewsFeedLike::class, 'puid', 'puid');
+    }
+
+    /**
      * Get count of likes
      */
     public function likesCount()

@@ -731,10 +731,39 @@ Route::get('/debug/statutory/{corpId}/{empCode}/{companyName}', [PaygroupConfigu
 Route::post('/attendance-summary/import', [EmployeeAttendanceSummaryApiController::class, 'importAttendanceSummary']);
 
 // NewsFeed Routes
+// Create a new news feed post
 Route::post('/newsfeed', [NewsFeedController::class, 'store']);
-Route::post('/newsfeed-reviews', [NewsFeedController::class, 'storeReview']);
-Route::delete('/newsfeed-reviews/{puid}', [NewsFeedController::class, 'deleteReview']);
+
+// Get all news feeds with reviews and likes
 Route::get('/newsfeed-with-reviews', [NewsFeedController::class, 'getWithReviews']);
+
+// Get a single news feed by puid
+Route::get('/newsfeed/{puid}', [NewsFeedController::class, 'show']);
+
+// Update a news feed post
+Route::put('/newsfeed/{puid}', [NewsFeedController::class, 'update']);
+Route::patch('/newsfeed/{puid}', [NewsFeedController::class, 'update']);
+
+// Delete a news feed post
+Route::delete('/newsfeed/{puid}', [NewsFeedController::class, 'destroy']);
+
+// Like a news feed post
+Route::post('/newsfeed/{puid}/like', [NewsFeedController::class, 'like']);
+
+// Unlike a news feed post
+Route::delete('/newsfeed/{puid}/unlike', [NewsFeedController::class, 'unlike']);
+
+// Get all likes for a news feed post
+Route::get('/newsfeed/{puid}/likes', [NewsFeedController::class, 'getLikes']);
+
+// Get likes count for a news feed post
+Route::get('/newsfeed/{puid}/likes-count', [NewsFeedController::class, 'getLikesCount']);
+
+// Create or update a review (comment)
+Route::post('/newsfeed-reviews', [NewsFeedController::class, 'storeReview']);
+
+// Delete a review (comment)
+Route::delete('/newsfeed-reviews/{puid}', [NewsFeedController::class, 'deleteReview']);
 
 // Utility Routes
 Route::get('/current-datetime', [UtilityApiController::class, 'currentDateTime']);

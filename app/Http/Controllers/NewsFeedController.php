@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use Illuminate\Http\Request;
 use App\Models\NewsFeed;
 use App\Models\NewsFeedReview;
+use App\Models\NewsFeedLike;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Facades\Log;
 use Carbon\Carbon;
@@ -249,7 +250,7 @@ class NewsFeedController extends Controller
             $page = $request->query('page', 1);
 
             // Build query with filters
-            $query = NewsFeed::with('reviews')
+            $query = NewsFeed::with(['reviews', 'likes'])
                 ->where('corpId', $corpId);
 
             // Add optional companyName filter
@@ -285,8 +286,8 @@ class NewsFeedController extends Controller
                 // Calculate duration for news feed
                 $duration = $this->calculateDuration($newsFeed->date, $newsFeed->time);
 
-                // Count likes and comments from loaded reviews collection
-                $likesCount = $newsFeed->reviews->where('isLiked', '1')->count();
+                // Count likes and comments from loaded collections
+                $likesCount = $newsFeed->likes->count();
                 $commentsCount = $newsFeed->reviews->where('comment', '!=', null)->where('comment', '!=', '')->count();
 
                 // Format reviews
@@ -493,6 +494,547 @@ class NewsFeedController extends Controller
             return response()->json([
                 'status' => false,
                 'message' => 'An error occurred while deleting review',
+                'error' => $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * Update a news feed entry
+     * PUT/PATCH /newsfeed/{puid}
+     *
+     * @param Request $request
+     * @param string $puid
+     * @return \Illuminate\Http\JsonResponse
+     */
+    public function update(Request $request, $puid)
+    {
+        // Validate request
+        $validator = Validator::make($request->all(), [
+            'corpId' => 'required|string|max:10',
+            'EmpCode' => 'required|string|max:20',
+            'body' => 'required|string',
+            'date' => 'required|string|max:20',
+            'time' => 'required|string|max:20',
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json([
+                'status' => false,
+                'message' => 'Validation failed',
+                'errors' => $validator->errors()
+            ], 422);
+        }
+
+        try {
+            // Find the news feed by puid
+            $newsFeed = NewsFeed::where('puid', $puid)
+                ->where('corpId', $request->corpId)
+                ->where('EmpCode', $request->EmpCode)
+                ->first();
+
+            if (!$newsFeed) {
+                return response()->json([
+                    'status' => false,
+                    'message' => 'News feed not found or you do not have permission to update it',
+                    'puid' => $puid
+                ], 404);
+            }
+
+            // Update the news feed
+            $newsFeed->update([
+                'body' => $request->body,
+                'date' => $request->date,
+                'time' => $request->time,
+            ]);
+
+            return response()->json([
+                'status' => true,
+                'message' => 'News feed updated successfully',
+                'data' => $newsFeed
+            ], 200);
+
+        } catch (\Exception $e) {
+            Log::error('Error updating news feed: ' . $e->getMessage());
+            return response()->json([
+                'status' => false,
+                'message' => 'An error occurred while updating news feed',
+                'error' => $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * Delete a news feed entry
+     * DELETE /newsfeed/{puid}
+     *
+     * @param Request $request
+     * @param string $puid
+     * @return \Illuminate\Http\JsonResponse
+     */
+    public function destroy(Request $request, $puid)
+    {
+        // Validate query parameters
+        $validator = Validator::make($request->query(), [
+            'corpId' => 'required|string|max:10',
+            'EmpCode' => 'required|string|max:20',
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json([
+                'status' => false,
+                'message' => 'Validation failed',
+                'errors' => $validator->errors()
+            ], 422);
+        }
+
+        try {
+            $corpId = $request->query('corpId');
+            $empCode = $request->query('EmpCode');
+
+            // Find the news feed by puid, corpId, and EmpCode
+            $newsFeed = NewsFeed::where('puid', $puid)
+                ->where('corpId', $corpId)
+                ->where('EmpCode', $empCode)
+                ->first();
+
+            if (!$newsFeed) {
+                return response()->json([
+                    'status' => false,
+                    'message' => 'News feed not found or you do not have permission to delete it',
+                    'puid' => $puid
+                ], 404);
+            }
+
+            // Delete the news feed (cascade will delete all reviews and likes)
+            $newsFeed->delete();
+
+            return response()->json([
+                'status' => true,
+                'message' => 'News feed deleted successfully',
+                'puid' => $puid
+            ], 200);
+
+        } catch (\Exception $e) {
+            Log::error('Error deleting news feed: ' . $e->getMessage());
+            return response()->json([
+                'status' => false,
+                'message' => 'An error occurred while deleting news feed',
+                'error' => $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * Get a single news feed entry with reviews and likes
+     * GET /newsfeed/{puid}
+     *
+     * @param Request $request
+     * @param string $puid
+     * @return \Illuminate\Http\JsonResponse
+     */
+    public function show(Request $request, $puid)
+    {
+        // Validate query parameters
+        $validator = Validator::make($request->query(), [
+            'corpId' => 'required|string|max:10',
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json([
+                'status' => false,
+                'message' => 'Validation failed',
+                'errors' => $validator->errors()
+            ], 422);
+        }
+
+        try {
+            $corpId = $request->query('corpId');
+
+            // Find the news feed with reviews and likes
+            $newsFeed = NewsFeed::with(['reviews', 'likes'])
+                ->where('puid', $puid)
+                ->where('corpId', $corpId)
+                ->first();
+
+            if (!$newsFeed) {
+                return response()->json([
+                    'status' => false,
+                    'message' => 'News feed not found',
+                    'puid' => $puid
+                ], 404);
+            }
+
+            // Calculate duration
+            $duration = $this->calculateDuration($newsFeed->date, $newsFeed->time);
+
+            // Count likes and comments
+            $likesCount = $newsFeed->likes->count();
+            $commentsCount = $newsFeed->reviews->where('comment', '!=', null)->where('comment', '!=', '')->count();
+
+            // Format reviews
+            $reviews = $newsFeed->reviews->map(function ($review) {
+                return [
+                    'id' => $review->id,
+                    'corpId' => $review->corpId,
+                    'puid' => $review->puid,
+                    'EmpCode' => $review->EmpCode,
+                    'companyName' => $review->companyName,
+                    'employeeFullName' => $review->employeeFullName,
+                    'isLiked' => $review->isLiked,
+                    'comment' => $review->comment,
+                    'date' => $this->formatDate($review->date),
+                    'time' => $this->formatTime($review->time),
+                    'duration' => $this->calculateDuration($review->date, $review->time),
+                ];
+            });
+
+            // Format likes
+            $likes = $newsFeed->likes->map(function ($like) {
+                return [
+                    'id' => $like->id,
+                    'corpId' => $like->corpId,
+                    'EmpCode' => $like->EmpCode,
+                    'companyName' => $like->companyName,
+                    'employeeFullName' => $like->employeeFullName,
+                    'date' => $this->formatDate($like->date),
+                    'time' => $this->formatTime($like->time),
+                    'duration' => $this->calculateDuration($like->date, $like->time),
+                ];
+            });
+
+            return response()->json([
+                'status' => true,
+                'message' => 'News feed retrieved successfully',
+                'data' => [
+                    'id' => $newsFeed->id,
+                    'corpId' => $newsFeed->corpId,
+                    'puid' => $newsFeed->puid,
+                    'EmpCode' => $newsFeed->EmpCode,
+                    'companyName' => $newsFeed->companyName,
+                    'employeeFullName' => $newsFeed->employeeFullName,
+                    'body' => $newsFeed->body,
+                    'date' => $this->formatDate($newsFeed->date),
+                    'time' => $this->formatTime($newsFeed->time),
+                    'duration' => $duration,
+                    'likesCount' => $likesCount,
+                    'commentsCount' => $commentsCount,
+                    'reviews' => $reviews,
+                    'likes' => $likes,
+                ]
+            ]);
+
+        } catch (\Exception $e) {
+            Log::error('Error fetching news feed: ' . $e->getMessage());
+            return response()->json([
+                'status' => false,
+                'message' => 'An error occurred while fetching news feed',
+                'error' => $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * Like a news feed post
+     * POST /newsfeed/{puid}/like
+     *
+     * @param Request $request
+     * @param string $puid
+     * @return \Illuminate\Http\JsonResponse
+     */
+    public function like(Request $request, $puid)
+    {
+        // Validate request
+        $validator = Validator::make($request->all(), [
+            'corpId' => 'required|string|max:10',
+            'EmpCode' => 'required|string|max:20',
+            'companyName' => 'required|string|max:100',
+            'date' => 'required|string|max:20',
+            'time' => 'required|string|max:20',
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json([
+                'status' => false,
+                'message' => 'Validation failed',
+                'errors' => $validator->errors()
+            ], 422);
+        }
+
+        try {
+            // Check if the news feed exists
+            $newsFeed = NewsFeed::where('puid', $puid)->first();
+
+            if (!$newsFeed) {
+                return response()->json([
+                    'status' => false,
+                    'message' => 'News feed not found with the provided puid',
+                    'puid' => $puid
+                ], 404);
+            }
+
+            // Fetch employee details from employee_details table
+            $employee = \DB::table('employee_details')
+                ->where('corp_id', $request->corpId)
+                ->where('EmpCode', $request->EmpCode)
+                ->first();
+
+            if (!$employee) {
+                return response()->json([
+                    'status' => false,
+                    'message' => 'Employee not found with the provided EmpCode',
+                    'corpId' => $request->corpId,
+                    'EmpCode' => $request->EmpCode
+                ], 404);
+            }
+
+            // Concatenate employee name
+            $employeeFullName = trim(
+                ($employee->FirstName ?? '') . ' ' . 
+                ($employee->MiddleName ?? '') . ' ' . 
+                ($employee->LastName ?? '')
+            );
+
+            // Check if already liked
+            $existingLike = NewsFeedLike::where('puid', $puid)
+                ->where('corpId', $request->corpId)
+                ->where('EmpCode', $request->EmpCode)
+                ->first();
+
+            if ($existingLike) {
+                return response()->json([
+                    'status' => false,
+                    'message' => 'You have already liked this post',
+                    'data' => $existingLike
+                ], 409);
+            }
+
+            // Create new like
+            $like = NewsFeedLike::create([
+                'corpId' => $request->corpId,
+                'puid' => $puid,
+                'EmpCode' => $request->EmpCode,
+                'companyName' => $request->companyName,
+                'employeeFullName' => $employeeFullName,
+                'date' => $request->date,
+                'time' => $request->time,
+            ]);
+
+            // Get updated likes count
+            $likesCount = NewsFeedLike::where('puid', $puid)->count();
+
+            return response()->json([
+                'status' => true,
+                'message' => 'Post liked successfully',
+                'data' => $like,
+                'likesCount' => $likesCount
+            ], 201);
+
+        } catch (\Exception $e) {
+            Log::error('Error liking post: ' . $e->getMessage());
+            return response()->json([
+                'status' => false,
+                'message' => 'An error occurred while liking the post',
+                'error' => $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * Unlike a news feed post
+     * DELETE /newsfeed/{puid}/unlike
+     *
+     * @param Request $request
+     * @param string $puid
+     * @return \Illuminate\Http\JsonResponse
+     */
+    public function unlike(Request $request, $puid)
+    {
+        // Validate query parameters
+        $validator = Validator::make($request->query(), [
+            'corpId' => 'required|string|max:10',
+            'EmpCode' => 'required|string|max:20',
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json([
+                'status' => false,
+                'message' => 'Validation failed',
+                'errors' => $validator->errors()
+            ], 422);
+        }
+
+        try {
+            $corpId = $request->query('corpId');
+            $empCode = $request->query('EmpCode');
+
+            // Find the like
+            $like = NewsFeedLike::where('puid', $puid)
+                ->where('corpId', $corpId)
+                ->where('EmpCode', $empCode)
+                ->first();
+
+            if (!$like) {
+                return response()->json([
+                    'status' => false,
+                    'message' => 'You have not liked this post',
+                    'puid' => $puid
+                ], 404);
+            }
+
+            // Delete the like
+            $like->delete();
+
+            // Get updated likes count
+            $likesCount = NewsFeedLike::where('puid', $puid)->count();
+
+            return response()->json([
+                'status' => true,
+                'message' => 'Post unliked successfully',
+                'puid' => $puid,
+                'likesCount' => $likesCount
+            ], 200);
+
+        } catch (\Exception $e) {
+            Log::error('Error unliking post: ' . $e->getMessage());
+            return response()->json([
+                'status' => false,
+                'message' => 'An error occurred while unliking the post',
+                'error' => $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * Get all likes for a news feed post
+     * GET /newsfeed/{puid}/likes
+     *
+     * @param Request $request
+     * @param string $puid
+     * @return \Illuminate\Http\JsonResponse
+     */
+    public function getLikes(Request $request, $puid)
+    {
+        // Validate query parameters
+        $validator = Validator::make($request->query(), [
+            'corpId' => 'required|string|max:10',
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json([
+                'status' => false,
+                'message' => 'Validation failed',
+                'errors' => $validator->errors()
+            ], 422);
+        }
+
+        try {
+            $corpId = $request->query('corpId');
+
+            // Check if the news feed exists
+            $newsFeed = NewsFeed::where('puid', $puid)
+                ->where('corpId', $corpId)
+                ->first();
+
+            if (!$newsFeed) {
+                return response()->json([
+                    'status' => false,
+                    'message' => 'News feed not found',
+                    'puid' => $puid
+                ], 404);
+            }
+
+            // Get all likes for this post
+            $likes = NewsFeedLike::where('puid', $puid)
+                ->orderBy('created_at', 'desc')
+                ->get();
+
+            // Format likes
+            $formattedLikes = $likes->map(function ($like) {
+                return [
+                    'id' => $like->id,
+                    'corpId' => $like->corpId,
+                    'EmpCode' => $like->EmpCode,
+                    'companyName' => $like->companyName,
+                    'employeeFullName' => $like->employeeFullName,
+                    'date' => $this->formatDate($like->date),
+                    'time' => $this->formatTime($like->time),
+                    'duration' => $this->calculateDuration($like->date, $like->time),
+                ];
+            });
+
+            return response()->json([
+                'status' => true,
+                'message' => 'Likes retrieved successfully',
+                'puid' => $puid,
+                'count' => $formattedLikes->count(),
+                'data' => $formattedLikes
+            ]);
+
+        } catch (\Exception $e) {
+            Log::error('Error fetching likes: ' . $e->getMessage());
+            return response()->json([
+                'status' => false,
+                'message' => 'An error occurred while fetching likes',
+                'error' => $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * Get likes count for a news feed post
+     * GET /newsfeed/{puid}/likes-count
+     *
+     * @param Request $request
+     * @param string $puid
+     * @return \Illuminate\Http\JsonResponse
+     */
+    public function getLikesCount(Request $request, $puid)
+    {
+        // Validate query parameters
+        $validator = Validator::make($request->query(), [
+            'corpId' => 'required|string|max:10',
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json([
+                'status' => false,
+                'message' => 'Validation failed',
+                'errors' => $validator->errors()
+            ], 422);
+        }
+
+        try {
+            $corpId = $request->query('corpId');
+
+            // Check if the news feed exists
+            $newsFeed = NewsFeed::where('puid', $puid)
+                ->where('corpId', $corpId)
+                ->first();
+
+            if (!$newsFeed) {
+                return response()->json([
+                    'status' => false,
+                    'message' => 'News feed not found',
+                    'puid' => $puid
+                ], 404);
+            }
+
+            // Get likes count
+            $likesCount = NewsFeedLike::where('puid', $puid)->count();
+
+            return response()->json([
+                'status' => true,
+                'message' => 'Likes count retrieved successfully',
+                'puid' => $puid,
+                'likesCount' => $likesCount
+            ]);
+
+        } catch (\Exception $e) {
+            Log::error('Error fetching likes count: ' . $e->getMessage());
+            return response()->json([
+                'status' => false,
+                'message' => 'An error occurred while fetching likes count',
                 'error' => $e->getMessage()
             ], 500);
         }
