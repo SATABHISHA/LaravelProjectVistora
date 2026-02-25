@@ -88,6 +88,12 @@ use App\Http\Controllers\CompanyStorageController;
 use App\Http\Controllers\FmsController;
 use App\Http\Controllers\FmsCategoryController;
 use App\Http\Controllers\EmployeeListApiController;
+use App\Http\Controllers\RecruitmentJobPostingApiController;
+use App\Http\Controllers\RecruitmentCandidateApiController;
+use App\Http\Controllers\RecruitmentApplicationApiController;
+use App\Http\Controllers\RecruitmentStageApiController;
+use App\Http\Controllers\OfferLetterTemplateApiController;
+use App\Http\Controllers\OfferLetterApiController;
 
 /*
 |--------------------------------------------------------------------------
@@ -820,3 +826,70 @@ Route::get('/employee-leave-balance/list/{corpId}/{empCode?}', [EmployeeLeaveBal
 Route::get('/employee-leave-balance/summary/{corpId}', [EmployeeLeaveBalanceApiController::class, 'getLeaveSummary']); // Get leave summary for admin dashboard
 Route::get('/employee-leave-balance/leave-names/{corpId}/{empCode?}', [EmployeeLeaveBalanceApiController::class, 'getLeaveNames']); // Get leave names by corp_id and optional emp_code
 Route::get('/employee-leave-balance/{corpId}/{empCode}', [EmployeeLeaveBalanceApiController::class, 'getEmployeeLeaveBalance']); // Get individual employee leave balance
+
+// ============================================================
+// ONBOARDING - RECRUITMENT JOB POSTINGS
+// ============================================================
+Route::get('/recruitment/job-postings/{corp_id}', [RecruitmentJobPostingApiController::class, 'index']);
+Route::get('/recruitment/job-postings/{corp_id}/{id}', [RecruitmentJobPostingApiController::class, 'show']);
+Route::post('/recruitment/job-postings', [RecruitmentJobPostingApiController::class, 'store']);
+Route::put('/recruitment/job-postings/{corp_id}/{id}', [RecruitmentJobPostingApiController::class, 'update']);
+Route::delete('/recruitment/job-postings/{corp_id}/{id}', [RecruitmentJobPostingApiController::class, 'destroy']);
+Route::patch('/recruitment/job-postings/{corp_id}/{id}/status', [RecruitmentJobPostingApiController::class, 'changeStatus']);
+
+// ============================================================
+// ONBOARDING - RECRUITMENT CANDIDATES
+// ============================================================
+Route::get('/recruitment/candidates/{corp_id}', [RecruitmentCandidateApiController::class, 'index']);
+Route::get('/recruitment/candidates/{corp_id}/{id}', [RecruitmentCandidateApiController::class, 'show']);
+Route::post('/recruitment/candidates', [RecruitmentCandidateApiController::class, 'store']);
+Route::post('/recruitment/candidates/{corp_id}/{id}', [RecruitmentCandidateApiController::class, 'update']); // POST for multipart/form-data with resume
+Route::delete('/recruitment/candidates/{corp_id}/{id}', [RecruitmentCandidateApiController::class, 'destroy']);
+Route::get('/recruitment/candidates/{corp_id}/{id}/resume', [RecruitmentCandidateApiController::class, 'downloadResume']);
+
+// ============================================================
+// ONBOARDING - RECRUITMENT STAGES
+// ============================================================
+Route::get('/recruitment/stages/{corp_id}', [RecruitmentStageApiController::class, 'index']);
+Route::get('/recruitment/stages/{corp_id}/{id}', [RecruitmentStageApiController::class, 'show']);
+Route::post('/recruitment/stages', [RecruitmentStageApiController::class, 'store']);
+Route::put('/recruitment/stages/{corp_id}/{id}', [RecruitmentStageApiController::class, 'update']);
+Route::delete('/recruitment/stages/{corp_id}/{id}', [RecruitmentStageApiController::class, 'destroy']);
+
+// ============================================================
+// ONBOARDING - RECRUITMENT APPLICATIONS
+// ============================================================
+Route::get('/recruitment/applications/{corp_id}', [RecruitmentApplicationApiController::class, 'index']);
+Route::get('/recruitment/applications/{corp_id}/{id}', [RecruitmentApplicationApiController::class, 'show']);
+Route::post('/recruitment/applications', [RecruitmentApplicationApiController::class, 'store']);
+Route::put('/recruitment/applications/{corp_id}/{id}', [RecruitmentApplicationApiController::class, 'update']);
+Route::delete('/recruitment/applications/{corp_id}/{id}', [RecruitmentApplicationApiController::class, 'destroy']);
+// Selection / Rejection
+Route::patch('/recruitment/applications/{corp_id}/{id}/decide', [RecruitmentApplicationApiController::class, 'decideCandidate']);
+// Stage Results (Interview Remarks)
+Route::get('/recruitment/applications/{corp_id}/{application_id}/stage-results', [RecruitmentApplicationApiController::class, 'listStageResults']);
+Route::post('/recruitment/applications/{corp_id}/{application_id}/stage-results', [RecruitmentApplicationApiController::class, 'addStageResult']);
+Route::put('/recruitment/applications/{corp_id}/{application_id}/stage-results/{result_id}', [RecruitmentApplicationApiController::class, 'updateStageResult']);
+Route::delete('/recruitment/applications/{corp_id}/{application_id}/stage-results/{result_id}', [RecruitmentApplicationApiController::class, 'deleteStageResult']);
+
+// ============================================================
+// ONBOARDING - OFFER LETTER TEMPLATES
+// ============================================================
+Route::get('/offer-letter-templates/{corp_id}', [OfferLetterTemplateApiController::class, 'index']);
+Route::get('/offer-letter-templates/{corp_id}/{id}', [OfferLetterTemplateApiController::class, 'show']);
+Route::post('/offer-letter-templates', [OfferLetterTemplateApiController::class, 'store']);
+Route::post('/offer-letter-templates/{corp_id}/{id}', [OfferLetterTemplateApiController::class, 'update']); // POST for multipart/form-data
+Route::delete('/offer-letter-templates/{corp_id}/{id}', [OfferLetterTemplateApiController::class, 'destroy']);
+Route::post('/offer-letter-templates/{corp_id}/{id}/upload-logo', [OfferLetterTemplateApiController::class, 'uploadLogo']);
+Route::post('/offer-letter-templates/{corp_id}/{id}/upload-signature', [OfferLetterTemplateApiController::class, 'uploadSignature']);
+
+// ============================================================
+// ONBOARDING - OFFER LETTERS
+// ============================================================
+Route::get('/offer-letters/{corp_id}', [OfferLetterApiController::class, 'index']);
+Route::get('/offer-letters/{corp_id}/{id}', [OfferLetterApiController::class, 'show']);
+Route::post('/offer-letters/generate', [OfferLetterApiController::class, 'generate']);
+Route::get('/offer-letters/{corp_id}/{id}/download-pdf', [OfferLetterApiController::class, 'downloadPdf']);
+Route::get('/offer-letters/{corp_id}/{id}/preview', [OfferLetterApiController::class, 'preview']);
+Route::patch('/offer-letters/{corp_id}/{id}/status', [OfferLetterApiController::class, 'updateStatus']);
+Route::delete('/offer-letters/{corp_id}/{id}', [OfferLetterApiController::class, 'destroy']);
