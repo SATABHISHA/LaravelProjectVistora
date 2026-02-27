@@ -3514,5 +3514,260 @@ class EmployeePayrollSalaryProcessApiController extends Controller
             ], 500);
         }
     }
+
+    /**
+     * Generate and download a salary slip PDF for a single employee with dynamic company name.
+     * Unlike the custom PDF endpoint, this does NOT have any hardcoded company defaults —
+     * the company name is required and all company details come from the database.
+     *
+     * @param string $corpId
+     * @param string $empCode
+     * @param string $year
+     * @param string $month
+     * @param string $companyName  (required)
+     * @return \Symfony\Component\HttpFoundation\StreamedResponse
+     */
+    public function downloadDynamicSalarySlipPdf($corpId, $empCode, $year, $month, $companyName)
+    {
+        try {
+            // Normalize month: accept numeric (1-12) or month name ("January", etc.)
+            if (is_numeric($month)) {
+                $monthNumber = (int)$month;
+                $monthName = date('F', mktime(0, 0, 0, $monthNumber, 1));
+            } else {
+                $monthName = ucfirst(strtolower($month));
+                $monthNumber = (int)date('n', strtotime($monthName));
+            }
+
+            // Query payroll with mandatory companyName filter
+            $payroll = EmployeePayrollSalaryProcess::where('corpId', $corpId)
+                ->where('empCode', $empCode)
+                ->where('year', $year)
+                ->where('month', $monthName)
+                ->where('companyName', $companyName)
+                ->first();
+
+            if (!$payroll) {
+                abort(404, 'Payroll record not found for the specified employee, period, and company.');
+            }
+
+            // Fetch related data
+            $employeeDetail = \App\Models\EmployeeDetail::where('corp_id', $corpId)->where('EmpCode', $empCode)->first();
+            $employmentDetail = \App\Models\EmploymentDetail::where('corp_id', $corpId)->where('EmpCode', $empCode)->first();
+            $companyDetails = \App\Models\CompanyDetails::where('corp_id', $corpId)->first();
+            $statutoryDetail = \App\Models\EmployeeStatutoryDetail::where('corp_id', $corpId)->where('EmpCode', $empCode)->first();
+            $bankDetail = \App\Models\EmployeeBankDetail::where('corp_id', $corpId)->where('empcode', $empCode)->first();
+
+            $attendanceSummary = \App\Models\EmployeeAttendanceSummary::where('corpId', $corpId)
+                ->where('empCode', $empCode)
+                ->where('year', $year)
+                ->where('month', $monthName)
+                ->first();
+
+            // Process payroll data
+            $earnings = json_decode($payroll->grossList, true) ?: [];
+            $deductions = json_decode($payroll->recurringDeduction, true) ?: [];
+            $totalEarnings = array_sum(array_column($earnings, 'calculatedValue'));
+            $totalDeductions = array_sum(array_column($deductions, 'calculatedValue'));
+            $netPay = $totalEarnings - $totalDeductions;
+
+            // Prepare data for the dynamic view (no hardcoded company defaults)
+            $data = [
+                'company' => $companyDetails,
+                'dynamicCompanyName' => $companyName,
+                'employee' => $employeeDetail,
+                'employment' => $employmentDetail,
+                'statutory' => $statutoryDetail,
+                'bank' => $bankDetail,
+                'payroll' => $payroll,
+                'monthName' => $monthName,
+                'year' => $year,
+                'attendance' => $attendanceSummary,
+                'earnings' => $earnings,
+                'deductions' => $deductions,
+                'totalEarnings' => $totalEarnings,
+                'totalDeductions' => $totalDeductions,
+                'netPay' => $netPay,
+                'netPayInWords' => $this->numberToWords($netPay),
+                'payDays' => $attendanceSummary ? $attendanceSummary->paidDays : 30,
+            ];
+
+            // Generate PDF using the dynamic template (no MACO defaults)
+            $html = view('salary-slip-dynamic-pdf', $data)->render();
+
+            $options = new \Dompdf\Options();
+            $options->set('isHtml5ParserEnabled', true);
+            $options->set('isRemoteEnabled', true);
+
+            $dompdf = new \Dompdf\Dompdf($options);
+            $dompdf->loadHtml($html);
+            $dompdf->setPaper('A4', 'portrait');
+            $dompdf->render();
+
+            $filename = "Payslip_{$empCode}_{$monthName}_{$year}.pdf";
+
+            return response()->streamDownload(function () use ($dompdf) {
+                echo $dompdf->output();
+            }, $filename, [
+                'Content-Type' => 'application/pdf',
+            ]);
+
+        } catch (\Exception $e) {
+            Log::error('Error generating dynamic single salary slip: ' . $e->getMessage());
+            abort(500, 'Error generating salary slip: ' . $e->getMessage());
+        }
+    }
+
+    /**
+     * Generate and download salary slip PDFs for all employees of a given company in a ZIP file.
+     * The company name is dynamic (required in request body) — no hardcoded company defaults.
+     *
+     * @param Request $request
+     * @return \Symfony\Component\HttpFoundation\BinaryFileResponse
+     */
+    public function downloadAllDynamicSalarySlipsPdf(Request $request)
+    {
+        $request->validate([
+            'corpId' => 'required|string|max:10',
+            'companyName' => 'required|string|max:100',
+            'year' => 'required|string|max:4',
+            'month' => 'required|string|max:50',
+            'status' => 'nullable|string',
+        ]);
+
+        try {
+            // Normalize month
+            if (is_numeric($request->month)) {
+                $monthNumber = (int)$request->month;
+                $monthName = date('F', mktime(0, 0, 0, $monthNumber, 1));
+            } else {
+                $monthName = ucfirst(strtolower($request->month));
+                $monthNumber = (int)date('n', strtotime($monthName));
+            }
+
+            // Fetch payroll records filtered by dynamic companyName
+            $query = EmployeePayrollSalaryProcess::where('corpId', $request->corpId)
+                ->where('companyName', $request->companyName)
+                ->where('year', $request->year)
+                ->where('month', $monthName);
+
+            if ($request->has('status') && !empty($request->status)) {
+                $query->where('status', $request->status);
+            }
+
+            $payrollRecords = $query->get();
+
+            if ($payrollRecords->isEmpty()) {
+                abort(404, 'No payroll records found for the specified criteria.');
+            }
+
+            // Bulk fetch all required data
+            $empCodes = $payrollRecords->pluck('empCode')->unique()->toArray();
+
+            $employeeDetails = \App\Models\EmployeeDetail::where('corp_id', $request->corpId)->whereIn('EmpCode', $empCodes)->get()->keyBy('EmpCode');
+            $employmentDetails = \App\Models\EmploymentDetail::where('corp_id', $request->corpId)->whereIn('EmpCode', $empCodes)->get()->keyBy('EmpCode');
+            $companyDetails = \App\Models\CompanyDetails::where('corp_id', $request->corpId)->first();
+            $statutoryDetails = \App\Models\EmployeeStatutoryDetail::where('corp_id', $request->corpId)->whereIn('EmpCode', $empCodes)->get()->keyBy('EmpCode');
+            $bankDetails = \App\Models\EmployeeBankDetail::where('corp_id', $request->corpId)->whereIn('empcode', $empCodes)->get()->keyBy('empcode');
+
+            $attendanceSummaries = \App\Models\EmployeeAttendanceSummary::where('corpId', $request->corpId)
+                ->where('year', $request->year)
+                ->where('month', $monthName)
+                ->whereIn('empCode', $empCodes)
+                ->get()->keyBy('empCode');
+
+            // Prepare for PDF generation
+            $tempDir = storage_path('app/temp/dynamic_salary_slips_' . time());
+            File::makeDirectory($tempDir, 0755, true);
+            $generatedFiles = [];
+
+            // Loop and generate PDFs
+            foreach ($payrollRecords as $payroll) {
+                $empCode = $payroll->empCode;
+
+                $earnings = json_decode($payroll->grossList, true) ?: [];
+                $deductions = json_decode($payroll->recurringDeduction, true) ?: [];
+                $totalEarnings = array_sum(array_column($earnings, 'calculatedValue'));
+                $totalDeductions = array_sum(array_column($deductions, 'calculatedValue'));
+                $netPay = $totalEarnings - $totalDeductions;
+                $attendance = $attendanceSummaries->get($empCode);
+
+                $data = [
+                    'company' => $companyDetails,
+                    'dynamicCompanyName' => $request->companyName,
+                    'employee' => $employeeDetails->get($empCode),
+                    'employment' => $employmentDetails->get($empCode),
+                    'statutory' => $statutoryDetails->get($empCode),
+                    'bank' => $bankDetails->get($empCode),
+                    'payroll' => $payroll,
+                    'monthName' => $monthName,
+                    'year' => $request->year,
+                    'attendance' => $attendance,
+                    'earnings' => $earnings,
+                    'deductions' => $deductions,
+                    'totalEarnings' => $totalEarnings,
+                    'totalDeductions' => $totalDeductions,
+                    'netPay' => $netPay,
+                    'netPayInWords' => $this->numberToWords($netPay),
+                    'payDays' => $attendance->paidDays ?? 30,
+                ];
+
+                // Use the dynamic template (no hardcoded company defaults)
+                $html = view('salary-slip-dynamic-pdf', $data)->render();
+
+                $options = new \Dompdf\Options();
+                $options->set('isHtml5ParserEnabled', true);
+                $options->set('isRemoteEnabled', true);
+
+                $dompdf = new \Dompdf\Dompdf($options);
+                $dompdf->loadHtml($html);
+                $dompdf->setPaper('A4', 'portrait');
+                $dompdf->render();
+
+                $filename = "Payslip_{$empCode}_{$monthName}_{$request->year}.pdf";
+                $filePath = $tempDir . '/' . $filename;
+                file_put_contents($filePath, $dompdf->output());
+                $generatedFiles[] = $filePath;
+            }
+
+            // Create ZIP file
+            if (empty($generatedFiles)) {
+                File::deleteDirectory($tempDir);
+                abort(500, 'Failed to generate any PDF files.');
+            }
+
+            $safeCompanyName = preg_replace('/[^A-Za-z0-9_\-]/', '_', $request->companyName);
+            $zipFilename = "Payslips_{$safeCompanyName}_{$monthName}_{$request->year}.zip";
+            $zipPath = $tempDir . '/' . $zipFilename;
+
+            $zip = new ZipArchive;
+            if ($zip->open($zipPath, ZipArchive::CREATE) === TRUE) {
+                foreach ($generatedFiles as $file) {
+                    $zip->addFile($file, basename($file));
+                }
+                $zip->close();
+            } else {
+                File::deleteDirectory($tempDir);
+                abort(500, 'Failed to create ZIP file.');
+            }
+
+            return response()->download($zipPath, $zipFilename)->deleteFileAfterSend(true);
+
+        } catch (\Exception $e) {
+            if (isset($tempDir) && File::exists($tempDir)) {
+                File::deleteDirectory($tempDir);
+            }
+            Log::error('Error generating bulk dynamic salary slips: ' . $e->getMessage());
+            abort(500, 'Error generating bulk dynamic salary slips: ' . $e->getMessage());
+        }
+    }
+
+    /**
+     * Download all dynamic salary slips as PDF (GET method for FlutterFlow compatibility)
+     */
+    public function downloadAllDynamicSalarySlipsPdfGet(Request $request)
+    {
+        return $this->downloadAllDynamicSalarySlipsPdf($request);
+    }
 }
 

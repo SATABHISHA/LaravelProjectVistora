@@ -657,6 +657,11 @@ Route::middleware(['cors'])->group(function () {
     // New routes for bulk downloading custom salary slips
     Route::post('/salary-slips/download-all-custom-pdf', [EmployeePayrollSalaryProcessApiController::class, 'downloadAllCustomSalarySlipsPdf']);
     Route::get('/salary-slips/download-all-custom-pdf', [EmployeePayrollSalaryProcessApiController::class, 'downloadAllCustomSalarySlipsPdfGet']);
+
+    // Dynamic company name salary slip routes (no hardcoded company defaults)
+    Route::get('/salary-slip/download-dynamic-pdf/{corpId}/{empCode}/{year}/{month}/{companyName}', [EmployeePayrollSalaryProcessApiController::class, 'downloadDynamicSalarySlipPdf']);
+    Route::post('/salary-slips/download-all-dynamic-pdf', [EmployeePayrollSalaryProcessApiController::class, 'downloadAllDynamicSalarySlipsPdf']);
+    Route::get('/salary-slips/download-all-dynamic-pdf', [EmployeePayrollSalaryProcessApiController::class, 'downloadAllDynamicSalarySlipsPdfGet']);
 });
 
 // Add these new routes for shift codes and shift names
