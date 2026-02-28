@@ -898,3 +898,85 @@ Route::get('/offer-letters/{corp_id}/{id}/download-pdf', [OfferLetterApiControll
 Route::get('/offer-letters/{corp_id}/{id}/preview', [OfferLetterApiController::class, 'preview']);
 Route::patch('/offer-letters/{corp_id}/{id}/status', [OfferLetterApiController::class, 'updateStatus']);
 Route::delete('/offer-letters/{corp_id}/{id}', [OfferLetterApiController::class, 'destroy']);
+
+// ============================================================
+// TIMESHEET SYSTEM APIs
+// ============================================================
+use App\Http\Controllers\TimesheetAuthController;
+use App\Http\Controllers\TimesheetProjectController;
+use App\Http\Controllers\TimesheetTaskController;
+use App\Http\Controllers\TimesheetDailyReportController;
+use App\Http\Controllers\TimesheetHistoryController;
+use App\Http\Controllers\TimesheetReportController;
+
+Route::prefix('timesheet')->group(function () {
+
+    // ---- Public Auth Routes ----
+    Route::post('/auth/register', [TimesheetAuthController::class, 'register']);
+    Route::post('/auth/login', [TimesheetAuthController::class, 'login']);
+
+    // ---- Protected Routes (Sanctum) ----
+    Route::middleware('auth:sanctum')->group(function () {
+
+        // Auth
+        Route::post('/auth/logout', [TimesheetAuthController::class, 'logout']);
+        Route::get('/auth/profile', [TimesheetAuthController::class, 'profile']);
+
+        // Users (Admin & Supervisor)
+        Route::get('/users', [TimesheetAuthController::class, 'listUsers'])
+            ->middleware('ts.role:admin,supervisor');
+
+        // ---- Projects (Admin & Supervisor can create/manage) ----
+        Route::get('/projects', [TimesheetProjectController::class, 'index']);
+        Route::post('/projects', [TimesheetProjectController::class, 'store'])
+            ->middleware('ts.role:admin,supervisor');
+        Route::get('/projects/{id}', [TimesheetProjectController::class, 'show']);
+        Route::put('/projects/{id}', [TimesheetProjectController::class, 'update'])
+            ->middleware('ts.role:admin,supervisor');
+        Route::delete('/projects/{id}', [TimesheetProjectController::class, 'destroy'])
+            ->middleware('ts.role:admin');
+        Route::post('/projects/{id}/extend-timeline', [TimesheetProjectController::class, 'extendTimeline'])
+            ->middleware('ts.role:admin,supervisor');
+        Route::post('/projects/{id}/assign-member', [TimesheetProjectController::class, 'assignMember'])
+            ->middleware('ts.role:admin,supervisor');
+        Route::post('/projects/{id}/remove-member', [TimesheetProjectController::class, 'removeMember'])
+            ->middleware('ts.role:admin,supervisor');
+
+        // ---- Tasks ----
+        Route::get('/tasks', [TimesheetTaskController::class, 'index']);
+        Route::post('/tasks', [TimesheetTaskController::class, 'store'])
+            ->middleware('ts.role:admin,supervisor');
+        Route::get('/tasks/{id}', [TimesheetTaskController::class, 'show']);
+        Route::put('/tasks/{id}', [TimesheetTaskController::class, 'update'])
+            ->middleware('ts.role:admin,supervisor');
+        Route::delete('/tasks/{id}', [TimesheetTaskController::class, 'destroy'])
+            ->middleware('ts.role:admin');
+        Route::patch('/tasks/{id}/status', [TimesheetTaskController::class, 'updateStatus'])
+            ->middleware('ts.role:subordinate');
+        Route::post('/tasks/{id}/approve', [TimesheetTaskController::class, 'approve'])
+            ->middleware('ts.role:admin,supervisor');
+        Route::post('/tasks/{id}/reject', [TimesheetTaskController::class, 'reject'])
+            ->middleware('ts.role:admin,supervisor');
+
+        // ---- Daily Reports ----
+        Route::get('/daily-reports', [TimesheetDailyReportController::class, 'index']);
+        Route::post('/daily-reports', [TimesheetDailyReportController::class, 'store'])
+            ->middleware('ts.role:subordinate');
+        Route::get('/daily-reports/{id}', [TimesheetDailyReportController::class, 'show']);
+        Route::put('/daily-reports/{id}', [TimesheetDailyReportController::class, 'update'])
+            ->middleware('ts.role:subordinate');
+        Route::delete('/daily-reports/{id}', [TimesheetDailyReportController::class, 'destroy']);
+
+        // ---- Histories ----
+        Route::get('/histories/tasks', [TimesheetHistoryController::class, 'taskHistories']);
+        Route::get('/histories/projects', [TimesheetHistoryController::class, 'projectHistories']);
+
+        // ---- Reports & KPIs ----
+        Route::get('/reports/subordinate-performance', [TimesheetReportController::class, 'subordinatePerformance']);
+        Route::get('/reports/supervisor-performance', [TimesheetReportController::class, 'supervisorPerformance'])
+            ->middleware('ts.role:admin,supervisor');
+        Route::get('/reports/organization-performance', [TimesheetReportController::class, 'organizationPerformance'])
+            ->middleware('ts.role:admin');
+        Route::get('/reports/kpi-history', [TimesheetReportController::class, 'kpiHistory']);
+    });
+});
