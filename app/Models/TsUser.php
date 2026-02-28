@@ -18,6 +18,8 @@ class TsUser extends Authenticatable
         'role',
         'supervisor_id',
         'is_active',
+        'corp_id',
+        'vistora_user_login_id',
     ];
 
     protected $hidden = [

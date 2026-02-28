@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\TsUser;
+use App\Models\UserLogin;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Validation\Rule;
@@ -59,9 +60,108 @@ class TimesheetAuthController extends Controller
     }
 
     /**
-     * Login an existing timesheet user.
+     * Login - supports BOTH Vistora credentials and direct timesheet credentials.
+     *
+     * Vistora login: { "corp_id": "test", "email": "test@gmail.com", "password": "123456" }
+     * Direct login:  { "email": "user@test.com", "password": "password123" }
+     *
+     * For Vistora login: authenticates against the `userlogin` table and
+     * auto-creates/links a ts_user record on first login.
      */
     public function login(Request $request)
+    {
+        // Detect Vistora login when corp_id is provided
+        if ($request->filled('corp_id')) {
+            return $this->vistoraLogin($request);
+        }
+
+        return $this->directLogin($request);
+    }
+
+    /**
+     * Vistora login: authenticate against the existing userlogin table.
+     */
+    private function vistoraLogin(Request $request)
+    {
+        $request->validate([
+            'corp_id' => 'required|string',
+            'email' => 'required|email',
+            'password' => 'required|string',
+        ]);
+
+        // Find user in the Vistora userlogin table
+        $vistoraUser = UserLogin::where('corp_id', $request->corp_id)
+            ->where('email_id', $request->email)
+            ->first();
+
+        if (!$vistoraUser || !Hash::check($request->password, $vistoraUser->password)) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Invalid Vistora credentials.',
+            ], 401);
+        }
+
+        if ((int) $vistoraUser->active_yn !== 1) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Your Vistora account is inactive.',
+            ], 403);
+        }
+
+        // Map Vistora role to timesheet role
+        $role = $this->mapVistoraRole($vistoraUser);
+
+        // Find or create linked ts_user
+        $tsUser = TsUser::where('vistora_user_login_id', $vistoraUser->user_login_id)
+            ->where('corp_id', $request->corp_id)
+            ->first();
+
+        if (!$tsUser) {
+            // Also check by email
+            $tsUser = TsUser::where('email', $request->email)
+                ->where('corp_id', $request->corp_id)
+                ->first();
+        }
+
+        if (!$tsUser) {
+            // Auto-create timesheet user from Vistora credentials
+            // Use plain-text password from request (TsUser 'hashed' cast will hash it)
+            $tsUser = TsUser::create([
+                'name' => $vistoraUser->username,
+                'email' => $vistoraUser->email_id,
+                'password' => $request->password,
+                'role' => $role,
+                'corp_id' => $request->corp_id,
+                'vistora_user_login_id' => $vistoraUser->user_login_id,
+                'is_active' => true,
+            ]);
+        } else {
+            // Update link if not set
+            if (!$tsUser->vistora_user_login_id) {
+                $tsUser->update([
+                    'vistora_user_login_id' => $vistoraUser->user_login_id,
+                    'corp_id' => $request->corp_id,
+                ]);
+            }
+            // Sync role from Vistora
+            if ($tsUser->role !== $role) {
+                $tsUser->update(['role' => $role]);
+            }
+        }
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Login successful via Vistora.',
+            'data' => [
+                'user' => $tsUser->only(['id', 'name', 'email', 'role', 'supervisor_id', 'corp_id']),
+            ],
+        ]);
+    }
+
+    /**
+     * Direct timesheet login (against ts_users table).
+     */
+    private function directLogin(Request $request)
     {
         $request->validate([
             'email' => 'required|email',
@@ -88,13 +188,28 @@ class TimesheetAuthController extends Controller
             'success' => true,
             'message' => 'Login successful.',
             'data' => [
-                'user' => $user->only(['id', 'name', 'email', 'role', 'supervisor_id']),
+                'user' => $user->only(['id', 'name', 'email', 'role', 'supervisor_id', 'corp_id']),
             ],
         ]);
     }
 
     /**
-     * Get user profile. Requires user_id parameter.
+     * Map Vistora user roles to timesheet role.
+     * admin_yn=1 → admin, supervisor_yn=1 → supervisor, otherwise → subordinate
+     */
+    private function mapVistoraRole(UserLogin $vistoraUser): string
+    {
+        if ((int) $vistoraUser->admin_yn === 1) {
+            return 'admin';
+        }
+        if ((int) $vistoraUser->supervisor_yn === 1) {
+            return 'supervisor';
+        }
+        return 'subordinate';
+    }
+
+    /**
+     * Get user profile. Requires user_id query parameter.
      */
     public function profile(Request $request)
     {
@@ -131,7 +246,7 @@ class TimesheetAuthController extends Controller
             $query->where('role', $request->role);
         }
 
-        $users = $query->select(['id', 'name', 'email', 'role', 'supervisor_id', 'is_active', 'created_at'])
+        $users = $query->select(['id', 'name', 'email', 'role', 'supervisor_id', 'is_active', 'corp_id', 'created_at'])
             ->orderBy('name')
             ->paginate($request->get('per_page', 15));
 
