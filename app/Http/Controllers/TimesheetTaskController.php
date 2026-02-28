@@ -4,7 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\TsTask;
 use App\Models\TsTaskHistory;
-use App\Models\TsUser;
+use App\Models\UserLogin;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
 
@@ -16,11 +16,7 @@ class TimesheetTaskController extends Controller
     public function index(Request $request)
     {
         $user = $request->user();
-        $query = TsTask::with([
-            'project:id,name,status',
-            'assignee:id,name,email,role',
-            'assigner:id,name,email,role',
-        ]);
+        $query = TsTask::with(['project:id,name,status', 'assignee', 'assigner']);
 
         if ($user->isAdmin()) {
             // Admin sees all tasks
@@ -28,11 +24,10 @@ class TimesheetTaskController extends Controller
             $visibleIds = $user->getVisibleUserIds();
             $query->where(function ($q) use ($visibleIds, $user) {
                 $q->whereIn('assigned_to', $visibleIds)
-                  ->orWhere('assigned_by', $user->id);
+                  ->orWhere('assigned_by', $user->user_login_id);
             });
         } else {
-            // Subordinate sees only their own tasks
-            $query->where('assigned_to', $user->id);
+            $query->where('assigned_to', $user->user_login_id);
         }
 
         // Filters
@@ -72,25 +67,25 @@ class TimesheetTaskController extends Controller
             'project_id' => 'nullable|exists:ts_projects,id',
             'title' => 'required|string|max:255',
             'description' => 'nullable|string',
-            'assigned_to' => 'required|exists:ts_users,id',
+            'assigned_to' => 'required|exists:userlogin,user_login_id',
             'priority' => ['nullable', Rule::in(['low', 'medium', 'high', 'urgent'])],
             'due_date' => 'nullable|date|after_or_equal:today',
         ]);
 
-        $assignee = TsUser::findOrFail($request->assigned_to);
+        $assignee = UserLogin::findOrFail($request->assigned_to);
 
-        if ($assignee->role !== 'subordinate') {
+        if (!$assignee->isSubordinate()) {
             return response()->json([
                 'success' => false,
                 'message' => 'Tasks can only be assigned to subordinates.',
             ], 422);
         }
 
-        // Supervisor can only assign to own subordinates
-        if ($user->isSupervisor() && $assignee->supervisor_id !== $user->id) {
+        // Supervisor can only assign to own team members
+        if ($user->isSupervisor() && !$user->isMyTeamMember($assignee->user_login_id)) {
             return response()->json([
                 'success' => false,
-                'message' => 'You can only assign tasks to your own subordinates.',
+                'message' => 'You can only assign tasks to your own team members.',
             ], 403);
         }
 
@@ -99,7 +94,7 @@ class TimesheetTaskController extends Controller
             'title' => $request->title,
             'description' => $request->description,
             'assigned_to' => $request->assigned_to,
-            'assigned_by' => $user->id,
+            'assigned_by' => $user->user_login_id,
             'priority' => $request->priority ?? 'medium',
             'due_date' => $request->due_date,
             'status' => 'pending',
@@ -107,13 +102,13 @@ class TimesheetTaskController extends Controller
 
         TsTaskHistory::create([
             'task_id' => $task->id,
-            'user_id' => $user->id,
+            'user_id' => $user->user_login_id,
             'action' => 'created',
             'new_value' => 'pending',
-            'remarks' => "Task '{$task->title}' created and assigned to {$assignee->name}.",
+            'remarks' => "Task '{$task->title}' created and assigned to {$assignee->username}.",
         ]);
 
-        $task->load(['project:id,name', 'assignee:id,name,email,role', 'assigner:id,name,email,role']);
+        $task->load(['project:id,name', 'assignee', 'assigner']);
 
         return response()->json([
             'success' => true,
@@ -130,11 +125,11 @@ class TimesheetTaskController extends Controller
         $user = $request->user();
         $task = TsTask::with([
             'project:id,name,status',
-            'assignee:id,name,email,role',
-            'assigner:id,name,email,role',
-            'approver:id,name,email,role',
+            'assignee',
+            'assigner',
+            'approver',
             'dailyReports',
-            'histories.user:id,name',
+            'histories.user',
         ])->findOrFail($id);
 
         if (!$this->canViewTask($user, $task)) {
@@ -158,7 +153,7 @@ class TimesheetTaskController extends Controller
         $user = $request->user();
         $task = TsTask::findOrFail($id);
 
-        if (!$user->isAdmin() && $task->assigned_by !== $user->id) {
+        if (!$user->isAdmin() && $task->assigned_by !== $user->user_login_id) {
             return response()->json([
                 'success' => false,
                 'message' => 'Only the task creator or admin can update this task.',
@@ -170,7 +165,7 @@ class TimesheetTaskController extends Controller
             'description' => 'nullable|string',
             'priority' => ['sometimes', Rule::in(['low', 'medium', 'high', 'urgent'])],
             'due_date' => 'nullable|date',
-            'assigned_to' => 'sometimes|exists:ts_users,id',
+            'assigned_to' => 'sometimes|exists:userlogin,user_login_id',
         ]);
 
         $changes = [];
@@ -182,17 +177,17 @@ class TimesheetTaskController extends Controller
 
         // If reassigning, validate the new assignee
         if ($request->has('assigned_to')) {
-            $newAssignee = TsUser::findOrFail($request->assigned_to);
-            if ($newAssignee->role !== 'subordinate') {
+            $newAssignee = UserLogin::findOrFail($request->assigned_to);
+            if (!$newAssignee->isSubordinate()) {
                 return response()->json([
                     'success' => false,
                     'message' => 'Tasks can only be assigned to subordinates.',
                 ], 422);
             }
-            if ($user->isSupervisor() && $newAssignee->supervisor_id !== $user->id) {
+            if ($user->isSupervisor() && !$user->isMyTeamMember($newAssignee->user_login_id)) {
                 return response()->json([
                     'success' => false,
-                    'message' => 'You can only reassign tasks to your own subordinates.',
+                    'message' => 'You can only reassign tasks to your own team members.',
                 ], 403);
             }
         }
@@ -202,7 +197,7 @@ class TimesheetTaskController extends Controller
         foreach ($changes as $field => $change) {
             TsTaskHistory::create([
                 'task_id' => $task->id,
-                'user_id' => $user->id,
+                'user_id' => $user->user_login_id,
                 'action' => $field === 'assigned_to' ? 'reassigned' : 'updated_' . $field,
                 'old_value' => (string) $change['old'],
                 'new_value' => (string) $change['new'],
@@ -210,7 +205,7 @@ class TimesheetTaskController extends Controller
             ]);
         }
 
-        $task->load(['project:id,name', 'assignee:id,name,email,role', 'assigner:id,name,email,role']);
+        $task->load(['project:id,name', 'assignee', 'assigner']);
 
         return response()->json([
             'success' => true,
@@ -227,8 +222,7 @@ class TimesheetTaskController extends Controller
         $user = $request->user();
         $task = TsTask::findOrFail($id);
 
-        // Only the assignee can update status to in_progress or completed
-        if ($task->assigned_to !== $user->id) {
+        if ($task->assigned_to !== $user->user_login_id) {
             return response()->json([
                 'success' => false,
                 'message' => 'Only the assigned subordinate can update task status.',
@@ -243,7 +237,7 @@ class TimesheetTaskController extends Controller
         $allowedTransitions = [
             'pending' => ['in_progress'],
             'in_progress' => ['completed'],
-            'rejected' => ['in_progress'], // Allow re-work after rejection
+            'rejected' => ['in_progress'],
         ];
 
         if (!isset($allowedTransitions[$task->status]) || !in_array($request->status, $allowedTransitions[$task->status])) {
@@ -264,14 +258,14 @@ class TimesheetTaskController extends Controller
 
         TsTaskHistory::create([
             'task_id' => $task->id,
-            'user_id' => $user->id,
+            'user_id' => $user->user_login_id,
             'action' => 'status_changed',
             'old_value' => $oldStatus,
             'new_value' => $request->status,
             'remarks' => $request->remarks,
         ]);
 
-        $task->load(['project:id,name', 'assignee:id,name,email,role', 'assigner:id,name,email,role']);
+        $task->load(['project:id,name', 'assignee', 'assigner']);
 
         return response()->json([
             'success' => true,
@@ -295,33 +289,30 @@ class TimesheetTaskController extends Controller
             ], 422);
         }
 
-        // Supervisor can only approve tasks of own subordinates
-        if ($user->isSupervisor()) {
-            $assignee = TsUser::find($task->assigned_to);
-            if ($assignee->supervisor_id !== $user->id) {
-                return response()->json([
-                    'success' => false,
-                    'message' => 'You can only approve tasks of your own subordinates.',
-                ], 403);
-            }
+        // Supervisor can only approve tasks of own team members
+        if ($user->isSupervisor() && !$user->isMyTeamMember($task->assigned_to)) {
+            return response()->json([
+                'success' => false,
+                'message' => 'You can only approve tasks of your own team members.',
+            ], 403);
         }
 
         $task->update([
             'status' => 'approved',
-            'approved_by' => $user->id,
+            'approved_by' => $user->user_login_id,
             'approved_at' => now(),
         ]);
 
         TsTaskHistory::create([
             'task_id' => $task->id,
-            'user_id' => $user->id,
+            'user_id' => $user->user_login_id,
             'action' => 'approved',
             'old_value' => 'completed',
             'new_value' => 'approved',
             'remarks' => $request->remarks ?? 'Task approved.',
         ]);
 
-        $task->load(['project:id,name', 'assignee:id,name,email,role', 'assigner:id,name,email,role', 'approver:id,name,email,role']);
+        $task->load(['project:id,name', 'assignee', 'assigner', 'approver']);
 
         return response()->json([
             'success' => true,
@@ -345,15 +336,12 @@ class TimesheetTaskController extends Controller
             ], 422);
         }
 
-        // Supervisor can only reject tasks of own subordinates
-        if ($user->isSupervisor()) {
-            $assignee = TsUser::find($task->assigned_to);
-            if ($assignee->supervisor_id !== $user->id) {
-                return response()->json([
-                    'success' => false,
-                    'message' => 'You can only reject tasks of your own subordinates.',
-                ], 403);
-            }
+        // Supervisor can only reject tasks of own team members
+        if ($user->isSupervisor() && !$user->isMyTeamMember($task->assigned_to)) {
+            return response()->json([
+                'success' => false,
+                'message' => 'You can only reject tasks of your own team members.',
+            ], 403);
         }
 
         $request->validate([
@@ -367,14 +355,14 @@ class TimesheetTaskController extends Controller
 
         TsTaskHistory::create([
             'task_id' => $task->id,
-            'user_id' => $user->id,
+            'user_id' => $user->user_login_id,
             'action' => 'rejected',
             'old_value' => 'completed',
             'new_value' => 'rejected',
             'remarks' => $request->rejection_reason,
         ]);
 
-        $task->load(['project:id,name', 'assignee:id,name,email,role', 'assigner:id,name,email,role']);
+        $task->load(['project:id,name', 'assignee', 'assigner']);
 
         return response()->json([
             'success' => true,
@@ -397,15 +385,15 @@ class TimesheetTaskController extends Controller
         ]);
     }
 
-    private function canViewTask(TsUser $user, TsTask $task): bool
+    private function canViewTask(UserLogin $user, TsTask $task): bool
     {
         if ($user->isAdmin()) return true;
 
         if ($user->isSupervisor()) {
             $visibleIds = $user->getVisibleUserIds();
-            return in_array($task->assigned_to, $visibleIds) || $task->assigned_by === $user->id;
+            return in_array($task->assigned_to, $visibleIds) || $task->assigned_by === $user->user_login_id;
         }
 
-        return $task->assigned_to === $user->id;
+        return $task->assigned_to === $user->user_login_id;
     }
 }

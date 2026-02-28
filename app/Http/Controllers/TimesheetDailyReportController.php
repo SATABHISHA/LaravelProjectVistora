@@ -4,7 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\TsDailyReport;
 use App\Models\TsTask;
-use App\Models\TsUser;
+use App\Models\UserLogin;
 use Illuminate\Http\Request;
 
 class TimesheetDailyReportController extends Controller
@@ -15,10 +15,7 @@ class TimesheetDailyReportController extends Controller
     public function index(Request $request)
     {
         $user = $request->user();
-        $query = TsDailyReport::with([
-            'user:id,name,email,role',
-            'task:id,title,project_id,status',
-        ]);
+        $query = TsDailyReport::with(['user', 'task:id,title,project_id,status']);
 
         if ($user->isAdmin()) {
             // Admin sees all reports
@@ -26,12 +23,12 @@ class TimesheetDailyReportController extends Controller
             $visibleIds = $user->getVisibleUserIds();
             $query->whereIn('user_id', $visibleIds);
         } else {
-            $query->where('user_id', $user->id);
+            $query->where('user_id', $user->user_login_id);
         }
 
         // Filters
-        if ($request->has('user_id')) {
-            $query->where('user_id', $request->user_id);
+        if ($request->has('report_user_id')) {
+            $query->where('user_id', $request->report_user_id);
         }
         if ($request->has('task_id')) {
             $query->where('task_id', $request->task_id);
@@ -72,7 +69,7 @@ class TimesheetDailyReportController extends Controller
         // If task_id is provided, verify it's assigned to this user
         if ($request->task_id) {
             $task = TsTask::where('id', $request->task_id)
-                ->where('assigned_to', $user->id)
+                ->where('assigned_to', $user->user_login_id)
                 ->first();
 
             if (!$task) {
@@ -84,7 +81,7 @@ class TimesheetDailyReportController extends Controller
         }
 
         // Check for duplicate
-        $exists = TsDailyReport::where('user_id', $user->id)
+        $exists = TsDailyReport::where('user_id', $user->user_login_id)
             ->where('task_id', $request->task_id)
             ->where('report_date', $request->report_date)
             ->exists();
@@ -97,14 +94,14 @@ class TimesheetDailyReportController extends Controller
         }
 
         $report = TsDailyReport::create([
-            'user_id' => $user->id,
+            'user_id' => $user->user_login_id,
             'task_id' => $request->task_id,
             'report_date' => $request->report_date,
             'description' => $request->description,
             'hours_spent' => $request->hours_spent,
         ]);
 
-        $report->load(['user:id,name,email', 'task:id,title,project_id']);
+        $report->load(['user', 'task:id,title,project_id']);
 
         return response()->json([
             'success' => true,
@@ -119,10 +116,7 @@ class TimesheetDailyReportController extends Controller
     public function show(Request $request, $id)
     {
         $user = $request->user();
-        $report = TsDailyReport::with([
-            'user:id,name,email,role',
-            'task:id,title,project_id,status',
-        ])->findOrFail($id);
+        $report = TsDailyReport::with(['user', 'task:id,title,project_id,status'])->findOrFail($id);
 
         if (!$this->canViewReport($user, $report)) {
             return response()->json([
@@ -145,7 +139,7 @@ class TimesheetDailyReportController extends Controller
         $user = $request->user();
         $report = TsDailyReport::findOrFail($id);
 
-        if ($report->user_id !== $user->id) {
+        if ($report->user_id !== $user->user_login_id) {
             return response()->json([
                 'success' => false,
                 'message' => 'You can only update your own reports.',
@@ -158,7 +152,7 @@ class TimesheetDailyReportController extends Controller
         ]);
 
         $report->update($request->only(['description', 'hours_spent']));
-        $report->load(['user:id,name,email', 'task:id,title,project_id']);
+        $report->load(['user', 'task:id,title,project_id']);
 
         return response()->json([
             'success' => true,
@@ -175,7 +169,7 @@ class TimesheetDailyReportController extends Controller
         $user = $request->user();
         $report = TsDailyReport::findOrFail($id);
 
-        if (!$user->isAdmin() && $report->user_id !== $user->id) {
+        if (!$user->isAdmin() && $report->user_id !== $user->user_login_id) {
             return response()->json([
                 'success' => false,
                 'message' => 'Access denied.',
@@ -190,7 +184,7 @@ class TimesheetDailyReportController extends Controller
         ]);
     }
 
-    private function canViewReport(TsUser $user, TsDailyReport $report): bool
+    private function canViewReport(UserLogin $user, TsDailyReport $report): bool
     {
         if ($user->isAdmin()) return true;
 
@@ -199,6 +193,6 @@ class TimesheetDailyReportController extends Controller
             return in_array($report->user_id, $visibleIds);
         }
 
-        return $report->user_id === $user->id;
+        return $report->user_id === $user->user_login_id;
     }
 }

@@ -2,173 +2,29 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\TsUser;
 use App\Models\UserLogin;
+use App\Models\TsTeamMember;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
-use Illuminate\Validation\Rule;
 
 class TimesheetAuthController extends Controller
 {
     /**
-     * Register a new timesheet user.
-     */
-    public function register(Request $request)
-    {
-        $request->validate([
-            'name' => 'required|string|max:255',
-            'email' => 'required|email|unique:ts_users,email',
-            'password' => 'required|string|min:6|confirmed',
-            'role' => ['required', Rule::in(['admin', 'supervisor', 'subordinate'])],
-            'supervisor_id' => 'nullable|exists:ts_users,id',
-        ]);
-
-        // If creating a subordinate, supervisor_id is required
-        if ($request->role === 'subordinate' && !$request->supervisor_id) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Subordinate must have a supervisor_id.',
-            ], 422);
-        }
-
-        // Validate supervisor_id points to a supervisor or admin
-        if ($request->supervisor_id) {
-            $supervisor = TsUser::find($request->supervisor_id);
-            if (!$supervisor || !in_array($supervisor->role, ['admin', 'supervisor'])) {
-                return response()->json([
-                    'success' => false,
-                    'message' => 'supervisor_id must reference a user with admin or supervisor role.',
-                ], 422);
-            }
-        }
-
-        $user = TsUser::create([
-            'name' => $request->name,
-            'email' => $request->email,
-            'password' => $request->password,
-            'role' => $request->role,
-            'supervisor_id' => $request->supervisor_id,
-        ]);
-
-        return response()->json([
-            'success' => true,
-            'message' => 'User registered successfully.',
-            'data' => [
-                'user' => $user->only(['id', 'name', 'email', 'role', 'supervisor_id']),
-            ],
-        ], 201);
-    }
-
-    /**
-     * Login - supports BOTH Vistora credentials and direct timesheet credentials.
-     *
-     * Vistora login: { "corp_id": "test", "email": "test@gmail.com", "password": "123456" }
-     * Direct login:  { "email": "user@test.com", "password": "password123" }
-     *
-     * For Vistora login: authenticates against the `userlogin` table and
-     * auto-creates/links a ts_user record on first login.
+     * Login using Vistora credentials.
+     * POST /api/timesheet/auth/login
+     * Body: { "corp_id": "test", "email_id": "test@gmail.com", "password": "123456" }
      */
     public function login(Request $request)
     {
-        // Detect Vistora login when corp_id is provided
-        if ($request->filled('corp_id')) {
-            return $this->vistoraLogin($request);
-        }
-
-        return $this->directLogin($request);
-    }
-
-    /**
-     * Vistora login: authenticate against the existing userlogin table.
-     */
-    private function vistoraLogin(Request $request)
-    {
         $request->validate([
             'corp_id' => 'required|string',
-            'email' => 'required|email',
+            'email_id' => 'required|email',
             'password' => 'required|string',
         ]);
 
-        // Find user in the Vistora userlogin table
-        $vistoraUser = UserLogin::where('corp_id', $request->corp_id)
-            ->where('email_id', $request->email)
+        $user = UserLogin::where('corp_id', $request->corp_id)
+            ->where('email_id', $request->email_id)
             ->first();
-
-        if (!$vistoraUser || !Hash::check($request->password, $vistoraUser->password)) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Invalid Vistora credentials.',
-            ], 401);
-        }
-
-        if ((int) $vistoraUser->active_yn !== 1) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Your Vistora account is inactive.',
-            ], 403);
-        }
-
-        // Map Vistora role to timesheet role
-        $role = $this->mapVistoraRole($vistoraUser);
-
-        // Find or create linked ts_user
-        $tsUser = TsUser::where('vistora_user_login_id', $vistoraUser->user_login_id)
-            ->where('corp_id', $request->corp_id)
-            ->first();
-
-        if (!$tsUser) {
-            // Also check by email
-            $tsUser = TsUser::where('email', $request->email)
-                ->where('corp_id', $request->corp_id)
-                ->first();
-        }
-
-        if (!$tsUser) {
-            // Auto-create timesheet user from Vistora credentials
-            // Use plain-text password from request (TsUser 'hashed' cast will hash it)
-            $tsUser = TsUser::create([
-                'name' => $vistoraUser->username,
-                'email' => $vistoraUser->email_id,
-                'password' => $request->password,
-                'role' => $role,
-                'corp_id' => $request->corp_id,
-                'vistora_user_login_id' => $vistoraUser->user_login_id,
-                'is_active' => true,
-            ]);
-        } else {
-            // Update link if not set
-            if (!$tsUser->vistora_user_login_id) {
-                $tsUser->update([
-                    'vistora_user_login_id' => $vistoraUser->user_login_id,
-                    'corp_id' => $request->corp_id,
-                ]);
-            }
-            // Sync role from Vistora
-            if ($tsUser->role !== $role) {
-                $tsUser->update(['role' => $role]);
-            }
-        }
-
-        return response()->json([
-            'success' => true,
-            'message' => 'Login successful via Vistora.',
-            'data' => [
-                'user' => $tsUser->only(['id', 'name', 'email', 'role', 'supervisor_id', 'corp_id']),
-            ],
-        ]);
-    }
-
-    /**
-     * Direct timesheet login (against ts_users table).
-     */
-    private function directLogin(Request $request)
-    {
-        $request->validate([
-            'email' => 'required|email',
-            'password' => 'required|string',
-        ]);
-
-        $user = TsUser::where('email', $request->email)->first();
 
         if (!$user || !Hash::check($request->password, $user->password)) {
             return response()->json([
@@ -180,7 +36,7 @@ class TimesheetAuthController extends Controller
         if (!$user->is_active) {
             return response()->json([
                 'success' => false,
-                'message' => 'Your account has been deactivated.',
+                'message' => 'Your account is inactive.',
             ], 403);
         }
 
@@ -188,71 +44,190 @@ class TimesheetAuthController extends Controller
             'success' => true,
             'message' => 'Login successful.',
             'data' => [
-                'user' => $user->only(['id', 'name', 'email', 'role', 'supervisor_id', 'corp_id']),
+                'user' => $user->only([
+                    'user_login_id', 'username', 'email_id', 'empcode',
+                    'corp_id', 'company_name', 'role', 'is_active',
+                ]),
             ],
         ]);
     }
 
     /**
-     * Map Vistora user roles to timesheet role.
-     * admin_yn=1 → admin, supervisor_yn=1 → supervisor, otherwise → subordinate
-     */
-    private function mapVistoraRole(UserLogin $vistoraUser): string
-    {
-        if ((int) $vistoraUser->admin_yn === 1) {
-            return 'admin';
-        }
-        if ((int) $vistoraUser->supervisor_yn === 1) {
-            return 'supervisor';
-        }
-        return 'subordinate';
-    }
-
-    /**
-     * Get user profile. Requires user_id query parameter.
+     * Get user profile.
+     * GET /api/timesheet/auth/profile?user_id=X
      */
     public function profile(Request $request)
     {
         $user = $request->user();
-        $user->load('supervisor:id,name,email,role');
+
+        $data = $user->only([
+            'user_login_id', 'username', 'email_id', 'empcode',
+            'corp_id', 'company_name', 'role', 'is_active',
+        ]);
 
         if ($user->isSupervisor() || $user->isAdmin()) {
-            $user->load('subordinates:id,name,email,role,supervisor_id');
+            $data['team_members'] = $user->subordinates()->get();
         }
 
         return response()->json([
             'success' => true,
-            'data' => $user,
+            'data' => $data,
         ]);
     }
 
     /**
-     * List users (Admin: all, Supervisor: own subordinates).
+     * List users (Admin: all in corp, Supervisor: own team members).
+     * GET /api/timesheet/users?user_id=X
      */
     public function listUsers(Request $request)
     {
         $user = $request->user();
-        $query = TsUser::query();
+        $query = UserLogin::where('corp_id', $user->corp_id);
 
         if ($user->isSupervisor()) {
-            $query->where(function ($q) use ($user) {
-                $q->where('supervisor_id', $user->id)
-                  ->orWhere('id', $user->id);
-            });
+            $memberIds = TsTeamMember::where('supervisor_id', $user->user_login_id)
+                ->pluck('member_id')->toArray();
+            $memberIds[] = $user->user_login_id;
+            $query->whereIn('user_login_id', $memberIds);
         }
-        // Admin sees all
+        // Admin sees all users in corp
 
         if ($request->has('role')) {
-            $query->where('role', $request->role);
+            $role = $request->role;
+            if ($role === 'admin') {
+                $query->where('admin_yn', 1);
+            } elseif ($role === 'supervisor') {
+                $query->where('supervisor_yn', 1)->where('admin_yn', '!=', 1);
+            } elseif ($role === 'subordinate') {
+                $query->where('admin_yn', '!=', 1)->where('supervisor_yn', '!=', 1);
+            }
         }
 
-        $users = $query->select(['id', 'name', 'email', 'role', 'supervisor_id', 'is_active', 'corp_id', 'created_at'])
-            ->orderBy('name')
+        $users = $query->select([
+                'user_login_id', 'username', 'email_id', 'empcode',
+                'corp_id', 'company_name', 'active_yn', 'admin_yn', 'supervisor_yn', 'created_at',
+            ])
+            ->orderBy('username')
             ->paginate($request->get('per_page', 15));
 
         return response()->json([
             'success' => true,
             'data' => $users,
+        ]);
+    }
+
+    /**
+     * Add a team member (supervisor-subordinate mapping).
+     * POST /api/timesheet/team-members?user_id=X
+     * Body: { "member_id": 5 }
+     * Admin can also specify: { "member_id": 5, "supervisor_id": 3 }
+     */
+    public function addTeamMember(Request $request)
+    {
+        $user = $request->user();
+
+        $request->validate([
+            'member_id' => 'required|integer',
+        ]);
+
+        $member = UserLogin::where('user_login_id', $request->member_id)->first();
+        if (!$member) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Member not found.',
+            ], 404);
+        }
+
+        // Admin can specify which supervisor; Supervisor assigns to themselves
+        $supervisorId = $user->user_login_id;
+        if ($user->isAdmin() && $request->filled('supervisor_id')) {
+            $supervisorId = $request->supervisor_id;
+        }
+
+        // Check for duplicate
+        $exists = TsTeamMember::where('supervisor_id', $supervisorId)
+            ->where('member_id', $request->member_id)
+            ->exists();
+
+        if ($exists) {
+            return response()->json([
+                'success' => false,
+                'message' => 'This user is already a team member.',
+            ], 422);
+        }
+
+        $teamMember = TsTeamMember::create([
+            'supervisor_id' => $supervisorId,
+            'member_id' => $request->member_id,
+            'corp_id' => $user->corp_id,
+        ]);
+
+        $teamMember->load(['supervisor', 'member']);
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Team member added successfully.',
+            'data' => $teamMember,
+        ], 201);
+    }
+
+    /**
+     * Remove a team member.
+     * DELETE /api/timesheet/team-members?user_id=X
+     * Body: { "member_id": 5 }
+     */
+    public function removeTeamMember(Request $request)
+    {
+        $user = $request->user();
+
+        $request->validate([
+            'member_id' => 'required|integer',
+        ]);
+
+        $supervisorId = $user->user_login_id;
+        if ($user->isAdmin() && $request->filled('supervisor_id')) {
+            $supervisorId = $request->supervisor_id;
+        }
+
+        $teamMember = TsTeamMember::where('supervisor_id', $supervisorId)
+            ->where('member_id', $request->member_id)
+            ->first();
+
+        if (!$teamMember) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Team member mapping not found.',
+            ], 404);
+        }
+
+        $teamMember->delete();
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Team member removed successfully.',
+        ]);
+    }
+
+    /**
+     * List team members for a supervisor.
+     * GET /api/timesheet/team-members?user_id=X
+     */
+    public function listTeamMembers(Request $request)
+    {
+        $user = $request->user();
+
+        $supervisorId = $user->user_login_id;
+        if ($user->isAdmin() && $request->filled('supervisor_id')) {
+            $supervisorId = $request->supervisor_id;
+        }
+
+        $members = TsTeamMember::where('supervisor_id', $supervisorId)
+            ->with(['member', 'supervisor'])
+            ->paginate($request->get('per_page', 15));
+
+        return response()->json([
+            'success' => true,
+            'data' => $members,
         ]);
     }
 }

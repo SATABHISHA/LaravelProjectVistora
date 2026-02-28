@@ -24,11 +24,11 @@ class TsProjectAssignment extends Model
 
     public function user()
     {
-        return $this->belongsTo(TsUser::class, 'user_id');
+        return $this->belongsTo(UserLogin::class, 'user_id', 'user_login_id');
     }
 
     public function assigner()
     {
-        return $this->belongsTo(TsUser::class, 'assigned_by');
+        return $this->belongsTo(UserLogin::class, 'assigned_by', 'user_login_id');
     }
 }

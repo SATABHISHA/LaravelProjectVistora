@@ -912,17 +912,24 @@ use App\Http\Controllers\TimesheetReportController;
 Route::prefix('timesheet')->group(function () {
 
     // ---- Public Auth Routes (no user_id needed) ----
-    Route::post('/auth/register', [TimesheetAuthController::class, 'register']);
     Route::post('/auth/login', [TimesheetAuthController::class, 'login']);
 
-    // ---- Protected Routes (require user_id parameter) ----
+    // ---- Protected Routes (require user_id query parameter) ----
     Route::middleware('ts.role')->group(function () {
 
-        // Auth
+        // Auth / Profile
         Route::get('/auth/profile', [TimesheetAuthController::class, 'profile']);
 
         // Users (Admin & Supervisor)
         Route::get('/users', [TimesheetAuthController::class, 'listUsers'])
+            ->middleware('ts.role:admin,supervisor');
+
+        // Team Members (Admin & Supervisor)
+        Route::get('/team-members', [TimesheetAuthController::class, 'listTeamMembers'])
+            ->middleware('ts.role:admin,supervisor');
+        Route::post('/team-members', [TimesheetAuthController::class, 'addTeamMember'])
+            ->middleware('ts.role:admin,supervisor');
+        Route::delete('/team-members', [TimesheetAuthController::class, 'removeTeamMember'])
             ->middleware('ts.role:admin,supervisor');
 
         // ---- Projects (Admin & Supervisor can create/manage) ----

@@ -30,7 +30,7 @@ class TsProject extends Model
     // Relationships
     public function creator()
     {
-        return $this->belongsTo(TsUser::class, 'created_by');
+        return $this->belongsTo(UserLogin::class, 'created_by', 'user_login_id');
     }
 
     public function assignments()
@@ -40,7 +40,7 @@ class TsProject extends Model
 
     public function members()
     {
-        return $this->belongsToMany(TsUser::class, 'ts_project_assignments', 'project_id', 'user_id')
+        return $this->belongsToMany(UserLogin::class, 'ts_project_assignments', 'project_id', 'user_id', 'id', 'user_login_id')
             ->withTimestamps();
     }
 

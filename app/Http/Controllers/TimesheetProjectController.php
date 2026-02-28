@@ -5,7 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\TsProject;
 use App\Models\TsProjectAssignment;
 use App\Models\TsProjectHistory;
-use App\Models\TsUser;
+use App\Models\UserLogin;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
 
@@ -17,23 +17,21 @@ class TimesheetProjectController extends Controller
     public function index(Request $request)
     {
         $user = $request->user();
-        $query = TsProject::with(['creator:id,name,email,role', 'members:id,name,email,role']);
+        $query = TsProject::with(['creator', 'members']);
 
         if ($user->isAdmin()) {
             // Admin sees all projects
         } elseif ($user->isSupervisor()) {
-            // Supervisor sees projects they created or that their subordinates are assigned to
             $subordinateIds = $user->getVisibleSubordinateIds();
             $query->where(function ($q) use ($user, $subordinateIds) {
-                $q->where('created_by', $user->id)
+                $q->where('created_by', $user->user_login_id)
                   ->orWhereHas('members', function ($q2) use ($subordinateIds) {
                       $q2->whereIn('user_id', $subordinateIds);
                   });
             });
         } else {
-            // Subordinate sees only projects assigned to them
             $query->whereHas('members', function ($q) use ($user) {
-                $q->where('user_id', $user->id);
+                $q->where('user_id', $user->user_login_id);
             });
         }
 
@@ -66,7 +64,7 @@ class TimesheetProjectController extends Controller
         $project = TsProject::create([
             'name' => $request->name,
             'description' => $request->description,
-            'created_by' => $request->user()->id,
+            'created_by' => $request->user()->user_login_id,
             'start_date' => $request->start_date,
             'end_date' => $request->end_date,
             'status' => $request->status ?? 'active',
@@ -74,13 +72,13 @@ class TimesheetProjectController extends Controller
 
         TsProjectHistory::create([
             'project_id' => $project->id,
-            'user_id' => $request->user()->id,
+            'user_id' => $request->user()->user_login_id,
             'action' => 'created',
             'new_value' => $project->name,
             'remarks' => 'Project created.',
         ]);
 
-        $project->load(['creator:id,name,email,role', 'members:id,name,email,role']);
+        $project->load(['creator', 'members']);
 
         return response()->json([
             'success' => true,
@@ -95,10 +93,9 @@ class TimesheetProjectController extends Controller
     public function show(Request $request, $id)
     {
         $user = $request->user();
-        $project = TsProject::with(['creator:id,name,email,role', 'members:id,name,email,role', 'tasks', 'histories.user:id,name'])
+        $project = TsProject::with(['creator', 'members', 'tasks', 'histories.user'])
             ->findOrFail($id);
 
-        // Visibility check
         if (!$this->canViewProject($user, $project)) {
             return response()->json([
                 'success' => false,
@@ -120,8 +117,7 @@ class TimesheetProjectController extends Controller
         $user = $request->user();
         $project = TsProject::findOrFail($id);
 
-        // Only creator or admin can update
-        if (!$user->isAdmin() && $project->created_by !== $user->id) {
+        if (!$user->isAdmin() && $project->created_by !== $user->user_login_id) {
             return response()->json([
                 'success' => false,
                 'message' => 'Only the project creator or admin can update this project.',
@@ -148,7 +144,7 @@ class TimesheetProjectController extends Controller
         foreach ($changes as $field => $change) {
             TsProjectHistory::create([
                 'project_id' => $project->id,
-                'user_id' => $user->id,
+                'user_id' => $user->user_login_id,
                 'action' => 'updated_' . $field,
                 'old_value' => (string) $change['old'],
                 'new_value' => (string) $change['new'],
@@ -156,7 +152,7 @@ class TimesheetProjectController extends Controller
             ]);
         }
 
-        $project->load(['creator:id,name,email,role', 'members:id,name,email,role']);
+        $project->load(['creator', 'members']);
 
         return response()->json([
             'success' => true,
@@ -173,7 +169,7 @@ class TimesheetProjectController extends Controller
         $user = $request->user();
         $project = TsProject::findOrFail($id);
 
-        if (!$user->isAdmin() && $project->created_by !== $user->id) {
+        if (!$user->isAdmin() && $project->created_by !== $user->user_login_id) {
             return response()->json([
                 'success' => false,
                 'message' => 'Only the project creator or admin can extend the timeline.',
@@ -190,14 +186,14 @@ class TimesheetProjectController extends Controller
 
         TsProjectHistory::create([
             'project_id' => $project->id,
-            'user_id' => $user->id,
+            'user_id' => $user->user_login_id,
             'action' => 'timeline_extended',
             'old_value' => $oldDate->format('Y-m-d'),
             'new_value' => $request->extended_end_date,
             'remarks' => $request->reason,
         ]);
 
-        $project->load(['creator:id,name,email,role', 'members:id,name,email,role']);
+        $project->load(['creator', 'members']);
 
         return response()->json([
             'success' => true,
@@ -207,14 +203,14 @@ class TimesheetProjectController extends Controller
     }
 
     /**
-     * Assign a subordinate to a project. Admin/Supervisor only.
+     * Assign a member to a project. Admin/Supervisor only.
      */
     public function assignMember(Request $request, $id)
     {
         $user = $request->user();
         $project = TsProject::findOrFail($id);
 
-        if (!$user->isAdmin() && $project->created_by !== $user->id) {
+        if (!$user->isAdmin() && $project->created_by !== $user->user_login_id) {
             return response()->json([
                 'success' => false,
                 'message' => 'Only the project creator or admin can assign members.',
@@ -222,20 +218,20 @@ class TimesheetProjectController extends Controller
         }
 
         $request->validate([
-            'user_id' => 'required|exists:ts_users,id',
+            'member_user_id' => 'required|exists:userlogin,user_login_id',
         ]);
 
-        $subordinate = TsUser::findOrFail($request->user_id);
+        $member = UserLogin::findOrFail($request->member_user_id);
 
-        // Supervisor can only assign own subordinates
-        if ($user->isSupervisor() && $subordinate->supervisor_id !== $user->id) {
+        // Supervisor can only assign own team members
+        if ($user->isSupervisor() && !$user->isMyTeamMember($member->user_login_id)) {
             return response()->json([
                 'success' => false,
-                'message' => 'You can only assign your own subordinates.',
+                'message' => 'You can only assign your own team members.',
             ], 403);
         }
 
-        if ($subordinate->role !== 'subordinate') {
+        if (!$member->isSubordinate()) {
             return response()->json([
                 'success' => false,
                 'message' => 'Only subordinates can be assigned to projects.',
@@ -244,7 +240,7 @@ class TimesheetProjectController extends Controller
 
         // Check if already assigned
         $exists = TsProjectAssignment::where('project_id', $id)
-            ->where('user_id', $request->user_id)
+            ->where('user_id', $request->member_user_id)
             ->exists();
 
         if ($exists) {
@@ -256,19 +252,19 @@ class TimesheetProjectController extends Controller
 
         TsProjectAssignment::create([
             'project_id' => $project->id,
-            'user_id' => $request->user_id,
-            'assigned_by' => $user->id,
+            'user_id' => $request->member_user_id,
+            'assigned_by' => $user->user_login_id,
         ]);
 
         TsProjectHistory::create([
             'project_id' => $project->id,
-            'user_id' => $user->id,
+            'user_id' => $user->user_login_id,
             'action' => 'member_added',
-            'new_value' => $subordinate->name,
-            'remarks' => "Assigned {$subordinate->name} to project.",
+            'new_value' => $member->username,
+            'remarks' => "Assigned {$member->username} to project.",
         ]);
 
-        $project->load(['creator:id,name,email,role', 'members:id,name,email,role']);
+        $project->load(['creator', 'members']);
 
         return response()->json([
             'success' => true,
@@ -285,7 +281,7 @@ class TimesheetProjectController extends Controller
         $user = $request->user();
         $project = TsProject::findOrFail($id);
 
-        if (!$user->isAdmin() && $project->created_by !== $user->id) {
+        if (!$user->isAdmin() && $project->created_by !== $user->user_login_id) {
             return response()->json([
                 'success' => false,
                 'message' => 'Only the project creator or admin can remove members.',
@@ -293,11 +289,11 @@ class TimesheetProjectController extends Controller
         }
 
         $request->validate([
-            'user_id' => 'required|exists:ts_users,id',
+            'member_user_id' => 'required|exists:userlogin,user_login_id',
         ]);
 
         $assignment = TsProjectAssignment::where('project_id', $id)
-            ->where('user_id', $request->user_id)
+            ->where('user_id', $request->member_user_id)
             ->first();
 
         if (!$assignment) {
@@ -307,18 +303,18 @@ class TimesheetProjectController extends Controller
             ], 404);
         }
 
-        $removedUser = TsUser::find($request->user_id);
+        $removedUser = UserLogin::find($request->member_user_id);
         $assignment->delete();
 
         TsProjectHistory::create([
             'project_id' => $project->id,
-            'user_id' => $user->id,
+            'user_id' => $user->user_login_id,
             'action' => 'member_removed',
-            'old_value' => $removedUser->name,
-            'remarks' => "Removed {$removedUser->name} from project.",
+            'old_value' => $removedUser->username,
+            'remarks' => "Removed {$removedUser->username} from project.",
         ]);
 
-        $project->load(['creator:id,name,email,role', 'members:id,name,email,role']);
+        $project->load(['creator', 'members']);
 
         return response()->json([
             'success' => true,
@@ -344,19 +340,16 @@ class TimesheetProjectController extends Controller
     /**
      * Check if user can view the project.
      */
-    private function canViewProject(TsUser $user, TsProject $project): bool
+    private function canViewProject(UserLogin $user, TsProject $project): bool
     {
         if ($user->isAdmin()) return true;
 
         if ($user->isSupervisor()) {
-            // Created by this supervisor
-            if ($project->created_by === $user->id) return true;
-            // Has subordinates assigned
+            if ($project->created_by === $user->user_login_id) return true;
             $subordinateIds = $user->getVisibleSubordinateIds();
             return $project->members()->whereIn('user_id', $subordinateIds)->exists();
         }
 
-        // Subordinate: must be a member
-        return $project->members()->where('user_id', $user->id)->exists();
+        return $project->members()->where('user_id', $user->user_login_id)->exists();
     }
 }

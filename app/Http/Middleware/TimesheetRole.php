@@ -2,7 +2,7 @@
 
 namespace App\Http\Middleware;
 
-use App\Models\TsUser;
+use App\Models\UserLogin;
 use Closure;
 use Illuminate\Http\Request;
 use Symfony\Component\HttpFoundation\Response;
@@ -11,11 +11,8 @@ class TimesheetRole
 {
     /**
      * Handle an incoming request.
-     * Resolves the timesheet user from the `user_id` request parameter.
+     * Resolves the user from the `user_id` query parameter (userlogin.user_login_id).
      * Usage: middleware('ts.role:admin,supervisor') or middleware('ts.role') for auth-only.
-     *
-     * @param  \Closure(\Illuminate\Http\Request): (\Symfony\Component\HttpFoundation\Response)  $next
-     * @param  string  ...$roles
      */
     public function handle(Request $request, Closure $next, string ...$roles): Response
     {
@@ -24,11 +21,11 @@ class TimesheetRole
         if (!$userId) {
             return response()->json([
                 'success' => false,
-                'message' => 'user_id is required for authentication.',
+                'message' => 'user_id query parameter is required (pass your user_login_id).',
             ], 401);
         }
 
-        $user = TsUser::find($userId);
+        $user = UserLogin::find($userId);
 
         if (!$user) {
             return response()->json([
@@ -40,7 +37,7 @@ class TimesheetRole
         if (!$user->is_active) {
             return response()->json([
                 'success' => false,
-                'message' => 'Your account has been deactivated.',
+                'message' => 'Your account is inactive.',
             ], 403);
         }
 

@@ -40,17 +40,17 @@ class TsTask extends Model
 
     public function assignee()
     {
-        return $this->belongsTo(TsUser::class, 'assigned_to');
+        return $this->belongsTo(UserLogin::class, 'assigned_to', 'user_login_id');
     }
 
     public function assigner()
     {
-        return $this->belongsTo(TsUser::class, 'assigned_by');
+        return $this->belongsTo(UserLogin::class, 'assigned_by', 'user_login_id');
     }
 
     public function approver()
     {
-        return $this->belongsTo(TsUser::class, 'approved_by');
+        return $this->belongsTo(UserLogin::class, 'approved_by', 'user_login_id');
     }
 
     public function dailyReports()

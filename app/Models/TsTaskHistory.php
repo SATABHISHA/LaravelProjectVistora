@@ -30,6 +30,6 @@ class TsTaskHistory extends Model
 
     public function user()
     {
-        return $this->belongsTo(TsUser::class, 'user_id');
+        return $this->belongsTo(UserLogin::class, 'user_id', 'user_login_id');
     }
 }

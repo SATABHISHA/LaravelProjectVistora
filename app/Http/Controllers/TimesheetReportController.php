@@ -6,7 +6,8 @@ use App\Models\TsDailyReport;
 use App\Models\TsKpi;
 use App\Models\TsProject;
 use App\Models\TsTask;
-use App\Models\TsUser;
+use App\Models\TsTeamMember;
+use App\Models\UserLogin;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 
@@ -14,16 +15,16 @@ class TimesheetReportController extends Controller
 {
     /**
      * Get performance report for a subordinate.
-     * Subordinate: own report. Supervisor: own subordinates. Admin: anyone.
+     * Subordinate: own report. Supervisor: own team members. Admin: anyone.
      */
     public function subordinatePerformance(Request $request)
     {
         $user = $request->user();
-        $targetUserId = $request->get('user_id', $user->id);
+        $targetUserId = $request->get('target_user_id', $user->user_login_id);
         $period = $request->get('period', now()->format('Y-m')); // YYYY-MM
 
         // Access control
-        if ($user->isSubordinate() && $targetUserId != $user->id) {
+        if ($user->isSubordinate() && $targetUserId != $user->user_login_id) {
             return response()->json([
                 'success' => false,
                 'message' => 'Subordinates can only view their own performance.',
@@ -35,12 +36,12 @@ class TimesheetReportController extends Controller
             if (!in_array($targetUserId, $visibleIds)) {
                 return response()->json([
                     'success' => false,
-                    'message' => 'You can only view performance of your own subordinates.',
+                    'message' => 'You can only view performance of your own team members.',
                 ], 403);
             }
         }
 
-        $targetUser = TsUser::findOrFail($targetUserId);
+        $targetUser = UserLogin::findOrFail($targetUserId);
         $startDate = Carbon::createFromFormat('Y-m', $period)->startOfMonth();
         $endDate = Carbon::createFromFormat('Y-m', $period)->endOfMonth();
 
@@ -95,7 +96,6 @@ class TimesheetReportController extends Controller
             ->where('report_date', '<=', $endDate)
             ->sum('hours_spent');
 
-        // Average hours per day
         $avgHoursPerDay = $daysReported > 0 ? round($totalHours / $daysReported, 2) : 0;
 
         // On-time completion rate
@@ -124,7 +124,7 @@ class TimesheetReportController extends Controller
         return response()->json([
             'success' => true,
             'data' => [
-                'user' => $targetUser->only(['id', 'name', 'email', 'role']),
+                'user' => $targetUser->only(['user_login_id', 'username', 'email_id', 'role']),
                 'period' => $period,
                 'kpis' => [
                     'task_completion_rate' => $taskCompletionRate,
@@ -154,20 +154,20 @@ class TimesheetReportController extends Controller
     public function supervisorPerformance(Request $request)
     {
         $user = $request->user();
-        $targetUserId = $request->get('user_id', $user->id);
+        $targetUserId = $request->get('target_user_id', $user->user_login_id);
         $period = $request->get('period', now()->format('Y-m'));
 
-        $targetUser = TsUser::findOrFail($targetUserId);
+        $targetUser = UserLogin::findOrFail($targetUserId);
 
         // Access control
-        if ($user->isSupervisor() && $targetUserId != $user->id) {
+        if ($user->isSupervisor() && $targetUserId != $user->user_login_id) {
             return response()->json([
                 'success' => false,
                 'message' => 'Supervisors can only view their own performance report.',
             ], 403);
         }
 
-        if ($targetUser->role !== 'supervisor') {
+        if (!$targetUser->isSupervisor()) {
             return response()->json([
                 'success' => false,
                 'message' => 'Specified user is not a supervisor.',
@@ -176,7 +176,8 @@ class TimesheetReportController extends Controller
 
         $startDate = Carbon::createFromFormat('Y-m', $period)->startOfMonth();
         $endDate = Carbon::createFromFormat('Y-m', $period)->endOfMonth();
-        $subordinateIds = $targetUser->subordinates()->pluck('id')->toArray();
+        $subordinateIds = TsTeamMember::where('supervisor_id', $targetUserId)
+            ->pluck('member_id')->toArray();
 
         // Project Delivery Rate
         $totalProjects = TsProject::where('created_by', $targetUserId)
@@ -248,7 +249,8 @@ class TimesheetReportController extends Controller
         // Per subordinate breakdown
         $subordinateBreakdown = [];
         foreach ($subordinateIds as $subId) {
-            $sub = TsUser::find($subId);
+            $sub = UserLogin::find($subId);
+            if (!$sub) continue;
             $subTotal = TsTask::where('assigned_to', $subId)
                 ->where('created_at', '>=', $startDate)
                 ->where('created_at', '<=', $endDate)
@@ -264,7 +266,7 @@ class TimesheetReportController extends Controller
                 ->sum('hours_spent');
 
             $subordinateBreakdown[] = [
-                'user' => $sub->only(['id', 'name', 'email']),
+                'user' => $sub->only(['user_login_id', 'username', 'email_id']),
                 'total_tasks' => $subTotal,
                 'completed_tasks' => $subCompleted,
                 'completion_rate' => $subTotal > 0 ? round(($subCompleted / $subTotal) * 100, 2) : 0,
@@ -275,7 +277,7 @@ class TimesheetReportController extends Controller
         return response()->json([
             'success' => true,
             'data' => [
-                'supervisor' => $targetUser->only(['id', 'name', 'email', 'role']),
+                'supervisor' => $targetUser->only(['user_login_id', 'username', 'email_id', 'role']),
                 'period' => $period,
                 'kpis' => [
                     'project_delivery_rate' => $projectDeliveryRate,
@@ -302,6 +304,7 @@ class TimesheetReportController extends Controller
      */
     public function organizationPerformance(Request $request)
     {
+        $user = $request->user();
         $period = $request->get('period', now()->format('Y-m'));
         $startDate = Carbon::createFromFormat('Y-m', $period)->startOfMonth();
         $endDate = Carbon::createFromFormat('Y-m', $period)->endOfMonth();
@@ -353,16 +356,31 @@ class TimesheetReportController extends Controller
             ->where('report_date', '<=', $endDate)
             ->sum('hours_spent');
 
-        // Total active users
-        $activeSubordinates = TsUser::where('role', 'subordinate')->where('is_active', true)->count();
-        $activeSupervisors = TsUser::where('role', 'supervisor')->where('is_active', true)->count();
+        // Total active users in corp
+        $activeSubordinates = UserLogin::where('corp_id', $user->corp_id)
+            ->where('active_yn', 1)
+            ->where('admin_yn', '!=', 1)
+            ->where('supervisor_yn', '!=', 1)
+            ->count();
+
+        $activeSupervisors = UserLogin::where('corp_id', $user->corp_id)
+            ->where('active_yn', 1)
+            ->where('supervisor_yn', 1)
+            ->where('admin_yn', '!=', 1)
+            ->count();
 
         // Supervisor comparisons
-        $supervisors = TsUser::where('role', 'supervisor')->where('is_active', true)->get();
+        $supervisorIds = UserLogin::where('corp_id', $user->corp_id)
+            ->where('active_yn', 1)
+            ->where('supervisor_yn', 1)
+            ->where('admin_yn', '!=', 1)
+            ->pluck('user_login_id');
+
         $supervisorComparisons = [];
 
-        foreach ($supervisors as $sup) {
-            $subIds = $sup->subordinates()->pluck('id')->toArray();
+        foreach ($supervisorIds as $supId) {
+            $sup = UserLogin::find($supId);
+            $subIds = TsTeamMember::where('supervisor_id', $supId)->pluck('member_id')->toArray();
             $supTotalTasks = TsTask::whereIn('assigned_to', $subIds)
                 ->where('created_at', '>=', $startDate)
                 ->where('created_at', '<=', $endDate)
@@ -372,15 +390,15 @@ class TimesheetReportController extends Controller
                 ->where('created_at', '<=', $endDate)
                 ->whereIn('status', ['completed', 'approved'])
                 ->count();
-            $supProjects = TsProject::where('created_by', $sup->id)->count();
-            $supCompletedProjects = TsProject::where('created_by', $sup->id)->where('status', 'completed')->count();
+            $supProjects = TsProject::where('created_by', $supId)->count();
+            $supCompletedProjects = TsProject::where('created_by', $supId)->where('status', 'completed')->count();
             $supHours = TsDailyReport::whereIn('user_id', $subIds)
                 ->where('report_date', '>=', $startDate)
                 ->where('report_date', '<=', $endDate)
                 ->sum('hours_spent');
 
             $supervisorComparisons[] = [
-                'supervisor' => $sup->only(['id', 'name', 'email']),
+                'supervisor' => $sup->only(['user_login_id', 'username', 'email_id']),
                 'subordinate_count' => count($subIds),
                 'total_tasks' => $supTotalTasks,
                 'completed_tasks' => $supCompletedTasks,
@@ -427,10 +445,10 @@ class TimesheetReportController extends Controller
     public function kpiHistory(Request $request)
     {
         $user = $request->user();
-        $targetUserId = $request->get('user_id', $user->id);
+        $targetUserId = $request->get('target_user_id', $user->user_login_id);
 
         // Access control
-        if ($user->isSubordinate() && $targetUserId != $user->id) {
+        if ($user->isSubordinate() && $targetUserId != $user->user_login_id) {
             return response()->json([
                 'success' => false,
                 'message' => 'Subordinates can only view their own KPI history.',
