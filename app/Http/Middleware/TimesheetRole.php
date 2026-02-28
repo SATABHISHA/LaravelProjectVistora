@@ -19,7 +19,7 @@ class TimesheetRole
      */
     public function handle(Request $request, Closure $next, string ...$roles): Response
     {
-        $userId = $request->input('user_id') ?? $request->query('user_id') ?? $request->header('X-User-Id');
+        $userId = $request->query('user_id') ?? $request->header('X-User-Id');
 
         if (!$userId) {
             return response()->json([
