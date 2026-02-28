@@ -2,213 +2,74 @@
 
 ## Overview
 
-A role-based timesheet management system with three roles: **Admin**, **Supervisor**, and **Subordinate**. Built on Laravel 10 with Sanctum token authentication and full RBAC middleware.
+A role-based timesheet management system integrated with Vistora's existing `userlogin` authentication. Three roles: **Admin**, **Supervisor**, and **Subordinate** — determined by `admin_yn` and `supervisor_yn` flags in the `userlogin` table.
 
-**Base URL:** `/api/timesheet`
+**Live Base URL:** `https://vistora.sroy.es/public/api/timesheet`
+
+**Authentication:** All protected endpoints require `?user_id=X` query parameter where `X` is the `user_login_id` from the `userlogin` table.
 
 ---
 
 ## Table of Contents
 
 1. [Roles & Permissions](#roles--permissions)
-2. [Database Tables](#database-tables)
-3. [Authentication APIs](#1-authentication)
-4. [User Management APIs](#2-user-management)
-5. [Project APIs](#3-projects)
-6. [Task APIs](#4-tasks)
-7. [Daily Report APIs](#5-daily-reports)
-8. [History APIs](#6-histories)
-9. [Report & KPI APIs](#7-reports--kpis)
+2. [Authentication](#1-authentication)
+3. [User Management](#2-user-management)
+4. [Team Members](#3-team-members)
+5. [Projects](#4-projects)
+6. [Tasks](#5-tasks)
+7. [Daily Reports](#6-daily-reports)
+8. [Histories](#7-histories)
+9. [Reports & KPIs](#8-reports--kpis)
 10. [Error Handling](#error-handling)
 
 ---
 
 ## Roles & Permissions
 
+Role is derived from `userlogin` table flags:
+- **Admin**: `admin_yn = 1`
+- **Supervisor**: `supervisor_yn = 1` AND `admin_yn != 1`
+- **Subordinate**: neither admin nor supervisor
+
 | Feature | Admin | Supervisor | Subordinate |
 |---|:---:|:---:|:---:|
-| Register/Login | ✅ | ✅ | ✅ |
-| View all users | ✅ | Own + subs | ❌ |
+| Login | ✅ | ✅ | ✅ |
+| View all users | ✅ | ✅ | ❌ |
+| Manage team members | ✅ (any supervisor) | ✅ (own team) | ❌ |
 | Create projects | ✅ | ✅ | ❌ |
-| Assign subordinates to projects | ✅ | Own subs only | ❌ |
+| Assign members to projects | ✅ | Own team only | ❌ |
 | Extend project timelines | ✅ | Own projects | ❌ |
 | Delete projects | ✅ | ❌ | ❌ |
-| Create/assign tasks | ✅ | Own subs only | ❌ |
+| Create/assign tasks | ✅ | Own team only | ❌ |
 | Update task status | ❌ | ❌ | Own tasks only |
-| Approve/reject tasks | ✅ | Own subs only | ❌ |
+| Approve/reject tasks | ✅ | Own team only | ❌ |
 | Delete tasks | ✅ | ❌ | ❌ |
 | Submit daily reports | ❌ | ❌ | ✅ |
-| View daily reports | All | Own + subs | Own only |
-| View task histories | All | Own + subs | Own only |
-| View project histories | All | Own projects | Assigned projects |
-| Subordinate performance | All | Own subs | Own only |
+| View daily reports | All | Own + team | Own only |
+| View histories | All | Own + team | Own only |
+| Subordinate performance | All | Own team | Own only |
 | Supervisor performance | All | Own only | ❌ |
 | Organization performance | ✅ | ❌ | ❌ |
-| KPI history | All | Own + subs | Own only |
-
----
-
-## Database Tables
-
-### ts_users
-| Column | Type | Description |
-|---|---|---|
-| id | bigint | Primary key |
-| name | varchar(255) | User name |
-| email | varchar(255) | Unique email |
-| password | varchar(255) | Hashed password |
-| role | enum | `admin`, `supervisor`, `subordinate` |
-| supervisor_id | bigint (nullable) | FK to ts_users (for subordinates) |
-| is_active | boolean | Account active status |
-| remember_token | varchar(100) | Token for remember me |
-| created_at / updated_at | timestamp | Timestamps |
-
-### ts_projects
-| Column | Type | Description |
-|---|---|---|
-| id | bigint | Primary key |
-| name | varchar(255) | Project name |
-| description | text (nullable) | Project description |
-| created_by | bigint | FK to ts_users |
-| start_date | date | Project start date |
-| end_date | date | Original end date |
-| extended_end_date | date (nullable) | Extended deadline |
-| status | enum | `active`, `completed`, `on_hold`, `cancelled` |
-| created_at / updated_at | timestamp | Timestamps |
-
-### ts_project_assignments
-| Column | Type | Description |
-|---|---|---|
-| id | bigint | Primary key |
-| project_id | bigint | FK to ts_projects |
-| user_id | bigint | FK to ts_users (subordinate) |
-| assigned_by | bigint | FK to ts_users (assigner) |
-| created_at / updated_at | timestamp | Timestamps |
-
-### ts_tasks
-| Column | Type | Description |
-|---|---|---|
-| id | bigint | Primary key |
-| project_id | bigint (nullable) | FK to ts_projects (tasks can exist without a project) |
-| title | varchar(255) | Task title |
-| description | text (nullable) | Task description |
-| assigned_to | bigint | FK to ts_users (subordinate) |
-| assigned_by | bigint | FK to ts_users (assigner) |
-| status | enum | `pending`, `in_progress`, `completed`, `approved`, `rejected` |
-| priority | enum | `low`, `medium`, `high`, `urgent` |
-| due_date | date (nullable) | Task due date |
-| completed_at | timestamp (nullable) | When marked completed |
-| approved_by | bigint (nullable) | FK to ts_users |
-| approved_at | timestamp (nullable) | When approved |
-| rejection_reason | text (nullable) | Reason for rejection |
-| created_at / updated_at | timestamp | Timestamps |
-
-### ts_daily_reports
-| Column | Type | Description |
-|---|---|---|
-| id | bigint | Primary key |
-| user_id | bigint | FK to ts_users |
-| task_id | bigint (nullable) | FK to ts_tasks |
-| report_date | date | Date of the report |
-| description | text | Work description |
-| hours_spent | decimal(5,2) | Hours worked |
-| created_at / updated_at | timestamp | Timestamps |
-
-### ts_task_histories
-| Column | Type | Description |
-|---|---|---|
-| id | bigint | Primary key |
-| task_id | bigint | FK to ts_tasks |
-| user_id | bigint | FK to ts_users (who performed the action) |
-| action | varchar(255) | Action type (created, status_changed, approved, rejected, reassigned) |
-| old_value | varchar(255) (nullable) | Previous value |
-| new_value | varchar(255) (nullable) | New value |
-| remarks | text (nullable) | Additional notes |
-| created_at | timestamp | When the action occurred |
-
-### ts_project_histories
-| Column | Type | Description |
-|---|---|---|
-| id | bigint | Primary key |
-| project_id | bigint | FK to ts_projects |
-| user_id | bigint | FK to ts_users |
-| action | varchar(255) | Action type (created, updated_*, timeline_extended, member_added, member_removed) |
-| old_value | varchar(255) (nullable) | Previous value |
-| new_value | varchar(255) (nullable) | New value |
-| remarks | text (nullable) | Additional notes |
-| created_at | timestamp | When the action occurred |
-
-### ts_kpis
-| Column | Type | Description |
-|---|---|---|
-| id | bigint | Primary key |
-| user_id | bigint | FK to ts_users |
-| period | varchar(7) | Period in YYYY-MM format |
-| metric_name | varchar(255) | KPI metric name |
-| metric_value | decimal(8,2) | Metric value (percentage) |
-| calculated_at | timestamp (nullable) | When calculated |
-| created_at / updated_at | timestamp | Timestamps |
+| KPI history | All | Own + team | Own only |
 
 ---
 
 ## 1. Authentication
 
-### POST `/auth/register`
-Register a new timesheet user.
-
-**Access:** Public
-
-**Request Body:**
-```json
-{
-    "name": "John Doe",
-    "email": "john@example.com",
-    "password": "password123",
-    "password_confirmation": "password123",
-    "role": "subordinate",
-    "supervisor_id": 2
-}
-```
-
-| Field | Type | Required | Notes |
-|---|---|---|---|
-| name | string | Yes | Max 255 chars |
-| email | string | Yes | Must be unique |
-| password | string | Yes | Min 6 chars |
-| password_confirmation | string | Yes | Must match password |
-| role | string | Yes | `admin`, `supervisor`, or `subordinate` |
-| supervisor_id | integer | Conditional | Required when role is `subordinate` |
-
-**Response (201):**
-```json
-{
-    "success": true,
-    "message": "User registered successfully.",
-    "data": {
-        "user": {
-            "id": 1,
-            "name": "John Doe",
-            "email": "john@example.com",
-            "role": "subordinate",
-            "supervisor_id": 2
-        },
-        "token": "1|abc123..."
-    }
-}
-```
-
----
-
 ### POST `/auth/login`
-Login an existing user.
 
-**Access:** Public
+Login using Vistora credentials. **No `user_id` query parameter needed.**
 
-**Request Body:**
+**Request:**
 ```json
+POST https://vistora.sroy.es/public/api/timesheet/auth/login
+Content-Type: application/json
+
 {
-    "email": "john@example.com",
-    "password": "password123"
+    "corp_id": "test",
+    "email_id": "test@gmail.com",
+    "password": "123456"
 }
 ```
 
@@ -219,59 +80,65 @@ Login an existing user.
     "message": "Login successful.",
     "data": {
         "user": {
-            "id": 1,
-            "name": "John Doe",
-            "email": "john@example.com",
-            "role": "subordinate",
-            "supervisor_id": 2
-        },
-        "token": "2|def456..."
+            "user_login_id": 2,
+            "username": "test",
+            "email_id": "test@gmail.com",
+            "empcode": "EMP001",
+            "corp_id": "test",
+            "company_name": "Nippo",
+            "role": "admin",
+            "is_active": true
+        }
     }
 }
 ```
 
----
-
-### POST `/auth/logout`
-Logout (revoke current token).
-
-**Access:** Authenticated
-
-**Headers:** `Authorization: Bearer {token}`
-
-**Response (200):**
+**Error (401):**
 ```json
 {
-    "success": true,
-    "message": "Logged out successfully."
+    "success": false,
+    "message": "Invalid credentials."
 }
 ```
 
 ---
 
-### GET `/auth/profile`
-Get current user profile with relationships.
+### GET `/auth/profile?user_id=X`
 
-**Access:** Authenticated
+Get logged-in user's profile. For admin/supervisor, includes team members.
 
-**Headers:** `Authorization: Bearer {token}`
+**Request:**
+```
+GET https://vistora.sroy.es/public/api/timesheet/auth/profile?user_id=2
+```
 
 **Response (200):**
 ```json
 {
     "success": true,
     "data": {
-        "id": 3,
-        "name": "Subordinate One",
-        "email": "sub1@example.com",
-        "role": "subordinate",
-        "supervisor_id": 2,
-        "supervisor": {
-            "id": 2,
-            "name": "Supervisor One",
-            "email": "sup1@example.com",
-            "role": "supervisor"
-        }
+        "user_login_id": 2,
+        "username": "test",
+        "email_id": "test@gmail.com",
+        "empcode": "EMP001",
+        "corp_id": "test",
+        "company_name": "Nippo",
+        "role": "admin",
+        "is_active": true,
+        "team_members": [
+            {
+                "user_login_id": 44,
+                "username": "Indranil Shah",
+                "email_id": "indSh@xyz.com",
+                "role": "subordinate"
+            },
+            {
+                "user_login_id": 45,
+                "username": "Pulkit Ray",
+                "email_id": "pr@gmail.com",
+                "role": "subordinate"
+            }
+        ]
     }
 }
 ```
@@ -280,523 +147,797 @@ Get current user profile with relationships.
 
 ## 2. User Management
 
-### GET `/users`
-List users with role-based visibility.
+### GET `/users?user_id=X`
 
-**Access:** Admin, Supervisor
-
-**Headers:** `Authorization: Bearer {token}`
+List all users in the same `corp_id`. **Admin & Supervisor only.**
 
 **Query Parameters:**
-| Param | Type | Description |
-|---|---|---|
-| role | string | Filter by role (`admin`, `supervisor`, `subordinate`) |
-| per_page | integer | Items per page (default: 15) |
-
-**Visibility Rules:**
-- **Admin:** sees all users
-- **Supervisor:** sees self + own subordinates
-
-**Response (200):** Paginated list of users.
-
----
-
-## 3. Projects
-
-### GET `/projects`
-List projects with role-based visibility.
-
-**Access:** Authenticated
-
-**Query Parameters:**
-| Param | Type | Description |
-|---|---|---|
-| status | string | Filter by status (`active`, `completed`, `on_hold`, `cancelled`) |
-| per_page | integer | Items per page (default: 15) |
-
-**Visibility Rules:**
-- **Admin:** all projects
-- **Supervisor:** projects they created + projects their subordinates are assigned to
-- **Subordinate:** only projects they are assigned to
-
-**Response (200):** Paginated list of projects with creator and members.
-
----
-
-### POST `/projects`
-Create a new project.
-
-**Access:** Admin, Supervisor
-
-**Request Body:**
-```json
-{
-    "name": "Project Alpha",
-    "description": "First project description",
-    "start_date": "2026-03-01",
-    "end_date": "2026-04-30",
-    "status": "active"
-}
-```
-
-| Field | Type | Required | Notes |
+| Parameter | Type | Required | Description |
 |---|---|---|---|
-| name | string | Yes | Max 255 chars |
-| description | string | No | |
-| start_date | date | Yes | YYYY-MM-DD |
-| end_date | date | Yes | Must be >= start_date |
-| status | string | No | Default: `active` |
+| `user_id` | integer | Yes | Your `user_login_id` |
+| `role` | string | No | Filter: `admin`, `supervisor`, `subordinate` |
+| `per_page` | integer | No | Results per page (default: 15) |
 
-**Response (201):** Created project object.
-
----
-
-### GET `/projects/{id}`
-Show a single project with tasks, members, and history.
-
-**Access:** Authenticated (with visibility check)
-
-**Response (200):** Full project object with relationships.
-
----
-
-### PUT `/projects/{id}`
-Update a project.
-
-**Access:** Admin or project creator (Supervisor)
-
-**Request Body:** (any fields to update)
-```json
-{
-    "name": "Project Alpha - Updated",
-    "description": "Updated description",
-    "status": "completed"
-}
+**Request:**
 ```
-
-**Response (200):** Updated project object.
-
----
-
-### DELETE `/projects/{id}`
-Delete a project.
-
-**Access:** Admin only
+GET https://vistora.sroy.es/public/api/timesheet/users?user_id=2
+```
 
 **Response (200):**
 ```json
 {
     "success": true,
-    "message": "Project deleted successfully."
+    "data": {
+        "current_page": 1,
+        "data": [
+            {
+                "user_login_id": 44,
+                "username": "Indranil Shah",
+                "email_id": "indSh@xyz.com",
+                "empcode": "EMP002",
+                "corp_id": "test",
+                "company_name": "IMS MACO SERVICES INDIA PVT. LTD.",
+                "active_yn": 1,
+                "admin_yn": 0,
+                "supervisor_yn": 0,
+                "created_at": null,
+                "role": "subordinate",
+                "is_active": true
+            },
+            {
+                "user_login_id": 2,
+                "username": "test",
+                "email_id": "test@gmail.com",
+                "empcode": "EMP001",
+                "corp_id": "test",
+                "company_name": "Nippo",
+                "active_yn": 1,
+                "admin_yn": 1,
+                "supervisor_yn": 1,
+                "created_at": "2025-06-02T15:39:31.000000Z",
+                "role": "admin",
+                "is_active": true
+            }
+        ],
+        "total": 5,
+        "per_page": 15,
+        "current_page": 1,
+        "last_page": 1
+    }
 }
 ```
 
 ---
 
-### POST `/projects/{id}/extend-timeline`
-Extend a project's deadline.
+## 3. Team Members
 
-**Access:** Admin or project creator (Supervisor)
+Team members define supervisor-subordinate relationships via the `ts_team_members` table. **Admin & Supervisor only.**
 
-**Request Body:**
+### POST `/team-members?user_id=X`
+
+Add a team member. Supervisor adds to own team; Admin can specify `supervisor_id`.
+
+**Request:**
 ```json
+POST https://vistora.sroy.es/public/api/timesheet/team-members?user_id=2
+Content-Type: application/json
+
+{
+    "member_id": 44,
+    "supervisor_id": 2
+}
+```
+
+> `supervisor_id` is optional. If omitted, defaults to the authenticated user. Only admins can set it to another user.
+
+**Response (201):**
+```json
+{
+    "success": true,
+    "message": "Team member added successfully.",
+    "data": {
+        "supervisor_id": 2,
+        "member_id": 44,
+        "corp_id": "test",
+        "updated_at": "2026-02-28T12:17:59.000000Z",
+        "created_at": "2026-02-28T12:17:59.000000Z",
+        "id": 4,
+        "supervisor": {
+            "user_login_id": 2,
+            "username": "test",
+            "email_id": "test@gmail.com",
+            "role": "admin",
+            "is_active": true
+        },
+        "member": {
+            "user_login_id": 44,
+            "username": "Indranil Shah",
+            "email_id": "indSh@xyz.com",
+            "role": "subordinate",
+            "is_active": true
+        }
+    }
+}
+```
+
+---
+
+### GET `/team-members?user_id=X`
+
+List team members. Supervisor sees own team; Admin can filter by `supervisor_id`.
+
+**Query Parameters:**
+| Parameter | Type | Required | Description |
+|---|---|---|---|
+| `user_id` | integer | Yes | Your `user_login_id` |
+| `supervisor_id` | integer | No | Admin-only: filter by supervisor |
+| `per_page` | integer | No | Results per page (default: 15) |
+
+**Request:**
+```
+GET https://vistora.sroy.es/public/api/timesheet/team-members?user_id=2
+```
+
+**Response (200):**
+```json
+{
+    "success": true,
+    "data": {
+        "current_page": 1,
+        "data": [
+            {
+                "id": 4,
+                "supervisor_id": 2,
+                "member_id": 44,
+                "corp_id": "test",
+                "created_at": "2026-02-28T12:17:59.000000Z",
+                "updated_at": "2026-02-28T12:17:59.000000Z",
+                "member": {
+                    "user_login_id": 44,
+                    "username": "Indranil Shah",
+                    "email_id": "indSh@xyz.com",
+                    "role": "subordinate",
+                    "is_active": true
+                },
+                "supervisor": {
+                    "user_login_id": 2,
+                    "username": "test",
+                    "email_id": "test@gmail.com",
+                    "role": "admin",
+                    "is_active": true
+                }
+            }
+        ],
+        "total": 3,
+        "per_page": 15
+    }
+}
+```
+
+---
+
+### DELETE `/team-members?user_id=X`
+
+Remove a team member.
+
+**Request:**
+```json
+DELETE https://vistora.sroy.es/public/api/timesheet/team-members?user_id=2
+Content-Type: application/json
+
+{
+    "member_id": 44,
+    "supervisor_id": 2
+}
+```
+
+> `supervisor_id` is optional (admin-only). Defaults to authenticated user.
+
+**Response (200):**
+```json
+{
+    "success": true,
+    "message": "Team member removed successfully."
+}
+```
+
+---
+
+## 4. Projects
+
+### POST `/projects?user_id=X`
+
+Create a new project. **Admin & Supervisor only.**
+
+**Request:**
+```json
+POST https://vistora.sroy.es/public/api/timesheet/projects?user_id=2
+Content-Type: application/json
+
+{
+    "name": "Website Redesign",
+    "description": "Complete redesign of company website with modern UI/UX",
+    "start_date": "2026-03-01",
+    "end_date": "2026-05-31",
+    "status": "active"
+}
+```
+
+**Response (201):**
+```json
+{
+    "success": true,
+    "message": "Project created successfully.",
+    "data": {
+        "name": "Website Redesign",
+        "description": "Complete redesign of company website with modern UI/UX",
+        "created_by": 2,
+        "start_date": "2026-03-01T00:00:00.000000Z",
+        "end_date": "2026-05-31T00:00:00.000000Z",
+        "status": "active",
+        "updated_at": "2026-02-28T12:18:55.000000Z",
+        "created_at": "2026-02-28T12:18:55.000000Z",
+        "id": 2,
+        "creator": {
+            "user_login_id": 2,
+            "username": "test",
+            "email_id": "test@gmail.com",
+            "role": "admin",
+            "is_active": true
+        },
+        "members": []
+    }
+}
+```
+
+---
+
+### GET `/projects?user_id=X`
+
+List projects visible to the user.
+
+**Query Parameters:**
+| Parameter | Type | Required | Description |
+|---|---|---|---|
+| `user_id` | integer | Yes | Your `user_login_id` |
+| `status` | string | No | Filter: `active`, `completed`, `on_hold`, `cancelled` |
+| `per_page` | integer | No | Results per page (default: 15) |
+
+**Request:**
+```
+GET https://vistora.sroy.es/public/api/timesheet/projects?user_id=2
+```
+
+**Response (200):**
+```json
+{
+    "success": true,
+    "data": {
+        "current_page": 1,
+        "data": [
+            {
+                "id": 2,
+                "name": "Website Redesign",
+                "description": "Complete redesign of company website with modern UI/UX",
+                "created_by": 2,
+                "start_date": "2026-03-01T00:00:00.000000Z",
+                "end_date": "2026-05-31T00:00:00.000000Z",
+                "extended_end_date": "2026-06-30T00:00:00.000000Z",
+                "status": "active",
+                "created_at": "2026-02-28T12:18:55.000000Z",
+                "updated_at": "2026-02-28T12:19:28.000000Z",
+                "creator": { "user_login_id": 2, "username": "test" },
+                "members": [
+                    { "user_login_id": 44, "username": "Indranil Shah" },
+                    { "user_login_id": 45, "username": "Pulkit Ray" }
+                ]
+            }
+        ],
+        "total": 3,
+        "per_page": 15
+    }
+}
+```
+
+---
+
+### GET `/projects/{id}?user_id=X`
+
+Get a single project by ID.
+
+**Request:**
+```
+GET https://vistora.sroy.es/public/api/timesheet/projects/2?user_id=2
+```
+
+---
+
+### PUT `/projects/{id}?user_id=X`
+
+Update a project. **Admin & Supervisor only.**
+
+**Request:**
+```json
+PUT https://vistora.sroy.es/public/api/timesheet/projects/2?user_id=2
+Content-Type: application/json
+
+{
+    "name": "Website Redesign v2",
+    "status": "active"
+}
+```
+
+---
+
+### DELETE `/projects/{id}?user_id=X`
+
+Delete a project. **Admin only.**
+
+```
+DELETE https://vistora.sroy.es/public/api/timesheet/projects/2?user_id=2
+```
+
+---
+
+### POST `/projects/{id}/extend-timeline?user_id=X`
+
+Extend project deadline. **Admin & Supervisor only.**
+
+**Request:**
+```json
+POST https://vistora.sroy.es/public/api/timesheet/projects/2/extend-timeline?user_id=2
+Content-Type: application/json
+
 {
     "extended_end_date": "2026-06-30",
     "reason": "Client requested additional features"
 }
 ```
 
-| Field | Type | Required | Notes |
-|---|---|---|---|
-| extended_end_date | date | Yes | Must be after current end date |
-| reason | string | Yes | Max 500 chars |
-
-**Response (200):** Updated project object.
-
----
-
-### POST `/projects/{id}/assign-member`
-Assign a subordinate to a project.
-
-**Access:** Admin or project creator (Supervisor)
-
-**Request Body:**
+**Response (200):**
 ```json
 {
-    "user_id": 3
+    "success": true,
+    "message": "Project timeline extended successfully.",
+    "data": {
+        "id": 2,
+        "name": "Website Redesign",
+        "extended_end_date": "2026-06-30T00:00:00.000000Z",
+        "status": "active"
+    }
 }
 ```
 
-| Field | Type | Required | Notes |
-|---|---|---|---|
-| user_id | integer | Yes | Must be a subordinate |
-
-**Constraints:**
-- Supervisors can only assign their own subordinates
-- Duplicate assignments are prevented
-
-**Response (200):** Updated project with members.
-
 ---
 
-### POST `/projects/{id}/remove-member`
-Remove a subordinate from a project.
+### POST `/projects/{id}/assign-member?user_id=X`
 
-**Access:** Admin or project creator (Supervisor)
+Assign a user to a project. **Admin & Supervisor only.**
 
-**Request Body:**
+**Request:**
 ```json
+POST https://vistora.sroy.es/public/api/timesheet/projects/2/assign-member?user_id=2
+Content-Type: application/json
+
 {
-    "user_id": 3
+    "member_user_id": 44
 }
 ```
 
-**Response (200):** Updated project with members.
-
----
-
-## 4. Tasks
-
-### GET `/tasks`
-List tasks with role-based visibility and filters.
-
-**Access:** Authenticated
-
-**Query Parameters:**
-| Param | Type | Description |
-|---|---|---|
-| status | string | Filter by status |
-| priority | string | Filter by priority |
-| project_id | integer | Filter by project |
-| assigned_to | integer | Filter by assignee |
-| overdue | boolean | Show only overdue tasks |
-| per_page | integer | Items per page (default: 15) |
-
-**Visibility Rules:**
-- **Admin:** all tasks
-- **Supervisor:** tasks of own subordinates + tasks they assigned
-- **Subordinate:** only their own tasks
-
-**Response (200):** Paginated list of tasks.
-
----
-
-### POST `/tasks`
-Create and assign a task (with or without project).
-
-**Access:** Admin, Supervisor
-
-**Request Body:**
-```json
-{
-    "project_id": 1,
-    "title": "Design wireframes",
-    "description": "Create initial wireframes for the project",
-    "assigned_to": 3,
-    "priority": "high",
-    "due_date": "2026-03-15"
-}
-```
-
-| Field | Type | Required | Notes |
-|---|---|---|---|
-| project_id | integer | No | Nullable - tasks can exist without a project |
-| title | string | Yes | Max 255 chars |
-| description | string | No | |
-| assigned_to | integer | Yes | Must be a subordinate |
-| priority | string | No | `low`, `medium` (default), `high`, `urgent` |
-| due_date | date | No | Must be today or later |
-
-**Constraints:**
-- Supervisors can only assign to their own subordinates
-- Only subordinates can be assignees
-
-**Response (201):** Created task object.
-
----
-
-### GET `/tasks/{id}`
-Show a single task with all relationships and history.
-
-**Access:** Authenticated (with visibility check)
-
-**Response (200):** Full task object with project, assignee, assigner, approver, daily reports, and histories.
-
----
-
-### PUT `/tasks/{id}`
-Update task details (title, description, priority, due_date, reassign).
-
-**Access:** Admin or task creator (Supervisor)
-
-**Request Body:** (any fields to update)
-```json
-{
-    "title": "Design wireframes - v2",
-    "priority": "urgent",
-    "assigned_to": 4
-}
-```
-
-**Response (200):** Updated task object.
-
----
-
-### DELETE `/tasks/{id}`
-Delete a task.
-
-**Access:** Admin only
+> Note: The body field is `member_user_id` (not `user_id`) to avoid conflict with the query parameter.
 
 **Response (200):**
 ```json
 {
     "success": true,
-    "message": "Task deleted successfully."
+    "message": "Member assigned to project successfully.",
+    "data": {
+        "id": 2,
+        "name": "Website Redesign",
+        "members": [
+            {
+                "user_login_id": 44,
+                "username": "Indranil Shah",
+                "role": "subordinate"
+            }
+        ]
+    }
 }
 ```
 
 ---
 
-### PATCH `/tasks/{id}/status`
-Update task status (subordinate marks progress).
+### POST `/projects/{id}/remove-member?user_id=X`
 
-**Access:** Subordinate (assigned to this task only)
+Remove a user from a project. **Admin & Supervisor only.**
 
-**Request Body:**
+**Request:**
 ```json
+POST https://vistora.sroy.es/public/api/timesheet/projects/2/remove-member?user_id=2
+Content-Type: application/json
+
 {
-    "status": "in_progress",
-    "remarks": "Starting work on this task"
+    "member_user_id": 44
 }
 ```
 
-| Field | Type | Required | Notes |
+---
+
+## 5. Tasks
+
+### POST `/tasks?user_id=X`
+
+Create and assign a task. **Admin & Supervisor only.**
+
+**Request:**
+```json
+POST https://vistora.sroy.es/public/api/timesheet/tasks?user_id=2
+Content-Type: application/json
+
+{
+    "project_id": 2,
+    "assigned_to": 44,
+    "title": "Design Homepage Mockup",
+    "description": "Create wireframes and mockups for new homepage",
+    "due_date": "2026-03-15",
+    "priority": "high"
+}
+```
+
+**Fields:**
+| Field | Type | Required | Description |
 |---|---|---|---|
-| status | string | Yes | `in_progress` or `completed` |
-| remarks | string | No | Optional notes |
+| `project_id` | integer | Yes | Project to assign task to |
+| `assigned_to` | integer | Yes | `user_login_id` of assignee |
+| `title` | string | Yes | Task title |
+| `description` | string | No | Task description |
+| `due_date` | date | No | Due date (YYYY-MM-DD) |
+| `priority` | string | Yes | `low`, `medium`, `high` |
 
-**Allowed Status Transitions:**
-| From | To |
-|---|---|
-| pending | in_progress |
-| in_progress | completed |
-| rejected | in_progress |
-
-**Response (200):** Updated task object.
-
----
-
-### POST `/tasks/{id}/approve`
-Approve a completed task.
-
-**Access:** Admin, Supervisor (own subordinates only)
-
-**Request Body:**
+**Response (201):**
 ```json
 {
-    "remarks": "Great work!"
+    "success": true,
+    "message": "Task created successfully.",
+    "data": {
+        "project_id": 2,
+        "title": "Design Homepage Mockup",
+        "description": "Create wireframes and mockups for new homepage",
+        "assigned_to": 44,
+        "assigned_by": 2,
+        "priority": "high",
+        "due_date": "2026-03-15T00:00:00.000000Z",
+        "status": "pending",
+        "updated_at": "2026-02-28T12:19:59.000000Z",
+        "created_at": "2026-02-28T12:19:59.000000Z",
+        "id": 3,
+        "project": { "id": 2, "name": "Website Redesign" },
+        "assignee": {
+            "user_login_id": 44,
+            "username": "Indranil Shah",
+            "role": "subordinate"
+        },
+        "assigner": {
+            "user_login_id": 2,
+            "username": "test",
+            "role": "admin"
+        }
+    }
 }
 ```
 
-**Constraints:**
-- Only tasks with status `completed` can be approved
-- Supervisors can only approve their own subordinates' tasks
-
-**Response (200):** Updated task with approver details.
-
 ---
 
-### POST `/tasks/{id}/reject`
-Reject a completed task (sends it back for rework).
+### GET `/tasks?user_id=X`
 
-**Access:** Admin, Supervisor (own subordinates only)
-
-**Request Body:**
-```json
-{
-    "rejection_reason": "Need more test coverage"
-}
-```
-
-| Field | Type | Required | Notes |
-|---|---|---|---|
-| rejection_reason | string | Yes | Max 500 chars |
-
-**Constraints:**
-- Only tasks with status `completed` can be rejected
-- After rejection, subordinate can change status: rejected → in_progress → completed
-
-**Response (200):** Updated task object.
-
----
-
-## 5. Daily Reports
-
-### GET `/daily-reports`
-List daily reports with role-based visibility.
-
-**Access:** Authenticated
+List tasks visible to the user.
 
 **Query Parameters:**
-| Param | Type | Description |
-|---|---|---|
-| user_id | integer | Filter by user |
-| task_id | integer | Filter by task |
-| report_date | date | Filter by exact date |
-| date_from | date | Filter from date |
-| date_to | date | Filter to date |
-| per_page | integer | Items per page (default: 15) |
-
-**Visibility Rules:**
-- **Admin:** all reports
-- **Supervisor:** own + subordinates' reports
-- **Subordinate:** own reports only
-
-**Response (200):** Paginated list of daily reports.
-
----
-
-### POST `/daily-reports`
-Submit a daily report.
-
-**Access:** Subordinate only
-
-**Request Body:**
-```json
-{
-    "task_id": 1,
-    "report_date": "2026-02-28",
-    "description": "Worked on wireframe designs for 6 hours",
-    "hours_spent": 6
-}
-```
-
-| Field | Type | Required | Notes |
+| Parameter | Type | Required | Description |
 |---|---|---|---|
-| task_id | integer | No | Must be assigned to this user |
-| report_date | date | Yes | Must be today or earlier |
-| description | string | Yes | Work description |
-| hours_spent | number | Yes | Min: 0.25, Max: 24 |
-
-**Constraints:**
-- Duplicate reports (same user + task + date) are prevented
-- task_id (if provided) must be assigned to the reporting user
-
-**Response (201):** Created report object.
+| `user_id` | integer | Yes | Your `user_login_id` |
+| `project_id` | integer | No | Filter by project |
+| `status` | string | No | Filter: `pending`, `in_progress`, `completed`, `approved`, `rejected` |
+| `priority` | string | No | Filter: `low`, `medium`, `high` |
+| `per_page` | integer | No | Results per page (default: 15) |
 
 ---
 
-### GET `/daily-reports/{id}`
-Show a single daily report.
+### GET `/tasks/{id}?user_id=X`
 
-**Access:** Authenticated (with visibility check)
-
-**Response (200):** Report object with user and task details.
+Get a single task by ID.
 
 ---
 
-### PUT `/daily-reports/{id}`
-Update a daily report.
+### PUT `/tasks/{id}?user_id=X`
 
-**Access:** Subordinate (own reports only)
+Update task details. **Admin & Supervisor only.**
 
-**Request Body:**
+---
+
+### DELETE `/tasks/{id}?user_id=X`
+
+Delete a task. **Admin only.**
+
+---
+
+### PATCH `/tasks/{id}/status?user_id=X`
+
+Update task status. **Subordinate only** (own assigned tasks).
+
+**Allowed transitions:**
+- `pending` → `in_progress`
+- `in_progress` → `completed`
+- `rejected` → `in_progress`
+
+**Request:**
 ```json
+PATCH https://vistora.sroy.es/public/api/timesheet/tasks/3/status?user_id=44
+Content-Type: application/json
+
 {
-    "description": "Updated description",
-    "hours_spent": 7
+    "status": "in_progress"
 }
 ```
 
-**Response (200):** Updated report object.
+**Response (200):**
+```json
+{
+    "success": true,
+    "message": "Task status updated successfully.",
+    "data": {
+        "id": 3,
+        "title": "Design Homepage Mockup",
+        "status": "in_progress",
+        "completed_at": null,
+        "approved_by": null,
+        "approved_at": null
+    }
+}
+```
 
 ---
 
-### DELETE `/daily-reports/{id}`
+### POST `/tasks/{id}/approve?user_id=X`
+
+Approve a completed task. **Admin & Supervisor only.**
+
+**Request:**
+```
+POST https://vistora.sroy.es/public/api/timesheet/tasks/3/approve?user_id=2
+```
+
+**Response (200):**
+```json
+{
+    "success": true,
+    "message": "Task approved successfully.",
+    "data": {
+        "id": 3,
+        "status": "approved",
+        "approved_by": 2,
+        "approved_at": "2026-02-28T12:20:44.000000Z"
+    }
+}
+```
+
+---
+
+### POST `/tasks/{id}/reject?user_id=X`
+
+Reject a completed task. **Admin & Supervisor only.**
+
+**Request:**
+```json
+POST https://vistora.sroy.es/public/api/timesheet/tasks/4/reject?user_id=2
+Content-Type: application/json
+
+{
+    "rejection_reason": "CSS does not match the mockup design specifications"
+}
+```
+
+**Response (200):**
+```json
+{
+    "success": true,
+    "message": "Task rejected.",
+    "data": {
+        "id": 4,
+        "status": "rejected",
+        "rejection_reason": "CSS does not match the mockup design specifications"
+    }
+}
+```
+
+---
+
+## 6. Daily Reports
+
+### POST `/daily-reports?user_id=X`
+
+Submit a daily work report. **Subordinate only.**
+
+**Request:**
+```json
+POST https://vistora.sroy.es/public/api/timesheet/daily-reports?user_id=44
+Content-Type: application/json
+
+{
+    "task_id": 3,
+    "report_date": "2026-02-28",
+    "description": "Completed homepage mockup design with 3 layout variations",
+    "hours_spent": 7.5
+}
+```
+
+**Fields:**
+| Field | Type | Required | Description |
+|---|---|---|---|
+| `task_id` | integer | No | Associated task ID |
+| `report_date` | date | Yes | Date of work (YYYY-MM-DD, <= today) |
+| `description` | string | Yes | Work description |
+| `hours_spent` | decimal | Yes | Hours worked (0.25 to 24) |
+
+**Response (201):**
+```json
+{
+    "success": true,
+    "message": "Daily report submitted successfully.",
+    "data": {
+        "user_id": 44,
+        "task_id": 3,
+        "report_date": "2026-02-28T00:00:00.000000Z",
+        "description": "Completed homepage mockup design with 3 layout variations",
+        "hours_spent": "7.50",
+        "updated_at": "2026-02-28T12:21:21.000000Z",
+        "created_at": "2026-02-28T12:21:21.000000Z",
+        "id": 2,
+        "user": {
+            "user_login_id": 44,
+            "username": "Indranil Shah",
+            "role": "subordinate"
+        },
+        "task": {
+            "id": 3,
+            "title": "Design Homepage Mockup",
+            "project_id": 2
+        }
+    }
+}
+```
+
+---
+
+### GET `/daily-reports?user_id=X`
+
+List daily reports visible to the user.
+
+**Query Parameters:**
+| Parameter | Type | Required | Description |
+|---|---|---|---|
+| `user_id` | integer | Yes | Your `user_login_id` |
+| `report_user_id` | integer | No | Filter by report author's `user_login_id` |
+| `task_id` | integer | No | Filter by task |
+| `date_from` | date | No | Start date filter |
+| `date_to` | date | No | End date filter |
+| `per_page` | integer | No | Results per page (default: 15) |
+
+---
+
+### GET `/daily-reports/{id}?user_id=X`
+
+Get a single daily report.
+
+---
+
+### PUT `/daily-reports/{id}?user_id=X`
+
+Update a daily report. **Subordinate only** (own reports).
+
+---
+
+### DELETE `/daily-reports/{id}?user_id=X`
+
 Delete a daily report.
 
-**Access:** Admin or Subordinate (own reports)
+---
+
+## 7. Histories
+
+### GET `/histories/tasks?user_id=X`
+
+Get task action history (created, status_changed, approved, rejected).
+
+**Query Parameters:**
+| Parameter | Type | Required | Description |
+|---|---|---|---|
+| `user_id` | integer | Yes | Your `user_login_id` |
+| `task_id` | integer | No | Filter by task |
+| `action_user_id` | integer | No | Filter by user who performed the action |
+| `action` | string | No | Filter: `created`, `status_changed`, `approved`, `rejected` |
+| `per_page` | integer | No | Results per page (default: 15) |
+
+**Request:**
+```
+GET https://vistora.sroy.es/public/api/timesheet/histories/tasks?user_id=2
+```
 
 **Response (200):**
 ```json
 {
     "success": true,
-    "message": "Daily report deleted successfully."
+    "data": {
+        "current_page": 1,
+        "data": [
+            {
+                "id": 16,
+                "task_id": 4,
+                "user_id": 2,
+                "action": "rejected",
+                "old_value": "completed",
+                "new_value": "rejected",
+                "remarks": "CSS does not match the mockup design specifications",
+                "created_at": "2026-02-28T12:21:05.000000Z",
+                "task": { "id": 4, "title": "Implement Responsive CSS", "project_id": 2, "assigned_to": 45 },
+                "user": { "user_login_id": 2, "username": "test", "role": "admin" }
+            },
+            {
+                "id": 13,
+                "task_id": 3,
+                "user_id": 2,
+                "action": "approved",
+                "old_value": "completed",
+                "new_value": "approved",
+                "remarks": "Task approved.",
+                "created_at": "2026-02-28T12:20:44.000000Z",
+                "task": { "id": 3, "title": "Design Homepage Mockup", "project_id": 2, "assigned_to": 44 },
+                "user": { "user_login_id": 2, "username": "test", "role": "admin" }
+            }
+        ],
+        "total": 16,
+        "per_page": 15
+    }
 }
 ```
 
 ---
 
-## 6. Histories
+### GET `/histories/projects?user_id=X`
 
-### GET `/histories/tasks`
-Get task change history with audit trail.
-
-**Access:** Authenticated
+Get project action history (created, updated, member_added, member_removed, timeline_extended).
 
 **Query Parameters:**
-| Param | Type | Description |
-|---|---|---|
-| task_id | integer | Filter by task |
-| action | string | Filter by action type |
-| user_id | integer | Filter by actor |
-| date_from | date | Filter from date |
-| date_to | date | Filter to date |
-| per_page | integer | Items per page (default: 15) |
-
-**Action Types:** `created`, `status_changed`, `approved`, `rejected`, `reassigned`, `updated_*`
-
-**Visibility Rules:**
-- **Admin:** all histories
-- **Supervisor:** histories of own subordinates' tasks + tasks they assigned
-- **Subordinate:** only their own task histories
-
-**Response (200):** Paginated list of task history entries.
-
----
-
-### GET `/histories/projects`
-Get project change history with audit trail.
-
-**Access:** Authenticated
-
-**Query Parameters:**
-| Param | Type | Description |
-|---|---|---|
-| project_id | integer | Filter by project |
-| action | string | Filter by action type |
-| date_from | date | Filter from date |
-| date_to | date | Filter to date |
-| per_page | integer | Items per page (default: 15) |
-
-**Action Types:** `created`, `updated_name`, `updated_description`, `updated_status`, `timeline_extended`, `member_added`, `member_removed`
-
-**Visibility Rules:**
-- **Admin:** all histories
-- **Supervisor:** histories of own projects + projects with their subordinates
-- **Subordinate:** histories of projects they're assigned to
-
-**Response (200):** Paginated list of project history entries.
-
----
-
-## 7. Reports & KPIs
-
-### GET `/reports/subordinate-performance`
-Get performance report for a subordinate.
-
-**Access:** Authenticated
-
-**Query Parameters:**
-| Param | Type | Required | Description |
+| Parameter | Type | Required | Description |
 |---|---|---|---|
-| user_id | integer | No | Target user (defaults to self) |
-| period | string | No | YYYY-MM format (defaults to current month) |
+| `user_id` | integer | Yes | Your `user_login_id` |
+| `project_id` | integer | No | Filter by project |
+| `action_user_id` | integer | No | Filter by user who performed the action |
+| `action` | string | No | Filter by action type |
+| `per_page` | integer | No | Results per page (default: 15) |
 
-**Visibility Rules:**
-- **Admin:** any subordinate
-- **Supervisor:** own subordinates
-- **Subordinate:** self only
+---
+
+## 8. Reports & KPIs
+
+### GET `/reports/subordinate-performance?user_id=X`
+
+Get performance metrics for a subordinate.
+- **Subordinate:** own metrics only
+- **Supervisor:** own team members
+- **Admin:** anyone
+
+**Query Parameters:**
+| Parameter | Type | Required | Description |
+|---|---|---|---|
+| `user_id` | integer | Yes | Your `user_login_id` |
+| `target_user_id` | integer | No | Target user (defaults to self) |
+| `period` | string | No | YYYY-MM format (defaults to current month) |
+
+**Request:**
+```
+GET https://vistora.sroy.es/public/api/timesheet/reports/subordinate-performance?user_id=2&target_user_id=44&period=2026-02
+```
 
 **Response (200):**
 ```json
@@ -804,26 +945,26 @@ Get performance report for a subordinate.
     "success": true,
     "data": {
         "user": {
-            "id": 3,
-            "name": "Subordinate One",
-            "email": "sub1@example.com",
+            "user_login_id": 44,
+            "username": "Indranil Shah",
+            "email_id": "indSh@xyz.com",
             "role": "subordinate"
         },
         "period": "2026-02",
         "kpis": {
-            "task_completion_rate": 50.00,
-            "approval_rate": 100.00,
-            "reporting_consistency": 5.00,
-            "on_time_completion_rate": 100.00
+            "task_completion_rate": 100,
+            "approval_rate": 100,
+            "reporting_consistency": 5,
+            "on_time_completion_rate": 100
         },
         "summary": {
             "total_tasks": 2,
-            "completed_tasks": 1,
-            "approved_tasks": 1,
+            "completed_tasks": 2,
+            "approved_tasks": 2,
             "rejected_tasks": 0,
             "overdue_tasks": 0,
-            "total_hours_logged": 9.00,
-            "avg_hours_per_day": 9.00,
+            "total_hours_logged": 14,
+            "avg_hours_per_day": 14,
             "working_days": 20,
             "days_reported": 1
         }
@@ -831,30 +972,23 @@ Get performance report for a subordinate.
 }
 ```
 
-**KPI Definitions:**
-| KPI | Description |
-|---|---|
-| task_completion_rate | % of assigned tasks that are completed or approved |
-| approval_rate | % of completed tasks that were approved |
-| reporting_consistency | % of working days with at least one daily report |
-| on_time_completion_rate | % of tasks completed before or on due date |
-
 ---
 
-### GET `/reports/supervisor-performance`
-Get performance report for a supervisor (with team breakdown).
+### GET `/reports/supervisor-performance?user_id=X`
 
-**Access:** Admin, Supervisor
+Get performance metrics for a supervisor including team breakdown. **Admin & Supervisor only.**
 
 **Query Parameters:**
-| Param | Type | Required | Description |
+| Parameter | Type | Required | Description |
 |---|---|---|---|
-| user_id | integer | No | Target supervisor (defaults to self) |
-| period | string | No | YYYY-MM format (defaults to current month) |
+| `user_id` | integer | Yes | Your `user_login_id` |
+| `target_user_id` | integer | No | Target supervisor (defaults to self) |
+| `period` | string | No | YYYY-MM format (defaults to current month) |
 
-**Visibility Rules:**
-- **Admin:** any supervisor
-- **Supervisor:** self only
+**Request:**
+```
+GET https://vistora.sroy.es/public/api/timesheet/reports/supervisor-performance?user_id=2&period=2026-02
+```
 
 **Response (200):**
 ```json
@@ -862,65 +996,63 @@ Get performance report for a supervisor (with team breakdown).
     "success": true,
     "data": {
         "supervisor": {
-            "id": 2,
-            "name": "Supervisor One",
-            "email": "sup1@example.com",
-            "role": "supervisor"
+            "user_login_id": 2,
+            "username": "test",
+            "email_id": "test@gmail.com",
+            "role": "admin"
         },
         "period": "2026-02",
         "kpis": {
-            "project_delivery_rate": 0.00,
-            "on_time_delivery_rate": 0.00,
-            "team_productivity": 66.67
+            "project_delivery_rate": 0,
+            "on_time_delivery_rate": 0,
+            "team_productivity": 50
         },
         "summary": {
-            "total_projects": 1,
+            "total_projects": 3,
             "completed_projects": 0,
-            "total_subordinates": 2,
-            "team_total_tasks": 3,
+            "total_subordinates": 3,
+            "team_total_tasks": 4,
             "team_completed_tasks": 2,
             "team_approved_tasks": 2,
-            "team_total_hours": 17.00,
-            "avg_approval_time_days": 0.00
+            "team_total_hours": 19,
+            "avg_approval_time_days": 0
         },
         "subordinate_breakdown": [
             {
-                "user": { "id": 3, "name": "Sub One", "email": "..." },
+                "user": { "user_login_id": 44, "username": "Indranil Shah", "email_id": "indSh@xyz.com" },
                 "total_tasks": 2,
-                "completed_tasks": 1,
-                "completion_rate": 50.00,
-                "hours_logged": 9.00
+                "completed_tasks": 2,
+                "completion_rate": 100,
+                "hours_logged": 14
             },
             {
-                "user": { "id": 4, "name": "Sub Two", "email": "..." },
-                "total_tasks": 1,
-                "completed_tasks": 1,
-                "completion_rate": 100.00,
-                "hours_logged": 8.00
+                "user": { "user_login_id": 45, "username": "Pulkit Ray", "email_id": "pr@gmail.com" },
+                "total_tasks": 2,
+                "completed_tasks": 0,
+                "completion_rate": 0,
+                "hours_logged": 5
             }
         ]
     }
 }
 ```
 
-**Supervisor KPIs:**
-| KPI | Description |
-|---|---|
-| project_delivery_rate | % of projects completed in the period |
-| on_time_delivery_rate | % of completed projects delivered on/before deadline |
-| team_productivity | % of team tasks completed/approved |
-
 ---
 
-### GET `/reports/organization-performance`
-Admin-only: Organization-wide efficiency report with supervisor comparisons.
+### GET `/reports/organization-performance?user_id=X`
 
-**Access:** Admin only
+Organization-wide performance report. **Admin only.**
 
 **Query Parameters:**
-| Param | Type | Required | Description |
+| Parameter | Type | Required | Description |
 |---|---|---|---|
-| period | string | No | YYYY-MM format (defaults to current month) |
+| `user_id` | integer | Yes | Your `user_login_id` |
+| `period` | string | No | YYYY-MM format (defaults to current month) |
+
+**Request:**
+```
+GET https://vistora.sroy.es/public/api/timesheet/reports/organization-performance?user_id=2&period=2026-02
+```
 
 **Response (200):**
 ```json
@@ -929,180 +1061,222 @@ Admin-only: Organization-wide efficiency report with supervisor comparisons.
     "data": {
         "period": "2026-02",
         "kpis": {
-            "organization_efficiency": 66.67,
-            "task_completion_rate": 66.67,
-            "project_completion_rate": 0.00
+            "organization_efficiency": 50,
+            "task_completion_rate": 50,
+            "project_completion_rate": 0
         },
         "summary": {
-            "total_tasks": 3,
+            "total_tasks": 4,
             "completed_tasks": 2,
             "approved_tasks": 2,
             "overdue_tasks": 0,
-            "total_projects": 2,
+            "total_projects": 3,
             "completed_projects": 0,
-            "total_hours_logged": 17.00,
-            "active_subordinates": 2,
-            "active_supervisors": 1
+            "total_hours_logged": 19,
+            "active_subordinates": 3,
+            "active_supervisors": 2
         },
         "supervisor_comparisons": [
             {
-                "supervisor": { "id": 2, "name": "Supervisor One", "email": "..." },
-                "subordinate_count": 2,
-                "total_tasks": 3,
+                "supervisor": { "user_login_id": 2, "username": "test", "email_id": "test@gmail.com" },
+                "subordinate_count": 3,
+                "total_tasks": 4,
                 "completed_tasks": 2,
-                "team_productivity": 66.67,
-                "total_projects": 1,
+                "team_productivity": 50,
+                "total_projects": 3,
                 "completed_projects": 0,
-                "team_hours_logged": 17.00
+                "team_hours_logged": 19
+            },
+            {
+                "supervisor": { "user_login_id": 19, "username": "sroy", "email_id": "sr@gmail.com" },
+                "subordinate_count": 2,
+                "total_tasks": 4,
+                "completed_tasks": 2,
+                "team_productivity": 50,
+                "total_projects": 0,
+                "completed_projects": 0,
+                "team_hours_logged": 19
             }
         ]
     }
 }
 ```
 
-**Organization KPIs:**
-| KPI | Description |
-|---|---|
-| organization_efficiency | Overall task completion rate across all teams |
-| task_completion_rate | % of all tasks completed/approved org-wide |
-| project_completion_rate | % of all projects completed in the period |
-
 ---
 
-### GET `/reports/kpi-history`
-Get historical KPI records for a user.
+### GET `/reports/kpi-history?user_id=X`
 
-**Access:** Authenticated
+Get stored KPI history for a user.
 
 **Query Parameters:**
-| Param | Type | Required | Description |
+| Parameter | Type | Required | Description |
 |---|---|---|---|
-| user_id | integer | No | Target user (defaults to self) |
-| metric_name | string | No | Filter by specific metric |
-| per_page | integer | No | Items per page (default: 30) |
+| `user_id` | integer | Yes | Your `user_login_id` |
+| `target_user_id` | integer | No | Target user (defaults to self) |
+| `metric_name` | string | No | Filter by metric name |
+| `per_page` | integer | No | Results per page (default: 30) |
 
-**Visibility Rules:**
-- **Admin:** any user
-- **Supervisor:** self + own subordinates
-- **Subordinate:** self only
-
-**Response (200):** Paginated list of KPI records.
-
----
-
-## Error Handling
-
-### Standard Error Responses
-
-**401 Unauthenticated:**
-```json
-{
-    "status": false,
-    "message": "Unauthenticated."
-}
+**Request:**
+```
+GET https://vistora.sroy.es/public/api/timesheet/reports/kpi-history?user_id=2&target_user_id=44
 ```
 
-**403 Forbidden (RBAC):**
+**Response (200):**
 ```json
 {
-    "success": false,
-    "message": "Access denied. Required role(s): admin, supervisor"
-}
-```
-
-**403 Forbidden (Business Logic):**
-```json
-{
-    "success": false,
-    "message": "You can only assign tasks to your own subordinates."
-}
-```
-
-**404 Not Found:**
-```json
-{
-    "status": false,
-    "message": "No query results for model [App\\Models\\TsTask] 999"
-}
-```
-
-**422 Validation Error:**
-```json
-{
-    "status": false,
-    "message": "The name field is required.",
-    "errors": {
-        "name": ["The name field is required."]
+    "success": true,
+    "data": {
+        "current_page": 1,
+        "data": [
+            {
+                "id": 3,
+                "user_id": 44,
+                "period": "2026-02",
+                "metric_name": "on_time_completion_rate",
+                "metric_value": "100.00",
+                "calculated_at": "2026-02-28T12:22:09.000000Z",
+                "created_at": "2026-02-28T06:36:37.000000Z",
+                "updated_at": "2026-02-28T12:22:09.000000Z"
+            },
+            {
+                "id": 2,
+                "user_id": 44,
+                "period": "2026-02",
+                "metric_name": "reporting_consistency",
+                "metric_value": "5.00",
+                "calculated_at": "2026-02-28T12:22:09.000000Z"
+            },
+            {
+                "id": 1,
+                "user_id": 44,
+                "period": "2026-02",
+                "metric_name": "task_completion_rate",
+                "metric_value": "100.00",
+                "calculated_at": "2026-02-28T12:22:09.000000Z"
+            }
+        ],
+        "total": 3,
+        "per_page": 30
     }
 }
 ```
 
 ---
 
-## Task Status Workflow
+## Error Handling
 
+All errors follow a consistent format:
+
+### Validation Error (422)
+```json
+{
+    "status": false,
+    "message": "The description field is required.",
+    "errors": {
+        "description": ["The description field is required."]
+    }
+}
 ```
-pending → in_progress → completed → approved ✓
-                                  → rejected → in_progress → completed → approved ✓
+
+### Authentication Error (401)
+```json
+{
+    "status": false,
+    "message": "user_id query parameter is required (pass your user_login_id)"
+}
+```
+
+### Inactive User (403)
+```json
+{
+    "status": false,
+    "message": "Your account is inactive."
+}
+```
+
+### Authorization Error (403)
+```json
+{
+    "success": false,
+    "message": "Access denied. Required role: admin, supervisor"
+}
+```
+
+### Not Found (404)
+```json
+{
+    "success": false,
+    "message": "Resource not found."
+}
 ```
 
 ---
 
-## Files Created
+## API Routes Summary
 
-### Migrations (8 tables)
-- `database/migrations/2026_02_28_000001_create_ts_users_table.php`
-- `database/migrations/2026_02_28_000002_create_ts_projects_table.php`
-- `database/migrations/2026_02_28_000003_create_ts_project_assignments_table.php`
-- `database/migrations/2026_02_28_000004_create_ts_tasks_table.php`
-- `database/migrations/2026_02_28_000005_create_ts_daily_reports_table.php`
-- `database/migrations/2026_02_28_000006_create_ts_task_histories_table.php`
-- `database/migrations/2026_02_28_000007_create_ts_project_histories_table.php`
-- `database/migrations/2026_02_28_000008_create_ts_kpis_table.php`
-
-### Models (8 models)
-- `app/Models/TsUser.php`
-- `app/Models/TsProject.php`
-- `app/Models/TsProjectAssignment.php`
-- `app/Models/TsTask.php`
-- `app/Models/TsDailyReport.php`
-- `app/Models/TsTaskHistory.php`
-- `app/Models/TsProjectHistory.php`
-- `app/Models/TsKpi.php`
-
-### Controllers (6 controllers)
-- `app/Http/Controllers/TimesheetAuthController.php`
-- `app/Http/Controllers/TimesheetProjectController.php`
-- `app/Http/Controllers/TimesheetTaskController.php`
-- `app/Http/Controllers/TimesheetDailyReportController.php`
-- `app/Http/Controllers/TimesheetHistoryController.php`
-- `app/Http/Controllers/TimesheetReportController.php`
-
-### Middleware
-- `app/Http/Middleware/TimesheetRole.php` — RBAC middleware registered as `ts.role`
-
-### Routes
-- All routes defined in `routes/api.php` under prefix `/api/timesheet`
-
-### Test Script
-- `test_timesheet_apis.ps1` — Comprehensive PowerShell test covering all 32 endpoints
+| Method | Endpoint | Auth | Roles |
+|---|---|---|---|
+| POST | `/auth/login` | No | All |
+| GET | `/auth/profile` | Yes | All |
+| GET | `/users` | Yes | Admin, Supervisor |
+| POST | `/team-members` | Yes | Admin, Supervisor |
+| GET | `/team-members` | Yes | Admin, Supervisor |
+| DELETE | `/team-members` | Yes | Admin, Supervisor |
+| GET | `/projects` | Yes | All |
+| POST | `/projects` | Yes | Admin, Supervisor |
+| GET | `/projects/{id}` | Yes | All |
+| PUT | `/projects/{id}` | Yes | Admin, Supervisor |
+| DELETE | `/projects/{id}` | Yes | Admin |
+| POST | `/projects/{id}/extend-timeline` | Yes | Admin, Supervisor |
+| POST | `/projects/{id}/assign-member` | Yes | Admin, Supervisor |
+| POST | `/projects/{id}/remove-member` | Yes | Admin, Supervisor |
+| GET | `/tasks` | Yes | All |
+| POST | `/tasks` | Yes | Admin, Supervisor |
+| GET | `/tasks/{id}` | Yes | All |
+| PUT | `/tasks/{id}` | Yes | Admin, Supervisor |
+| DELETE | `/tasks/{id}` | Yes | Admin |
+| PATCH | `/tasks/{id}/status` | Yes | Subordinate |
+| POST | `/tasks/{id}/approve` | Yes | Admin, Supervisor |
+| POST | `/tasks/{id}/reject` | Yes | Admin, Supervisor |
+| GET | `/daily-reports` | Yes | All |
+| POST | `/daily-reports` | Yes | Subordinate |
+| GET | `/daily-reports/{id}` | Yes | All |
+| PUT | `/daily-reports/{id}` | Yes | Subordinate |
+| DELETE | `/daily-reports/{id}` | Yes | All |
+| GET | `/histories/tasks` | Yes | All |
+| GET | `/histories/projects` | Yes | All |
+| GET | `/reports/subordinate-performance` | Yes | All |
+| GET | `/reports/supervisor-performance` | Yes | Admin, Supervisor |
+| GET | `/reports/organization-performance` | Yes | Admin |
+| GET | `/reports/kpi-history` | Yes | All |
 
 ---
 
-## Quick Start
+## Test Credentials
 
-```bash
-# Run migrations
-php artisan migrate
-
-# Start server
-php artisan serve --port=8001
-
-# Register admin
-curl -X POST http://127.0.0.1:8001/api/timesheet/auth/register \
-  -H "Content-Type: application/json" \
-  -d '{"name":"Admin","email":"admin@test.com","password":"password123","password_confirmation":"password123","role":"admin"}'
-
-# Use the returned token for authenticated requests
-curl -H "Authorization: Bearer {token}" http://127.0.0.1:8001/api/timesheet/auth/profile
 ```
+Corp ID:  test
+Email:    test@gmail.com
+Password: 123456
+Role:     Admin (user_login_id: 2)
+```
+
+## Test Data on Live Server
+
+| user_login_id | Username | Email | Role |
+|---|---|---|---|
+| 2 | test | test@gmail.com | Admin |
+| 19 | sroy | sr@gmail.com | Admin |
+| 43 | Rajesh Kr Patel | rjk@gmail.com | Subordinate |
+| 44 | Indranil Shah | indSh@xyz.com | Subordinate |
+| 45 | Pulkit Ray | pr@gmail.com | Subordinate |
+
+**Team Setup:** User 2 (test) supervises users 43, 44, 45
+
+**Projects Created:**
+- Project 2: "Website Redesign" (members: 44, 45) — extended to 2026-06-30
+- Project 3: "Mobile App Development" (member: 43)
+
+**Tasks Created:**
+- Task 3: "Design Homepage Mockup" → assigned to 44, status: approved
+- Task 4: "Implement Responsive CSS" → assigned to 45, status: rejected
