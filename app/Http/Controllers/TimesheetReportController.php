@@ -167,7 +167,7 @@ class TimesheetReportController extends Controller
             ], 403);
         }
 
-        if (!$targetUser->isSupervisor()) {
+        if (!$targetUser->isSupervisor() && (int)$targetUser->supervisor_yn !== 1) {
             return response()->json([
                 'success' => false,
                 'message' => 'Specified user is not a supervisor.',
@@ -366,14 +366,12 @@ class TimesheetReportController extends Controller
         $activeSupervisors = UserLogin::where('corp_id', $user->corp_id)
             ->where('active_yn', 1)
             ->where('supervisor_yn', 1)
-            ->where('admin_yn', '!=', 1)
             ->count();
 
-        // Supervisor comparisons
+        // Supervisor comparisons (anyone with supervisor_yn=1, including admins)
         $supervisorIds = UserLogin::where('corp_id', $user->corp_id)
             ->where('active_yn', 1)
             ->where('supervisor_yn', 1)
-            ->where('admin_yn', '!=', 1)
             ->pluck('user_login_id');
 
         $supervisorComparisons = [];
