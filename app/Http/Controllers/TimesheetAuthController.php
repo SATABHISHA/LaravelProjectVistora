@@ -11,7 +11,6 @@ class TimesheetAuthController extends Controller
 {
     /**
      * Register a new timesheet user.
-     * Admin can register any role. Supervisor can register subordinates.
      */
     public function register(Request $request)
     {
@@ -50,14 +49,11 @@ class TimesheetAuthController extends Controller
             'supervisor_id' => $request->supervisor_id,
         ]);
 
-        $token = $user->createToken('timesheet-token')->plainTextToken;
-
         return response()->json([
             'success' => true,
             'message' => 'User registered successfully.',
             'data' => [
                 'user' => $user->only(['id', 'name', 'email', 'role', 'supervisor_id']),
-                'token' => $token,
             ],
         ], 201);
     }
@@ -88,33 +84,17 @@ class TimesheetAuthController extends Controller
             ], 403);
         }
 
-        $token = $user->createToken('timesheet-token')->plainTextToken;
-
         return response()->json([
             'success' => true,
             'message' => 'Login successful.',
             'data' => [
                 'user' => $user->only(['id', 'name', 'email', 'role', 'supervisor_id']),
-                'token' => $token,
             ],
         ]);
     }
 
     /**
-     * Logout (revoke current token).
-     */
-    public function logout(Request $request)
-    {
-        $request->user()->currentAccessToken()->delete();
-
-        return response()->json([
-            'success' => true,
-            'message' => 'Logged out successfully.',
-        ]);
-    }
-
-    /**
-     * Get authenticated user profile.
+     * Get user profile. Requires user_id parameter.
      */
     public function profile(Request $request)
     {

@@ -4,11 +4,10 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Foundation\Auth\User as Authenticatable;
-use Laravel\Sanctum\HasApiTokens;
 
 class TsUser extends Authenticatable
 {
-    use HasApiTokens, HasFactory;
+    use HasFactory;
 
     protected $table = 'ts_users';
 

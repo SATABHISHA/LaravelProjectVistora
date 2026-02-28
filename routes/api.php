@@ -911,15 +911,14 @@ use App\Http\Controllers\TimesheetReportController;
 
 Route::prefix('timesheet')->group(function () {
 
-    // ---- Public Auth Routes ----
+    // ---- Public Auth Routes (no user_id needed) ----
     Route::post('/auth/register', [TimesheetAuthController::class, 'register']);
     Route::post('/auth/login', [TimesheetAuthController::class, 'login']);
 
-    // ---- Protected Routes (Sanctum) ----
-    Route::middleware('auth:sanctum')->group(function () {
+    // ---- Protected Routes (require user_id parameter) ----
+    Route::middleware('ts.role')->group(function () {
 
         // Auth
-        Route::post('/auth/logout', [TimesheetAuthController::class, 'logout']);
         Route::get('/auth/profile', [TimesheetAuthController::class, 'profile']);
 
         // Users (Admin & Supervisor)
