@@ -29,8 +29,12 @@ class AttendanceApiController extends Controller
             // ✅ **FIXED:** Get today's date in the correct timezone
             $today = Carbon::now('Asia/Kolkata')->format('Y-m-d');
             
-            // Check if user already has an attendance record for today
-            $attendance = Attendance::where('puid', $request->puid)
+            // ✅ **FIXED:** Use corpId + empCode + companyName + date as the unique business key
+            // Previously used only puid + date, which caused cross-user collisions when
+            // multiple users shared the same puid (e.g., same device or non-unique puid generation).
+            $attendance = Attendance::where('corpId', $request->corpId)
+                ->where('empCode', $request->empCode)
+                ->where('companyName', $request->companyName)
                 ->where('date', $today)
                 ->first();
 
