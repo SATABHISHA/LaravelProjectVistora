@@ -18,7 +18,9 @@ class TimesheetDailyReportController extends Controller
         $query = TsDailyReport::with(['user', 'task:id,title,project_id,status']);
 
         if ($user->isAdmin()) {
-            // Admin sees all reports
+            // Admin sees all reports in their corp
+            $corpUserIds = $user->getVisibleUserIds();
+            $query->whereIn('user_id', $corpUserIds);
         } elseif ($user->isSupervisor()) {
             $visibleIds = $user->getVisibleUserIds();
             $query->whereIn('user_id', $visibleIds);
@@ -169,6 +171,15 @@ class TimesheetDailyReportController extends Controller
         $user = $request->user();
         $report = TsDailyReport::findOrFail($id);
 
+        // Corp isolation
+        $reportUser = UserLogin::find($report->user_id);
+        if (!$reportUser || $reportUser->corp_id !== $user->corp_id) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Report not found.',
+            ], 404);
+        }
+
         if (!$user->isAdmin() && $report->user_id !== $user->user_login_id) {
             return response()->json([
                 'success' => false,
@@ -186,6 +197,12 @@ class TimesheetDailyReportController extends Controller
 
     private function canViewReport(UserLogin $user, TsDailyReport $report): bool
     {
+        // Corp isolation: report user must be in same corp
+        $reportUser = $report->relationLoaded('user') ? $report->user : UserLogin::find($report->user_id);
+        if (!$reportUser || $reportUser->corp_id !== $user->corp_id) {
+            return false;
+        }
+
         if ($user->isAdmin()) return true;
 
         if ($user->isSupervisor()) {

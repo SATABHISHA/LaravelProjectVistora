@@ -19,7 +19,12 @@ class TimesheetTaskController extends Controller
         $query = TsTask::with(['project:id,name,status', 'assignee', 'assigner']);
 
         if ($user->isAdmin()) {
-            // Admin sees all tasks
+            // Admin sees all tasks in their corp
+            $corpUserIds = $user->getVisibleUserIds();
+            $query->where(function ($q) use ($corpUserIds) {
+                $q->whereIn('assigned_to', $corpUserIds)
+                  ->orWhereIn('assigned_by', $corpUserIds);
+            });
         } elseif ($user->isSupervisor()) {
             $visibleIds = $user->getVisibleUserIds();
             $query->where(function ($q) use ($visibleIds, $user) {
@@ -73,6 +78,14 @@ class TimesheetTaskController extends Controller
         ]);
 
         $assignee = UserLogin::findOrFail($request->assigned_to);
+
+        // Corp isolation: assignee must be in same corp
+        if ($assignee->corp_id !== $user->corp_id) {
+            return response()->json([
+                'success' => false,
+                'message' => 'User not found in your organization.',
+            ], 404);
+        }
 
         if (!$assignee->isSubordinate()) {
             return response()->json([
@@ -151,7 +164,7 @@ class TimesheetTaskController extends Controller
     public function update(Request $request, $id)
     {
         $user = $request->user();
-        $task = TsTask::findOrFail($id);
+        $task = $this->findTaskInCorp($id, $user);
 
         if (!$user->isAdmin() && $task->assigned_by !== $user->user_login_id) {
             return response()->json([
@@ -178,6 +191,12 @@ class TimesheetTaskController extends Controller
         // If reassigning, validate the new assignee
         if ($request->has('assigned_to')) {
             $newAssignee = UserLogin::findOrFail($request->assigned_to);
+            if ($newAssignee->corp_id !== $user->corp_id) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'User not found in your organization.',
+                ], 404);
+            }
             if (!$newAssignee->isSubordinate()) {
                 return response()->json([
                     'success' => false,
@@ -220,7 +239,7 @@ class TimesheetTaskController extends Controller
     public function updateStatus(Request $request, $id)
     {
         $user = $request->user();
-        $task = TsTask::findOrFail($id);
+        $task = $this->findTaskInCorp($id, $user);
 
         if ($task->assigned_to !== $user->user_login_id) {
             return response()->json([
@@ -280,7 +299,7 @@ class TimesheetTaskController extends Controller
     public function approve(Request $request, $id)
     {
         $user = $request->user();
-        $task = TsTask::findOrFail($id);
+        $task = $this->findTaskInCorp($id, $user);
 
         if ($task->status !== 'completed') {
             return response()->json([
@@ -327,7 +346,7 @@ class TimesheetTaskController extends Controller
     public function reject(Request $request, $id)
     {
         $user = $request->user();
-        $task = TsTask::findOrFail($id);
+        $task = $this->findTaskInCorp($id, $user);
 
         if ($task->status !== 'completed') {
             return response()->json([
@@ -376,7 +395,8 @@ class TimesheetTaskController extends Controller
      */
     public function destroy(Request $request, $id)
     {
-        $task = TsTask::findOrFail($id);
+        $user = $request->user();
+        $task = $this->findTaskInCorp($id, $user);
         $task->delete();
 
         return response()->json([
@@ -387,6 +407,12 @@ class TimesheetTaskController extends Controller
 
     private function canViewTask(UserLogin $user, TsTask $task): bool
     {
+        // Corp isolation: ensure task belongs to user's corp
+        $assigner = $task->relationLoaded('assigner') ? $task->assigner : UserLogin::find($task->assigned_by);
+        if (!$assigner || $assigner->corp_id !== $user->corp_id) {
+            return false;
+        }
+
         if ($user->isAdmin()) return true;
 
         if ($user->isSupervisor()) {
@@ -395,5 +421,15 @@ class TimesheetTaskController extends Controller
         }
 
         return $task->assigned_to === $user->user_login_id;
+    }
+
+    /**
+     * Find a task scoped to the user's corp_id.
+     */
+    private function findTaskInCorp($id, UserLogin $user)
+    {
+        return TsTask::where('id', $id)
+            ->whereHas('assigner', fn($q) => $q->where('corp_id', $user->corp_id))
+            ->firstOrFail();
     }
 }

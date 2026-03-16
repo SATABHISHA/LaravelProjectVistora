@@ -42,6 +42,15 @@ class TimesheetReportController extends Controller
         }
 
         $targetUser = UserLogin::findOrFail($targetUserId);
+
+        // Corp isolation: target user must be in same corp
+        if ($targetUser->corp_id !== $user->corp_id) {
+            return response()->json([
+                'success' => false,
+                'message' => 'User not found in your organization.',
+            ], 404);
+        }
+
         $startDate = Carbon::createFromFormat('Y-m', $period)->startOfMonth();
         $endDate = Carbon::createFromFormat('Y-m', $period)->endOfMonth();
 
@@ -158,6 +167,14 @@ class TimesheetReportController extends Controller
         $period = $request->get('period', now()->format('Y-m'));
 
         $targetUser = UserLogin::findOrFail($targetUserId);
+
+        // Corp isolation: target user must be in same corp
+        if ($targetUser->corp_id !== $user->corp_id) {
+            return response()->json([
+                'success' => false,
+                'message' => 'User not found in your organization.',
+            ], 404);
+        }
 
         // Access control
         if ($user->isSupervisor() && $targetUserId != $user->user_login_id) {
@@ -309,22 +326,29 @@ class TimesheetReportController extends Controller
         $startDate = Carbon::createFromFormat('Y-m', $period)->startOfMonth();
         $endDate = Carbon::createFromFormat('Y-m', $period)->endOfMonth();
 
+        // Corp-scoped user IDs for multi-tenancy
+        $corpUserIds = $user->getVisibleUserIds();
+
         // Overall task metrics
-        $totalTasks = TsTask::where('created_at', '>=', $startDate)
+        $totalTasks = TsTask::whereIn('assigned_to', $corpUserIds)
+            ->where('created_at', '>=', $startDate)
             ->where('created_at', '<=', $endDate)
             ->count();
 
-        $completedTasks = TsTask::where('created_at', '>=', $startDate)
+        $completedTasks = TsTask::whereIn('assigned_to', $corpUserIds)
+            ->where('created_at', '>=', $startDate)
             ->where('created_at', '<=', $endDate)
             ->whereIn('status', ['completed', 'approved'])
             ->count();
 
-        $approvedTasks = TsTask::where('created_at', '>=', $startDate)
+        $approvedTasks = TsTask::whereIn('assigned_to', $corpUserIds)
+            ->where('created_at', '>=', $startDate)
             ->where('created_at', '<=', $endDate)
             ->where('status', 'approved')
             ->count();
 
-        $overdueTasks = TsTask::where('created_at', '>=', $startDate)
+        $overdueTasks = TsTask::whereIn('assigned_to', $corpUserIds)
+            ->where('created_at', '>=', $startDate)
             ->where('created_at', '<=', $endDate)
             ->whereNotNull('due_date')
             ->where(function ($q) {
@@ -342,17 +366,20 @@ class TimesheetReportController extends Controller
         $orgEfficiency = $totalTasks > 0 ? round(($completedTasks / $totalTasks) * 100, 2) : 0;
 
         // Overall project metrics
-        $totalProjects = TsProject::where('created_at', '>=', $startDate)
+        $totalProjects = TsProject::whereIn('created_by', $corpUserIds)
+            ->where('created_at', '>=', $startDate)
             ->where('created_at', '<=', $endDate)
             ->count();
 
-        $completedProjects = TsProject::where('status', 'completed')
+        $completedProjects = TsProject::whereIn('created_by', $corpUserIds)
+            ->where('status', 'completed')
             ->where('updated_at', '>=', $startDate)
             ->where('updated_at', '<=', $endDate)
             ->count();
 
         // Total hours across org
-        $totalHours = TsDailyReport::where('report_date', '>=', $startDate)
+        $totalHours = TsDailyReport::whereIn('user_id', $corpUserIds)
+            ->where('report_date', '>=', $startDate)
             ->where('report_date', '<=', $endDate)
             ->sum('hours_spent');
 
@@ -444,6 +471,17 @@ class TimesheetReportController extends Controller
     {
         $user = $request->user();
         $targetUserId = $request->get('target_user_id', $user->user_login_id);
+
+        // Corp isolation: verify target user belongs to same corp
+        if ($targetUserId != $user->user_login_id) {
+            $targetUser = UserLogin::find($targetUserId);
+            if (!$targetUser || $targetUser->corp_id !== $user->corp_id) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'User not found in your organization.',
+                ], 404);
+            }
+        }
 
         // Access control
         if ($user->isSubordinate() && $targetUserId != $user->user_login_id) {

@@ -18,7 +18,12 @@ class TimesheetHistoryController extends Controller
         $query = TsTaskHistory::with(['task:id,title,project_id,assigned_to', 'user']);
 
         if ($user->isAdmin()) {
-            // Admin sees all
+            // Admin sees all task histories in their corp
+            $corpUserIds = $user->getVisibleUserIds();
+            $query->whereHas('task', function ($q) use ($corpUserIds) {
+                $q->whereIn('assigned_to', $corpUserIds)
+                  ->orWhereIn('assigned_by', $corpUserIds);
+            });
         } elseif ($user->isSupervisor()) {
             $visibleIds = $user->getVisibleUserIds();
             $query->whereHas('task', function ($q) use ($visibleIds, $user) {
@@ -66,7 +71,11 @@ class TimesheetHistoryController extends Controller
         $query = TsProjectHistory::with(['project:id,name,status,created_by', 'user']);
 
         if ($user->isAdmin()) {
-            // Admin sees all
+            // Admin sees all project histories in their corp
+            $corpUserIds = $user->getVisibleUserIds();
+            $query->whereHas('project', function ($q) use ($corpUserIds) {
+                $q->whereIn('created_by', $corpUserIds);
+            });
         } elseif ($user->isSupervisor()) {
             $subordinateIds = $user->getVisibleSubordinateIds();
             $query->whereHas('project', function ($q) use ($user, $subordinateIds) {

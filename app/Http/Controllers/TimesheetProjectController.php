@@ -20,7 +20,9 @@ class TimesheetProjectController extends Controller
         $query = TsProject::with(['creator', 'members']);
 
         if ($user->isAdmin()) {
-            // Admin sees all projects
+            // Admin sees all projects in their corp
+            $corpUserIds = $user->getVisibleUserIds();
+            $query->whereIn('created_by', $corpUserIds);
         } elseif ($user->isSupervisor()) {
             $subordinateIds = $user->getVisibleSubordinateIds();
             $query->where(function ($q) use ($user, $subordinateIds) {
@@ -115,7 +117,7 @@ class TimesheetProjectController extends Controller
     public function update(Request $request, $id)
     {
         $user = $request->user();
-        $project = TsProject::findOrFail($id);
+        $project = $this->findProjectInCorp($id, $user);
 
         if (!$user->isAdmin() && $project->created_by !== $user->user_login_id) {
             return response()->json([
@@ -167,7 +169,7 @@ class TimesheetProjectController extends Controller
     public function extendTimeline(Request $request, $id)
     {
         $user = $request->user();
-        $project = TsProject::findOrFail($id);
+        $project = $this->findProjectInCorp($id, $user);
 
         if (!$user->isAdmin() && $project->created_by !== $user->user_login_id) {
             return response()->json([
@@ -208,7 +210,7 @@ class TimesheetProjectController extends Controller
     public function assignMember(Request $request, $id)
     {
         $user = $request->user();
-        $project = TsProject::findOrFail($id);
+        $project = $this->findProjectInCorp($id, $user);
 
         if (!$user->isAdmin() && $project->created_by !== $user->user_login_id) {
             return response()->json([
@@ -222,6 +224,14 @@ class TimesheetProjectController extends Controller
         ]);
 
         $member = UserLogin::findOrFail($request->member_user_id);
+
+        // Corp isolation: member must be in same corp
+        if ($member->corp_id !== $user->corp_id) {
+            return response()->json([
+                'success' => false,
+                'message' => 'User not found in your organization.',
+            ], 404);
+        }
 
         // Supervisor can only assign own team members
         if ($user->isSupervisor() && !$user->isMyTeamMember($member->user_login_id)) {
@@ -279,7 +289,7 @@ class TimesheetProjectController extends Controller
     public function removeMember(Request $request, $id)
     {
         $user = $request->user();
-        $project = TsProject::findOrFail($id);
+        $project = $this->findProjectInCorp($id, $user);
 
         if (!$user->isAdmin() && $project->created_by !== $user->user_login_id) {
             return response()->json([
@@ -328,7 +338,8 @@ class TimesheetProjectController extends Controller
      */
     public function destroy(Request $request, $id)
     {
-        $project = TsProject::findOrFail($id);
+        $user = $request->user();
+        $project = $this->findProjectInCorp($id, $user);
         $project->delete();
 
         return response()->json([
@@ -342,6 +353,12 @@ class TimesheetProjectController extends Controller
      */
     private function canViewProject(UserLogin $user, TsProject $project): bool
     {
+        // Corp isolation: project creator must be in same corp
+        $creatorCorpId = $project->creator ? $project->creator->corp_id : null;
+        if ($creatorCorpId !== $user->corp_id) {
+            return false;
+        }
+
         if ($user->isAdmin()) return true;
 
         if ($user->isSupervisor()) {
@@ -351,5 +368,15 @@ class TimesheetProjectController extends Controller
         }
 
         return $project->members()->where('user_id', $user->user_login_id)->exists();
+    }
+
+    /**
+     * Find a project scoped to the user's corp_id.
+     */
+    private function findProjectInCorp($id, UserLogin $user)
+    {
+        return TsProject::where('id', $id)
+            ->whereHas('creator', fn($q) => $q->where('corp_id', $user->corp_id))
+            ->firstOrFail();
     }
 }

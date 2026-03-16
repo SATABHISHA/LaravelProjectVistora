@@ -138,9 +138,24 @@ class TimesheetAuthController extends Controller
             ], 404);
         }
 
+        // Corp isolation: member must be in same corp
+        if ($member->corp_id !== $user->corp_id) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Member not found.',
+            ], 404);
+        }
+
         // Admin can specify which supervisor; Supervisor assigns to themselves
         $supervisorId = $user->user_login_id;
         if ($user->isAdmin() && $request->filled('supervisor_id')) {
+            $supervisor = UserLogin::find($request->supervisor_id);
+            if (!$supervisor || $supervisor->corp_id !== $user->corp_id) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Supervisor not found.',
+                ], 404);
+            }
             $supervisorId = $request->supervisor_id;
         }
 
@@ -186,6 +201,13 @@ class TimesheetAuthController extends Controller
 
         $supervisorId = $user->user_login_id;
         if ($user->isAdmin() && $request->filled('supervisor_id')) {
+            $supervisor = UserLogin::find($request->supervisor_id);
+            if (!$supervisor || $supervisor->corp_id !== $user->corp_id) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Supervisor not found.',
+                ], 404);
+            }
             $supervisorId = $request->supervisor_id;
         }
 
@@ -218,6 +240,13 @@ class TimesheetAuthController extends Controller
 
         $supervisorId = $user->user_login_id;
         if ($user->isAdmin() && $request->filled('supervisor_id')) {
+            $supervisor = UserLogin::find($request->supervisor_id);
+            if (!$supervisor || $supervisor->corp_id !== $user->corp_id) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Supervisor not found.',
+                ], 404);
+            }
             $supervisorId = $request->supervisor_id;
         }
 
