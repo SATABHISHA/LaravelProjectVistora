@@ -557,6 +557,71 @@
             gap: 14px;
         }
 
+        /* Body fields */
+        .body-fields {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 12px;
+        }
+        .body-field {
+            display: flex;
+            flex-direction: column;
+            gap: 5px;
+        }
+        .body-field label {
+            font-size: 11px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            color: var(--accent-cyan);
+        }
+        .body-field input {
+            padding: 10px 14px;
+            background: var(--bg-input);
+            border: 1px solid rgba(79, 195, 247, 0.25);
+            border-radius: 8px;
+            color: var(--text-primary);
+            font-family: 'Inter', sans-serif;
+            font-size: 13px;
+            transition: all 0.3s;
+        }
+        .body-field input:focus {
+            outline: none;
+            border-color: var(--accent-cyan);
+            box-shadow: 0 0 0 3px rgba(79, 195, 247, 0.12);
+        }
+        .body-field input::placeholder {
+            color: var(--text-muted);
+        }
+        .body-mode-toggle {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            margin-bottom: 10px;
+        }
+        .body-mode-toggle button {
+            padding: 5px 12px;
+            font-size: 11px;
+            font-weight: 600;
+            border-radius: 6px;
+            cursor: pointer;
+            border: 1px solid var(--border);
+            background: var(--bg-input);
+            color: var(--text-secondary);
+            transition: all 0.2s;
+        }
+        .body-mode-toggle button.active {
+            background: rgba(79, 195, 247, 0.15);
+            border-color: var(--accent-cyan);
+            color: var(--accent-cyan);
+        }
+        .body-mode-toggle button:hover {
+            color: var(--text-primary);
+        }
+        @media (max-width: 900px) {
+            .body-fields { grid-template-columns: 1fr; }
+        }
+
         /* Headers section */
         .headers-section {
             margin-bottom: 14px;
@@ -2034,6 +2099,53 @@
     document.getElementById('totalEndpoints').textContent = totalEndpoints;
     document.getElementById('totalCategories').textContent = API_DATA.length;
 
+    function buildBodyFields(bodyStr, epId) {
+        if (!bodyStr || bodyStr.includes('multipart')) return `<div class="body-fields"><p style="color:var(--text-muted); font-size:12px; grid-column:1/-1;">Use Raw JSON mode or multipart form tool for this endpoint.</p></div>`;
+        try {
+            const parsed = JSON.parse(bodyStr);
+            const keys = Object.keys(parsed);
+            if (keys.length === 0) return `<div class="body-fields"><p style="color:var(--text-muted); font-size:12px; grid-column:1/-1;">Add fields via Raw JSON mode</p></div>`;
+            let html = '<div class="body-fields">';
+            keys.forEach(key => {
+                const val = parsed[key] || '';
+                const inputType = key.toLowerCase().includes('password') ? 'password' : 'text';
+                html += `<div class="body-field">
+                    <label>${key}</label>
+                    <input type="${inputType}" data-key="${key}" placeholder="Enter ${key}" value="${val}">
+                </div>`;
+            });
+            html += '</div>';
+            return html;
+        } catch {
+            return `<div class="body-fields"><p style="color:var(--text-muted); font-size:12px; grid-column:1/-1;">Cannot parse fields. Use Raw JSON mode.</p></div>`;
+        }
+    }
+
+    function switchBodyMode(epId, mode, btn) {
+        const fieldsContainer = document.getElementById(`${epId}-body-fields`);
+        const textarea = document.getElementById(`${epId}-body`);
+        const toggleBtns = btn.parentElement.querySelectorAll('button');
+        toggleBtns.forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        if (mode === 'fields') {
+            fieldsContainer.style.display = '';
+            textarea.style.display = 'none';
+            // Sync fields -> textarea
+        } else {
+            // Sync form field values to textarea JSON before showing
+            const inputs = fieldsContainer.querySelectorAll('.body-field input');
+            if (inputs.length > 0) {
+                const obj = {};
+                inputs.forEach(input => {
+                    obj[input.dataset.key] = input.value;
+                });
+                textarea.value = JSON.stringify(obj, null, 2);
+            }
+            fieldsContainer.style.display = 'none';
+            textarea.style.display = '';
+        }
+    }
+
     function getParamsFromPath(path) {
         const matches = path.match(/\{([^}]+)\}/g);
         return matches ? matches.map(m => m.replace(/[{}?]/g, '')) : [];
@@ -2129,8 +2241,15 @@
 
                             ${ep.body ? `
                             <div class="form-group">
-                                <label class="form-label">Request Body (JSON)</label>
-                                <textarea class="form-textarea" id="${epId}-body" placeholder="Enter JSON body">${ep.body}</textarea>
+                                <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:8px;">
+                                    <label class="form-label" style="margin-bottom:0">Request Body</label>
+                                    <div class="body-mode-toggle">
+                                        <button class="active" onclick="switchBodyMode('${epId}', 'fields', this)">📝 Form Fields</button>
+                                        <button onclick="switchBodyMode('${epId}', 'raw', this)">{ } Raw JSON</button>
+                                    </div>
+                                </div>
+                                <div class="body-fields-container" id="${epId}-body-fields">${buildBodyFields(ep.body, epId)}</div>
+                                <textarea class="form-textarea" id="${epId}-body" placeholder="Enter JSON body" style="display:none">${ep.body}</textarea>
                             </div>` : ''}
 
                             <div class="btn-group">
@@ -2260,7 +2379,22 @@
 
     function getBody(epId) {
         const bodyEl = document.getElementById(`${epId}-body`);
-        return bodyEl ? bodyEl.value : null;
+        const fieldsContainer = document.getElementById(`${epId}-body-fields`);
+        if (!bodyEl) return null;
+        // If form fields mode is visible, build JSON from fields
+        if (fieldsContainer && fieldsContainer.style.display !== 'none') {
+            const inputs = fieldsContainer.querySelectorAll('.body-field input');
+            if (inputs.length > 0) {
+                const obj = {};
+                inputs.forEach(input => {
+                    const key = input.dataset.key;
+                    const val = input.value;
+                    if (key) obj[key] = val;
+                });
+                return JSON.stringify(obj, null, 2);
+            }
+        }
+        return bodyEl.value || null;
     }
 
     function buildCurlCommand(epId, method, path) {
