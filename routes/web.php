@@ -18,6 +18,11 @@ Route::get('/', function () {
     return view('welcome');
 });
 
+// API Documentation Page
+Route::get('/apidocs', function () {
+    return response()->file(public_path('apidocs.html'));
+});
+
 // Temporary migration route - REMOVE after use
 Route::get('/run-migrate-ts', function () {
     try {

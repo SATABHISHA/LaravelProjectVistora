@@ -1,0 +1,2451 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Vistora API Documentation</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap');
+
+        :root {
+            --bg-primary: #0a0a0f;
+            --bg-secondary: #12121a;
+            --bg-card: #1a1a2e;
+            --bg-card-hover: #1f1f35;
+            --bg-input: #0f0f1a;
+            --border: #2a2a40;
+            --border-glow: #6c63ff33;
+            --text-primary: #e8e8f0;
+            --text-secondary: #8888a8;
+            --text-muted: #555570;
+            --accent-purple: #6c63ff;
+            --accent-blue: #4fc3f7;
+            --accent-cyan: #00e5ff;
+            --accent-pink: #ff6b9d;
+            --accent-green: #66ffb4;
+            --accent-orange: #ffa726;
+            --accent-red: #ff5252;
+            --accent-yellow: #ffd740;
+            --method-get: #66ffb4;
+            --method-post: #4fc3f7;
+            --method-put: #ffa726;
+            --method-patch: #ffd740;
+            --method-delete: #ff5252;
+            --gradient-1: linear-gradient(135deg, #6c63ff, #4fc3f7);
+            --gradient-2: linear-gradient(135deg, #ff6b9d, #ffa726);
+            --gradient-3: linear-gradient(135deg, #66ffb4, #4fc3f7);
+            --shadow-glow: 0 0 30px rgba(108, 99, 255, 0.15);
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            min-height: 100vh;
+            overflow-x: hidden;
+        }
+
+        /* Animated background */
+        .bg-animation {
+            position: fixed;
+            top: 0; left: 0;
+            width: 100%; height: 100%;
+            z-index: 0;
+            pointer-events: none;
+            overflow: hidden;
+        }
+        .bg-animation .orb {
+            position: absolute;
+            border-radius: 50%;
+            filter: blur(80px);
+            opacity: 0.12;
+            animation: float 20s ease-in-out infinite;
+        }
+        .bg-animation .orb:nth-child(1) {
+            width: 500px; height: 500px;
+            background: var(--accent-purple);
+            top: -100px; left: -100px;
+            animation-delay: 0s;
+        }
+        .bg-animation .orb:nth-child(2) {
+            width: 400px; height: 400px;
+            background: var(--accent-cyan);
+            top: 50%; right: -100px;
+            animation-delay: -5s;
+        }
+        .bg-animation .orb:nth-child(3) {
+            width: 350px; height: 350px;
+            background: var(--accent-pink);
+            bottom: -50px; left: 30%;
+            animation-delay: -10s;
+        }
+        .bg-animation .orb:nth-child(4) {
+            width: 300px; height: 300px;
+            background: var(--accent-green);
+            top: 30%; left: 50%;
+            animation-delay: -15s;
+        }
+
+        @keyframes float {
+            0%, 100% { transform: translate(0, 0) scale(1); }
+            25% { transform: translate(50px, -80px) scale(1.1); }
+            50% { transform: translate(-30px, 60px) scale(0.9); }
+            75% { transform: translate(80px, 30px) scale(1.05); }
+        }
+
+        /* Scrollbar */
+        ::-webkit-scrollbar { width: 8px; }
+        ::-webkit-scrollbar-track { background: var(--bg-primary); }
+        ::-webkit-scrollbar-thumb {
+            background: var(--accent-purple);
+            border-radius: 4px;
+        }
+
+        /* Layout */
+        .app-container {
+            position: relative;
+            z-index: 1;
+            display: flex;
+            min-height: 100vh;
+        }
+
+        /* Sidebar */
+        .sidebar {
+            width: 300px;
+            min-width: 300px;
+            background: var(--bg-secondary);
+            border-right: 1px solid var(--border);
+            position: fixed;
+            top: 0;
+            left: 0;
+            height: 100vh;
+            overflow-y: auto;
+            z-index: 100;
+            transition: transform 0.3s ease;
+        }
+        .sidebar-header {
+            padding: 24px 20px;
+            border-bottom: 1px solid var(--border);
+            position: sticky;
+            top: 0;
+            background: var(--bg-secondary);
+            z-index: 10;
+        }
+        .logo {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            margin-bottom: 16px;
+        }
+        .logo-icon {
+            width: 40px; height: 40px;
+            background: var(--gradient-1);
+            border-radius: 10px;
+            display: flex; align-items: center; justify-content: center;
+            font-size: 20px; font-weight: 800; color: white;
+            animation: pulse 3s ease-in-out infinite;
+        }
+        @keyframes pulse {
+            0%, 100% { box-shadow: 0 0 0 0 rgba(108, 99, 255, 0.4); }
+            50% { box-shadow: 0 0 20px 5px rgba(108, 99, 255, 0.2); }
+        }
+        .logo-text {
+            font-size: 20px;
+            font-weight: 700;
+            background: var(--gradient-1);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+        .search-box {
+            position: relative;
+        }
+        .search-box input {
+            width: 100%;
+            padding: 10px 14px 10px 38px;
+            background: var(--bg-input);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            color: var(--text-primary);
+            font-size: 13px;
+            transition: all 0.3s;
+            font-family: 'Inter', sans-serif;
+        }
+        .search-box input:focus {
+            outline: none;
+            border-color: var(--accent-purple);
+            box-shadow: 0 0 0 3px rgba(108, 99, 255, 0.15);
+        }
+        .search-box input::placeholder { color: var(--text-muted); }
+        .search-box .search-icon {
+            position: absolute;
+            left: 12px; top: 50%;
+            transform: translateY(-50%);
+            color: var(--text-muted);
+            font-size: 14px;
+        }
+        .search-count {
+            font-size: 11px;
+            color: var(--text-muted);
+            margin-top: 6px;
+            padding-left: 4px;
+        }
+        .sidebar-nav {
+            padding: 12px 0;
+        }
+        .nav-category {
+            padding: 8px 20px 4px;
+            font-size: 10px;
+            font-weight: 700;
+            letter-spacing: 1.5px;
+            text-transform: uppercase;
+            color: var(--text-muted);
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            user-select: none;
+            transition: color 0.2s;
+        }
+        .nav-category:hover { color: var(--text-secondary); }
+        .nav-category .arrow {
+            transition: transform 0.3s;
+            font-size: 10px;
+        }
+        .nav-category.collapsed .arrow {
+            transform: rotate(-90deg);
+        }
+        .nav-group {
+            overflow: hidden;
+            transition: max-height 0.3s ease;
+        }
+        .nav-group.collapsed {
+            max-height: 0 !important;
+        }
+        .nav-item {
+            padding: 6px 20px 6px 28px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 12.5px;
+            color: var(--text-secondary);
+            transition: all 0.2s;
+            border-left: 2px solid transparent;
+        }
+        .nav-item:hover {
+            background: rgba(108, 99, 255, 0.06);
+            color: var(--text-primary);
+            border-left-color: var(--accent-purple);
+        }
+        .nav-item.active {
+            background: rgba(108, 99, 255, 0.1);
+            color: var(--accent-purple);
+            border-left-color: var(--accent-purple);
+        }
+        .nav-method {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 9px;
+            font-weight: 600;
+            padding: 1px 5px;
+            border-radius: 3px;
+            min-width: 36px;
+            text-align: center;
+        }
+        .nav-method.get { background: rgba(102, 255, 180, 0.12); color: var(--method-get); }
+        .nav-method.post { background: rgba(79, 195, 247, 0.12); color: var(--method-post); }
+        .nav-method.put { background: rgba(255, 167, 38, 0.12); color: var(--method-put); }
+        .nav-method.patch { background: rgba(255, 215, 64, 0.12); color: var(--method-patch); }
+        .nav-method.delete { background: rgba(255, 82, 82, 0.12); color: var(--method-delete); }
+
+        /* Main Content */
+        .main-content {
+            margin-left: 300px;
+            flex: 1;
+            padding: 0;
+        }
+
+        /* Hero */
+        .hero {
+            padding: 60px 48px 40px;
+            position: relative;
+            overflow: hidden;
+        }
+        .hero::before {
+            content: '';
+            position: absolute;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: linear-gradient(180deg, rgba(108, 99, 255, 0.05) 0%, transparent 100%);
+        }
+        .hero h1 {
+            font-size: 42px;
+            font-weight: 800;
+            margin-bottom: 12px;
+            background: var(--gradient-1);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            animation: shimmer 3s ease-in-out infinite;
+            position: relative;
+        }
+        @keyframes shimmer {
+            0%, 100% { filter: brightness(1); }
+            50% { filter: brightness(1.3); }
+        }
+        .hero p {
+            font-size: 16px;
+            color: var(--text-secondary);
+            max-width: 600px;
+            line-height: 1.7;
+            position: relative;
+        }
+        .stats-bar {
+            display: flex;
+            gap: 32px;
+            margin-top: 28px;
+            position: relative;
+        }
+        .stat-item {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 12px 20px;
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            transition: all 0.3s;
+        }
+        .stat-item:hover {
+            border-color: var(--accent-purple);
+            transform: translateY(-2px);
+            box-shadow: var(--shadow-glow);
+        }
+        .stat-number {
+            font-size: 24px;
+            font-weight: 700;
+            background: var(--gradient-1);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+        .stat-label {
+            font-size: 12px;
+            color: var(--text-secondary);
+        }
+
+        /* Base URL bar */
+        .base-url-bar {
+            margin: 0 48px 32px;
+            padding: 14px 20px;
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+        .base-url-label {
+            font-size: 11px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            color: var(--accent-purple);
+            white-space: nowrap;
+        }
+        .base-url-input {
+            flex: 1;
+            background: var(--bg-input);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 8px 14px;
+            color: var(--accent-cyan);
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 13px;
+        }
+        .base-url-input:focus {
+            outline: none;
+            border-color: var(--accent-purple);
+        }
+
+        /* API sections */
+        .api-sections {
+            padding: 0 48px 60px;
+        }
+        .category-section {
+            margin-bottom: 40px;
+            animation: fadeInUp 0.5s ease;
+        }
+        @keyframes fadeInUp {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        .category-title {
+            font-size: 22px;
+            font-weight: 700;
+            margin-bottom: 20px;
+            padding-bottom: 12px;
+            border-bottom: 1px solid var(--border);
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+        .category-icon {
+            width: 36px; height: 36px;
+            border-radius: 10px;
+            display: flex; align-items: center; justify-content: center;
+            font-size: 18px;
+        }
+        .category-badge {
+            font-size: 11px;
+            font-weight: 600;
+            padding: 3px 10px;
+            border-radius: 20px;
+            background: rgba(108, 99, 255, 0.15);
+            color: var(--accent-purple);
+            margin-left: auto;
+        }
+
+        /* Endpoint card */
+        .endpoint-card {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 14px;
+            margin-bottom: 12px;
+            overflow: hidden;
+            transition: all 0.3s;
+        }
+        .endpoint-card:hover {
+            border-color: var(--border-glow);
+            box-shadow: var(--shadow-glow);
+        }
+        .endpoint-card.expanded {
+            border-color: var(--accent-purple);
+        }
+        .endpoint-header {
+            padding: 16px 20px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 14px;
+            transition: background 0.2s;
+        }
+        .endpoint-header:hover {
+            background: var(--bg-card-hover);
+        }
+        .method-badge {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 11px;
+            font-weight: 700;
+            padding: 4px 10px;
+            border-radius: 6px;
+            min-width: 58px;
+            text-align: center;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        .method-badge.get { background: rgba(102, 255, 180, 0.15); color: var(--method-get); border: 1px solid rgba(102, 255, 180, 0.2); }
+        .method-badge.post { background: rgba(79, 195, 247, 0.15); color: var(--method-post); border: 1px solid rgba(79, 195, 247, 0.2); }
+        .method-badge.put { background: rgba(255, 167, 38, 0.15); color: var(--method-put); border: 1px solid rgba(255, 167, 38, 0.2); }
+        .method-badge.patch { background: rgba(255, 215, 64, 0.15); color: var(--method-patch); border: 1px solid rgba(255, 215, 64, 0.2); }
+        .method-badge.delete { background: rgba(255, 82, 82, 0.15); color: var(--method-delete); border: 1px solid rgba(255, 82, 82, 0.2); }
+
+        .endpoint-path {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 13px;
+            color: var(--text-primary);
+            flex: 1;
+            word-break: break-all;
+        }
+        .endpoint-path .param {
+            color: var(--accent-orange);
+        }
+        .endpoint-desc {
+            font-size: 12px;
+            color: var(--text-muted);
+            max-width: 300px;
+            text-align: right;
+        }
+        .expand-icon {
+            color: var(--text-muted);
+            transition: transform 0.3s;
+            font-size: 12px;
+        }
+        .endpoint-card.expanded .expand-icon {
+            transform: rotate(180deg);
+        }
+
+        /* Endpoint body (test area) */
+        .endpoint-body {
+            display: none;
+            border-top: 1px solid var(--border);
+            padding: 20px;
+            animation: slideDown 0.3s ease;
+        }
+        .endpoint-card.expanded .endpoint-body {
+            display: block;
+        }
+        @keyframes slideDown {
+            from { opacity: 0; transform: translateY(-10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        /* Tabs */
+        .test-tabs {
+            display: flex;
+            gap: 0;
+            margin-bottom: 20px;
+            background: var(--bg-input);
+            border-radius: 10px;
+            padding: 4px;
+            border: 1px solid var(--border);
+        }
+        .test-tab {
+            flex: 1;
+            padding: 10px 16px;
+            text-align: center;
+            font-size: 12px;
+            font-weight: 600;
+            color: var(--text-secondary);
+            cursor: pointer;
+            border-radius: 8px;
+            transition: all 0.3s;
+        }
+        .test-tab:hover { color: var(--text-primary); }
+        .test-tab.active {
+            background: var(--accent-purple);
+            color: white;
+            box-shadow: 0 2px 8px rgba(108, 99, 255, 0.3);
+        }
+        .tab-content { display: none; }
+        .tab-content.active { display: block; }
+
+        /* Form area */
+        .form-group {
+            margin-bottom: 14px;
+        }
+        .form-label {
+            display: block;
+            font-size: 11px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            color: var(--text-secondary);
+            margin-bottom: 6px;
+        }
+        .form-input, .form-textarea {
+            width: 100%;
+            padding: 10px 14px;
+            background: var(--bg-input);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            color: var(--text-primary);
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 13px;
+            transition: all 0.3s;
+        }
+        .form-input:focus, .form-textarea:focus {
+            outline: none;
+            border-color: var(--accent-purple);
+            box-shadow: 0 0 0 3px rgba(108, 99, 255, 0.1);
+        }
+        .form-textarea {
+            min-height: 120px;
+            resize: vertical;
+        }
+        .form-row {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 14px;
+        }
+
+        /* Headers section */
+        .headers-section {
+            margin-bottom: 14px;
+        }
+        .header-row {
+            display: flex;
+            gap: 8px;
+            margin-bottom: 6px;
+            align-items: center;
+        }
+        .header-row input {
+            flex: 1;
+            padding: 8px 12px;
+            background: var(--bg-input);
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            color: var(--text-primary);
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 12px;
+        }
+        .header-row input:focus {
+            outline: none;
+            border-color: var(--accent-purple);
+        }
+        .btn-remove-header {
+            padding: 6px 10px;
+            background: rgba(255, 82, 82, 0.1);
+            border: 1px solid rgba(255, 82, 82, 0.2);
+            border-radius: 6px;
+            color: var(--accent-red);
+            cursor: pointer;
+            font-size: 14px;
+            transition: all 0.2s;
+        }
+        .btn-remove-header:hover {
+            background: rgba(255, 82, 82, 0.2);
+        }
+        .btn-add-header {
+            padding: 6px 12px;
+            background: rgba(108, 99, 255, 0.1);
+            border: 1px solid rgba(108, 99, 255, 0.2);
+            border-radius: 6px;
+            color: var(--accent-purple);
+            cursor: pointer;
+            font-size: 12px;
+            font-weight: 600;
+            transition: all 0.2s;
+        }
+        .btn-add-header:hover {
+            background: rgba(108, 99, 255, 0.2);
+        }
+
+        /* Buttons */
+        .btn-send {
+            padding: 12px 28px;
+            background: var(--gradient-1);
+            border: none;
+            border-radius: 10px;
+            color: white;
+            font-size: 14px;
+            font-weight: 700;
+            cursor: pointer;
+            transition: all 0.3s;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            position: relative;
+            overflow: hidden;
+        }
+        .btn-send::before {
+            content: '';
+            position: absolute;
+            top: 0; left: -100%;
+            width: 100%; height: 100%;
+            background: linear-gradient(90deg, transparent, rgba(255,255,255,0.2), transparent);
+            transition: left 0.5s;
+        }
+        .btn-send:hover::before { left: 100%; }
+        .btn-send:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 25px rgba(108, 99, 255, 0.35);
+        }
+        .btn-send:active { transform: translateY(0); }
+        .btn-send.loading {
+            opacity: 0.7;
+            pointer-events: none;
+        }
+        .btn-copy-curl {
+            padding: 10px 20px;
+            background: rgba(255, 107, 157, 0.12);
+            border: 1px solid rgba(255, 107, 157, 0.25);
+            border-radius: 10px;
+            color: var(--accent-pink);
+            font-size: 13px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .btn-copy-curl:hover {
+            background: rgba(255, 107, 157, 0.2);
+            transform: translateY(-2px);
+        }
+        .btn-group {
+            display: flex;
+            gap: 12px;
+            margin-top: 16px;
+        }
+
+        /* cURL display */
+        .curl-display {
+            margin-top: 16px;
+            padding: 16px;
+            background: var(--bg-input);
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 12px;
+            color: var(--accent-cyan);
+            line-height: 1.8;
+            white-space: pre-wrap;
+            word-break: break-all;
+            position: relative;
+            display: none;
+        }
+        .curl-display.visible { display: block; }
+        .curl-kw { color: var(--accent-pink); }
+        .curl-url { color: var(--accent-green); }
+        .curl-header { color: var(--accent-orange); }
+        .curl-data { color: var(--accent-cyan); }
+
+        /* Response area */
+        .response-area {
+            margin-top: 20px;
+            border-top: 1px solid var(--border);
+            padding-top: 20px;
+            display: none;
+        }
+        .response-area.visible { display: block; }
+        .response-header {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            margin-bottom: 12px;
+        }
+        .response-status {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 13px;
+            font-weight: 700;
+            padding: 4px 12px;
+            border-radius: 6px;
+        }
+        .response-status.success { background: rgba(102, 255, 180, 0.15); color: var(--method-get); }
+        .response-status.error { background: rgba(255, 82, 82, 0.15); color: var(--method-delete); }
+        .response-time {
+            font-size: 12px;
+            color: var(--text-muted);
+        }
+        .response-body {
+            padding: 16px;
+            background: var(--bg-input);
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 12px;
+            color: var(--text-primary);
+            line-height: 1.7;
+            max-height: 400px;
+            overflow-y: auto;
+            white-space: pre-wrap;
+            word-break: break-all;
+        }
+
+        /* Param inputs */
+        .param-inputs {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            margin-bottom: 14px;
+        }
+        .param-chip {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+        }
+        .param-chip label {
+            font-size: 10px;
+            font-weight: 600;
+            text-transform: uppercase;
+            color: var(--accent-orange);
+            letter-spacing: 0.5px;
+        }
+        .param-chip input {
+            padding: 8px 12px;
+            background: var(--bg-input);
+            border: 1px solid rgba(255, 167, 38, 0.3);
+            border-radius: 6px;
+            color: var(--text-primary);
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 12px;
+            width: 160px;
+        }
+        .param-chip input:focus {
+            outline: none;
+            border-color: var(--accent-orange);
+            box-shadow: 0 0 0 3px rgba(255, 167, 38, 0.1);
+        }
+
+        /* Toast */
+        .toast {
+            position: fixed;
+            bottom: 24px; right: 24px;
+            padding: 14px 22px;
+            border-radius: 10px;
+            font-size: 13px;
+            font-weight: 600;
+            color: white;
+            z-index: 9999;
+            transform: translateY(100px);
+            opacity: 0;
+            transition: all 0.4s ease;
+        }
+        .toast.show {
+            transform: translateY(0);
+            opacity: 1;
+        }
+        .toast.success { background: linear-gradient(135deg, #2d7a4f, #1a5c3a); }
+        .toast.error { background: linear-gradient(135deg, #7a2d2d, #5c1a1a); }
+        .toast.info { background: linear-gradient(135deg, #2d4a7a, #1a3a5c); }
+
+        /* Mobile toggle */
+        .mobile-toggle {
+            display: none;
+            position: fixed;
+            top: 16px; left: 16px;
+            z-index: 200;
+            width: 42px; height: 42px;
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            color: var(--text-primary);
+            font-size: 18px;
+            cursor: pointer;
+            align-items: center; justify-content: center;
+        }
+
+        /* No results */
+        .no-results {
+            text-align: center;
+            padding: 40px;
+            color: var(--text-muted);
+            font-size: 14px;
+            display: none;
+        }
+        .no-results.visible { display: block; }
+
+        /* Responsive */
+        @media (max-width: 900px) {
+            .sidebar {
+                transform: translateX(-100%);
+            }
+            .sidebar.open {
+                transform: translateX(0);
+            }
+            .main-content {
+                margin-left: 0;
+            }
+            .mobile-toggle {
+                display: flex;
+            }
+            .hero { padding: 80px 20px 30px; }
+            .hero h1 { font-size: 28px; }
+            .base-url-bar { margin: 0 20px 24px; flex-direction: column; align-items: stretch; }
+            .api-sections { padding: 0 20px 40px; }
+            .stats-bar { flex-wrap: wrap; gap: 12px; }
+            .form-row { grid-template-columns: 1fr; }
+        }
+
+        /* backdrop for mobile */
+        .sidebar-backdrop {
+            display: none;
+            position: fixed;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: rgba(0,0,0,0.5);
+            z-index: 90;
+        }
+        .sidebar-backdrop.visible { display: block; }
+
+        /* Highlight matching text */
+        mark {
+            background: rgba(108, 99, 255, 0.3);
+            color: var(--text-primary);
+            padding: 0 2px;
+            border-radius: 2px;
+        }
+
+        /* Spinner */
+        .spinner {
+            display: inline-block;
+            width: 16px; height: 16px;
+            border: 2px solid rgba(255,255,255,0.3);
+            border-top-color: white;
+            border-radius: 50%;
+            animation: spin 0.7s linear infinite;
+        }
+        @keyframes spin { to { transform: rotate(360deg); } }
+    </style>
+</head>
+<body>
+    <div class="bg-animation">
+        <div class="orb"></div>
+        <div class="orb"></div>
+        <div class="orb"></div>
+        <div class="orb"></div>
+    </div>
+
+    <button class="mobile-toggle" onclick="toggleSidebar()">☰</button>
+    <div class="sidebar-backdrop" onclick="toggleSidebar()"></div>
+
+    <div class="app-container">
+        <aside class="sidebar" id="sidebar">
+            <div class="sidebar-header">
+                <div class="logo">
+                    <div class="logo-icon">V</div>
+                    <span class="logo-text">Vistora API</span>
+                </div>
+                <div class="search-box">
+                    <span class="search-icon">🔍</span>
+                    <input type="text" id="searchInput" placeholder="Search APIs..." oninput="filterAPIs()">
+                </div>
+                <div class="search-count" id="searchCount"></div>
+            </div>
+            <nav class="sidebar-nav" id="sidebarNav"></nav>
+        </aside>
+
+        <main class="main-content">
+            <div class="hero">
+                <h1>Vistora API Documentation</h1>
+                <p>Complete interactive API reference with built-in testing. Explore, test, and integrate all endpoints with ease.</p>
+                <div class="stats-bar">
+                    <div class="stat-item">
+                        <span class="stat-number" id="totalEndpoints">0</span>
+                        <span class="stat-label">Endpoints</span>
+                    </div>
+                    <div class="stat-item">
+                        <span class="stat-number" id="totalCategories">0</span>
+                        <span class="stat-label">Categories</span>
+                    </div>
+                    <div class="stat-item">
+                        <span class="stat-number" id="totalMethods">5</span>
+                        <span class="stat-label">Methods</span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="base-url-bar">
+                <span class="base-url-label">Base URL</span>
+                <input type="text" class="base-url-input" id="baseUrl" value="http://localhost:8000/api" placeholder="Enter your API base URL">
+            </div>
+
+            <div class="api-sections" id="apiSections"></div>
+            <div class="no-results" id="noResults">
+                <p style="font-size: 32px; margin-bottom: 12px;">🔍</p>
+                <p>No APIs match your search. Try a different keyword.</p>
+            </div>
+        </main>
+    </div>
+
+    <div class="toast" id="toast"></div>
+
+    <script>
+    const API_DATA = [
+        {
+            category: "Authentication",
+            icon: "🔐",
+            color: "#6c63ff",
+            endpoints: [
+                { method: "POST", path: "/userlogin/register", desc: "Register a new user", body: '{\n  "name": "",\n  "email": "",\n  "password": "",\n  "corp_id": ""\n}' },
+                { method: "POST", path: "/userlogin/login", desc: "User login", body: '{\n  "email": "",\n  "password": "",\n  "corp_id": ""\n}' },
+                { method: "GET", path: "/userlogin/userslist", desc: "Get all users list" },
+                { method: "PUT", path: "/users/update/{corp_id}/{email_id}", desc: "Update user details", body: '{\n  "name": "",\n  "password": ""\n}' },
+                { method: "GET", path: "/users/{corp_id}/{email_id}", desc: "Get user by corp_id & email" },
+                { method: "GET", path: "/user/check-details/{corp_id}/{email_id}", desc: "Check user details exist" },
+                { method: "POST", path: "/userlogin/empcode-fullname", desc: "Get empcode with full name", body: '{\n  "corp_id": "",\n  "email": ""\n}' }
+            ]
+        },
+        {
+            category: "Company",
+            icon: "🏢",
+            color: "#4fc3f7",
+            endpoints: [
+                { method: "POST", path: "/company/register_company_details", desc: "Register company details", body: '{\n  "corp_id": "",\n  "company_name": "",\n  "address": ""\n}' },
+                { method: "GET", path: "/company/details/{corp_id}", desc: "Get company details" },
+                { method: "PUT", path: "/company/update/{company_id}/{corp_id}", desc: "Update company", body: '{\n  "company_name": "",\n  "address": ""\n}' },
+                { method: "DELETE", path: "/company/delete/{company_id}/{corp_id}", desc: "Delete company" },
+                { method: "GET", path: "/company/name/{corp_id}", desc: "Get company name by corp_id" }
+            ]
+        },
+        {
+            category: "Business Unit",
+            icon: "🏗️",
+            color: "#66ffb4",
+            endpoints: [
+                { method: "POST", path: "/business_unit/add", desc: "Add business unit", body: '{\n  "corp_id": "",\n  "business_unit_name": ""\n}' },
+                { method: "PUT", path: "/business_unit/update/{corp_id}/{business_unit_id}", desc: "Update business unit", body: '{\n  "business_unit_name": ""\n}' },
+                { method: "DELETE", path: "/business_unit/delete/{corp_id}/{business_unit_id}", desc: "Delete business unit" },
+                { method: "GET", path: "/business_unit/all/{corp_id}", desc: "Get all business units" }
+            ]
+        },
+        {
+            category: "Department",
+            icon: "🏛️",
+            color: "#ffa726",
+            endpoints: [
+                { method: "POST", path: "/department/add", desc: "Add department", body: '{\n  "corp_id": "",\n  "department_name": ""\n}' },
+                { method: "PUT", path: "/department/update/{department_id}", desc: "Update department", body: '{\n  "department_name": ""\n}' },
+                { method: "DELETE", path: "/department/delete/{department_id}", desc: "Delete department" },
+                { method: "GET", path: "/department/all/{corp_id}", desc: "Get all departments" }
+            ]
+        },
+        {
+            category: "Location",
+            icon: "📍",
+            color: "#ff6b9d",
+            endpoints: [
+                { method: "POST", path: "/location/add-country", desc: "Add country", body: '{\n  "corp_id": "",\n  "country_name": ""\n}' },
+                { method: "DELETE", path: "/location/delete-country/{corp_id}/{country_id}", desc: "Delete country" },
+                { method: "GET", path: "/location/countries/{corp_id}", desc: "Get all countries" },
+                { method: "POST", path: "/location/add-state", desc: "Add state", body: '{\n  "corp_id": "",\n  "country_id": "",\n  "state_name": ""\n}' },
+                { method: "DELETE", path: "/location/delete-state/{corp_id}/{state_id}", desc: "Delete state" },
+                { method: "GET", path: "/location/states/{corp_id}/{country_id}", desc: "Get states by country" },
+                { method: "POST", path: "/location/add-city", desc: "Add city", body: '{\n  "corp_id": "",\n  "state_id": "",\n  "city_name": ""\n}' },
+                { method: "DELETE", path: "/location/delete-city/{corp_id}/{city_id}", desc: "Delete city" },
+                { method: "GET", path: "/location/cities/{corp_id}/{state_id}", desc: "Get cities by state" }
+            ]
+        },
+        {
+            category: "Industry",
+            icon: "🏭",
+            color: "#00e5ff",
+            endpoints: [
+                { method: "POST", path: "/industry/add", desc: "Add industry", body: '{\n  "corp_id": "",\n  "industry_name": ""\n}' },
+                { method: "DELETE", path: "/industry/delete/{corp_id}/{industry_id}", desc: "Delete industry" },
+                { method: "GET", path: "/industry/all/{corp_id}", desc: "Get all industries" }
+            ]
+        },
+        {
+            category: "Currency",
+            icon: "💰",
+            color: "#ffd740",
+            endpoints: [
+                { method: "POST", path: "/currency/add", desc: "Add currency", body: '{\n  "corp_id": "",\n  "currency_name": "",\n  "currency_code": ""\n}' },
+                { method: "GET", path: "/currency/all/{corp_id}", desc: "Get all currencies" },
+                { method: "DELETE", path: "/currency/delete/{corp_id}", desc: "Delete currency", body: '{\n  "id": ""\n}' }
+            ]
+        },
+        {
+            category: "Sub-Department",
+            icon: "🗂️",
+            color: "#b388ff",
+            endpoints: [
+                { method: "POST", path: "/subdepartment/add", desc: "Add sub-department", body: '{\n  "corp_id": "",\n  "sub_dept_name": "",\n  "dept_id": ""\n}' },
+                { method: "GET", path: "/subdepartment/all/{corp_id}", desc: "Get all sub-departments" },
+                { method: "PUT", path: "/subdepartment/update/{sub_dept_id}", desc: "Update sub-department", body: '{\n  "sub_dept_name": ""\n}' },
+                { method: "DELETE", path: "/subdepartment/delete/{corp_id}/{sub_dept_id}", desc: "Delete sub-department" }
+            ]
+        },
+        {
+            category: "Designation",
+            icon: "🎖️",
+            color: "#ff8a65",
+            endpoints: [
+                { method: "POST", path: "/designation/add", desc: "Add designation", body: '{\n  "corp_id": "",\n  "designation_name": ""\n}' },
+                { method: "GET", path: "/designation/all/{corp_id}", desc: "Get all designations" },
+                { method: "PUT", path: "/designation/update/{id}/{corp_id}", desc: "Update designation", body: '{\n  "designation_name": ""\n}' },
+                { method: "DELETE", path: "/designation/delete/{corp_id}/{id}", desc: "Delete designation" }
+            ]
+        },
+        {
+            category: "Grade",
+            icon: "📊",
+            color: "#69f0ae",
+            endpoints: [
+                { method: "POST", path: "/grade/add", desc: "Add grade", body: '{\n  "corp_id": "",\n  "grade_name": ""\n}' },
+                { method: "GET", path: "/grade/all/{corp_id}", desc: "Get all grades" },
+                { method: "DELETE", path: "/grade/delete/{corp_id}/{grade_id}", desc: "Delete grade" }
+            ]
+        },
+        {
+            category: "Document Type",
+            icon: "📋",
+            color: "#80deea",
+            endpoints: [
+                { method: "POST", path: "/document_type/add", desc: "Add document type", body: '{\n  "corp_id": "",\n  "type_name": ""\n}' },
+                { method: "GET", path: "/document_type/all/{corp_id}", desc: "Get all document types" },
+                { method: "DELETE", path: "/document_type/delete/{corp_id}/{id}", desc: "Delete document type" }
+            ]
+        },
+        {
+            category: "Document Form List",
+            icon: "📝",
+            color: "#a5d6a7",
+            endpoints: [
+                { method: "POST", path: "/document_form_list/add", desc: "Add document form", body: '{\n  "corp_id": "",\n  "form_name": ""\n}' },
+                { method: "GET", path: "/document_form_list/all/{corp_id}", desc: "Get all document forms" },
+                { method: "DELETE", path: "/document_form_list/delete/{corp_id}/{id}", desc: "Delete document form" }
+            ]
+        },
+        {
+            category: "Document Field List",
+            icon: "📑",
+            color: "#ce93d8",
+            endpoints: [
+                { method: "POST", path: "/document_field_list/add", desc: "Add document field", body: '{\n  "corp_id": "",\n  "field_name": ""\n}' },
+                { method: "GET", path: "/document_field_list/all/{corp_id}", desc: "Get all document fields" },
+                { method: "DELETE", path: "/document_field_list/delete/{corp_id}/{id}", desc: "Delete document field" }
+            ]
+        },
+        {
+            category: "Document",
+            icon: "📄",
+            color: "#90caf9",
+            endpoints: [
+                { method: "POST", path: "/document/add", desc: "Add document", body: '{\n  "corp_id": "",\n  "document_name": ""\n}' },
+                { method: "GET", path: "/document/all/{corp_id}", desc: "Get all documents" },
+                { method: "DELETE", path: "/document/delete/{corp_id}/{id}", desc: "Delete document" },
+                { method: "POST", path: "/document/update/{corp_id}/{id}", desc: "Update document", body: '{\n  "document_name": ""\n}' }
+            ]
+        },
+        {
+            category: "Qualification",
+            icon: "🎓",
+            color: "#fff176",
+            endpoints: [
+                { method: "POST", path: "/qualification/add", desc: "Add qualification", body: '{\n  "corp_id": "",\n  "qualification_name": ""\n}' },
+                { method: "GET", path: "/qualification/all/{corp_id}", desc: "Get all qualifications" },
+                { method: "DELETE", path: "/qualification/delete/{corp_id}/{id}", desc: "Delete qualification" }
+            ]
+        },
+        {
+            category: "Specialization",
+            icon: "🔬",
+            color: "#ef9a9a",
+            endpoints: [
+                { method: "POST", path: "/specialization/add", desc: "Add specialization", body: '{\n  "corp_id": "",\n  "specialization_name": "",\n  "qualification_id": ""\n}' },
+                { method: "DELETE", path: "/specialization/delete/{corp_id}/{id}", desc: "Delete specialization" },
+                { method: "GET", path: "/specialization/qualifications/{corp_id}", desc: "Get qualifications with specialization count" }
+            ]
+        },
+        {
+            category: "Blacklist",
+            icon: "🚫",
+            color: "#ff5252",
+            endpoints: [
+                { method: "POST", path: "/blacklist/add", desc: "Add to blacklist", body: '{\n  "corp_id": "",\n  "name": "",\n  "reason": ""\n}' },
+                { method: "DELETE", path: "/blacklist/delete/{corp_id}/{id}", desc: "Remove from blacklist" },
+                { method: "GET", path: "/blacklist/all/{corp_id}", desc: "Get blacklist" }
+            ]
+        },
+        {
+            category: "Job Function",
+            icon: "💼",
+            color: "#81d4fa",
+            endpoints: [
+                { method: "POST", path: "/jobfunction/add", desc: "Add job function", body: '{\n  "corp_id": "",\n  "function_name": ""\n}' },
+                { method: "DELETE", path: "/jobfunction/delete/{corp_id}/{id}", desc: "Delete job function" },
+                { method: "GET", path: "/jobfunction/all/{corp_id}", desc: "Get all job functions" }
+            ]
+        },
+        {
+            category: "Skill",
+            icon: "⚡",
+            color: "#ffcc02",
+            endpoints: [
+                { method: "POST", path: "/skill/add", desc: "Add skill", body: '{\n  "corp_id": "",\n  "skill_name": ""\n}' },
+                { method: "DELETE", path: "/skill/delete/{corp_id}/{id}", desc: "Delete skill" },
+                { method: "GET", path: "/skill/all/{corp_id}", desc: "Get all skills" }
+            ]
+        },
+        {
+            category: "Skill Proficiency",
+            icon: "📈",
+            color: "#a5d6a7",
+            endpoints: [
+                { method: "POST", path: "/skillproficiency/add", desc: "Add skill proficiency", body: '{\n  "corp_id": "",\n  "proficiency_name": ""\n}' },
+                { method: "DELETE", path: "/skillproficiency/delete/{corp_id}/{id}", desc: "Delete skill proficiency" },
+                { method: "GET", path: "/skillproficiency/all/{corp_id}", desc: "Get all skill proficiencies" }
+            ]
+        },
+        {
+            category: "Bank",
+            icon: "🏦",
+            color: "#4dd0e1",
+            endpoints: [
+                { method: "POST", path: "/bank/add", desc: "Add bank", body: '{\n  "corp_id": "",\n  "bank_name": ""\n}' },
+                { method: "DELETE", path: "/bank/delete/{corp_id}/{id}", desc: "Delete bank" },
+                { method: "GET", path: "/bank/all/{corp_id}", desc: "Get all banks" }
+            ]
+        },
+        {
+            category: "Bank Challan Report",
+            icon: "🧾",
+            color: "#aed581",
+            endpoints: [
+                { method: "POST", path: "/bankchallanreport/add", desc: "Add bank challan report", body: '{\n  "corp_id": "",\n  "bank_name": ""\n}' },
+                { method: "DELETE", path: "/bankchallanreport/delete/{corp_id}/{id}", desc: "Delete bank challan report" },
+                { method: "GET", path: "/bankchallanreport/all/{corp_id}", desc: "Get all bank challan reports" }
+            ]
+        },
+        {
+            category: "Payment Bank",
+            icon: "💳",
+            color: "#f48fb1",
+            endpoints: [
+                { method: "POST", path: "/paymentbank/add", desc: "Add payment bank", body: '{\n  "corp_id": "",\n  "bank_name": ""\n}' },
+                { method: "GET", path: "/paymentbank/all/{corp_id}", desc: "Get all payment banks" },
+                { method: "PUT", path: "/paymentbank/update/{corp_id}/{id}", desc: "Update payment bank", body: '{\n  "bank_name": ""\n}' },
+                { method: "DELETE", path: "/paymentbank/delete/{corp_id}/{id}", desc: "Delete payment bank" }
+            ]
+        },
+        {
+            category: "Vendor",
+            icon: "🤝",
+            color: "#ffab91",
+            endpoints: [
+                { method: "POST", path: "/vendor/add", desc: "Add vendor", body: '{\n  "corp_id": "",\n  "vendor_name": ""\n}' },
+                { method: "PUT", path: "/vendor/update/{corp_id}/{id}", desc: "Update vendor", body: '{\n  "vendor_name": ""\n}' },
+                { method: "DELETE", path: "/vendor/delete/{corp_id}/{id}", desc: "Delete vendor" },
+                { method: "GET", path: "/vendor/all/{corp_id}", desc: "Get all vendors" }
+            ]
+        },
+        {
+            category: "Customer",
+            icon: "👥",
+            color: "#80cbc4",
+            endpoints: [
+                { method: "POST", path: "/customer/add", desc: "Add customer", body: '{\n  "corp_id": "",\n  "customer_name": ""\n}' },
+                { method: "GET", path: "/customer/all/{corp_id}", desc: "Get all customers" },
+                { method: "PUT", path: "/customer/update/{corp_id}/{id}", desc: "Update customer", body: '{\n  "customer_name": ""\n}' },
+                { method: "DELETE", path: "/customer/delete/{corp_id}/{id}", desc: "Delete customer" }
+            ]
+        },
+        {
+            category: "Profile Access",
+            icon: "🔒",
+            color: "#b39ddb",
+            endpoints: [
+                { method: "POST", path: "/profileaccess/add", desc: "Add profile access", body: '{\n  "corp_id": ""\n}' },
+                { method: "GET", path: "/profileaccess/all/{corp_id}", desc: "Get all profile access" },
+                { method: "PUT", path: "/profileaccess/update/{corp_id}/{id}", desc: "Update profile access", body: '{}' },
+                { method: "DELETE", path: "/profileaccess/delete/{corp_id}/{id}", desc: "Delete profile access" }
+            ]
+        },
+        {
+            category: "Social Profile Access",
+            icon: "🌐",
+            color: "#90caf9",
+            endpoints: [
+                { method: "POST", path: "/socialprofileaccess/add", desc: "Add social profile access", body: '{\n  "corp_id": ""\n}' },
+                { method: "GET", path: "/socialprofileaccess/all/{corp_id}", desc: "Get all social profile access" },
+                { method: "PUT", path: "/socialprofileaccess/update/{corp_id}/{id}", desc: "Update social profile access", body: '{}' },
+                { method: "DELETE", path: "/socialprofileaccess/delete/{corp_id}/{id}", desc: "Delete social profile access" }
+            ]
+        },
+        {
+            category: "Employment Details",
+            icon: "👔",
+            color: "#4fc3f7",
+            endpoints: [
+                { method: "POST", path: "/employment/add", desc: "Add employment details", body: '{\n  "corp_id": "",\n  "EmpCode": "",\n  "company_name": ""\n}' },
+                { method: "PUT", path: "/employment/update/{corp_id}/{EmpCode}", desc: "Update employment details", body: '{}' },
+                { method: "DELETE", path: "/employment/delete/{corp_id}/{EmpCode}", desc: "Delete employment details" },
+                { method: "GET", path: "/employment/next-empcode/{corp_id}", desc: "Get next emp code" },
+                { method: "GET", path: "/employment/summary/{corp_id}/{company_name}", desc: "Get employment summary" },
+                { method: "POST", path: "/employment/check-empcode", desc: "Check emp code exists", body: '{\n  "corp_id": "",\n  "EmpCode": ""\n}' },
+                { method: "GET", path: "/employment/summary-by-corp/{corpid}", desc: "Get summary by corp ID" },
+                { method: "GET", path: "/employment/{corp_id}/{EmpCode}", desc: "Get employment by emp code" }
+            ]
+        },
+        {
+            category: "Employee Details",
+            icon: "👤",
+            color: "#66ffb4",
+            endpoints: [
+                { method: "POST", path: "/employee/add", desc: "Add employee", body: '{\n  "corp_id": "",\n  "EmpCode": "",\n  "first_name": "",\n  "last_name": ""\n}' },
+                { method: "PUT", path: "/employee/update/{corp_id}/{EmpCode}/{id}", desc: "Update employee", body: '{}' },
+                { method: "DELETE", path: "/employee/delete/{corp_id}/{EmpCode}/{id}", desc: "Delete employee" },
+                { method: "POST", path: "/employee/check-empcode", desc: "Check emp code exists", body: '{\n  "corp_id": "",\n  "EmpCode": ""\n}' },
+                { method: "GET", path: "/employee/empcode-fullname/{corp_id}", desc: "Get empcode with fullname" },
+                { method: "GET", path: "/employee/{corp_id}/{EmpCode}", desc: "Get employee by emp code" },
+                { method: "GET", path: "/employee-details/by-corp/{corp_id}", desc: "Get employee details by corp" }
+            ]
+        },
+        {
+            category: "Employee Statutory",
+            icon: "⚖️",
+            color: "#ffa726",
+            endpoints: [
+                { method: "POST", path: "/statutory/add", desc: "Add statutory details", body: '{\n  "corp_id": "",\n  "EmpCode": ""\n}' },
+                { method: "PUT", path: "/statutory/update/{corp_id}/{EmpCode}/{id}", desc: "Update statutory details", body: '{}' },
+                { method: "DELETE", path: "/statutory/delete/{corp_id}/{EmpCode}/{id}", desc: "Delete statutory details" },
+                { method: "GET", path: "/statutory/exists/{corp_id}/{EmpCode}", desc: "Check if statutory exists" },
+                { method: "GET", path: "/statutory/{corp_id}/{EmpCode}", desc: "Get statutory details" }
+            ]
+        },
+        {
+            category: "Family Details",
+            icon: "👨‍👩‍👧‍👦",
+            color: "#ff6b9d",
+            endpoints: [
+                { method: "POST", path: "/family/add", desc: "Add family details", body: '{\n  "corp_id": "",\n  "EmpCode": ""\n}' },
+                { method: "PUT", path: "/family/update/{corp_id}/{EmpCode}", desc: "Update family details", body: '{}' },
+                { method: "DELETE", path: "/family/delete/{corp_id}/{EmpCode}", desc: "Delete family details" },
+                { method: "GET", path: "/family/exists/{corp_id}/{EmpCode}", desc: "Check family exists" },
+                { method: "GET", path: "/family/{corp_id}/{EmpCode}", desc: "Get family details" }
+            ]
+        },
+        {
+            category: "Child Details",
+            icon: "👶",
+            color: "#ce93d8",
+            endpoints: [
+                { method: "POST", path: "/child/add", desc: "Add child details", body: '{\n  "corp_id": "",\n  "EmpCode": ""\n}' },
+                { method: "PUT", path: "/child/update/{corp_id}/{EmpCode}", desc: "Update child details", body: '{}' },
+                { method: "DELETE", path: "/child/delete/{corp_id}/{EmpCode}/{id}", desc: "Delete child details" },
+                { method: "GET", path: "/child/{corp_id}/{EmpCode}", desc: "Get child details" }
+            ]
+        },
+        {
+            category: "Work Experience",
+            icon: "💼",
+            color: "#81d4fa",
+            endpoints: [
+                { method: "POST", path: "/workexperience/add", desc: "Add work experience", body: '{\n  "corp_id": "",\n  "empcode": ""\n}' },
+                { method: "PUT", path: "/workexperience/update/{corp_id}/{empcode}/{id}", desc: "Update work experience", body: '{}' },
+                { method: "DELETE", path: "/workexperience/delete/{corp_id}/{empcode}/{id}", desc: "Delete work experience" },
+                { method: "GET", path: "/workexperience/{corp_id}/{empcode}", desc: "Get work experience" }
+            ]
+        },
+        {
+            category: "Relation",
+            icon: "🔗",
+            color: "#a5d6a7",
+            endpoints: [
+                { method: "POST", path: "/relation/add", desc: "Add relation", body: '{\n  "corp_id": "",\n  "relation_name": ""\n}' },
+                { method: "DELETE", path: "/relation/delete/{corp_id}", desc: "Delete relation", body: '{\n  "id": ""\n}' },
+                { method: "GET", path: "/relation/all/{corp_id}", desc: "Get all relations" }
+            ]
+        },
+        {
+            category: "Education",
+            icon: "📚",
+            color: "#fff176",
+            endpoints: [
+                { method: "POST", path: "/education/add", desc: "Add education", body: '{\n  "corp_id": "",\n  "empcode": ""\n}' },
+                { method: "PUT", path: "/education/update/{corp_id}/{empcode}/{id}", desc: "Update education", body: '{}' },
+                { method: "DELETE", path: "/education/delete/{corp_id}/{empcode}/{id}", desc: "Delete education" },
+                { method: "GET", path: "/education/{corp_id}/{empcode}", desc: "Get education details" }
+            ]
+        },
+        {
+            category: "Employee Skills",
+            icon: "🛠️",
+            color: "#ffcc02",
+            endpoints: [
+                { method: "POST", path: "/employee/skills/add", desc: "Add employee skill", body: '{\n  "corp_id": "",\n  "empcode": ""\n}' },
+                { method: "PUT", path: "/employee/skills/update/{corp_id}/{empcode}/{id}", desc: "Update employee skill", body: '{}' },
+                { method: "DELETE", path: "/employee/skills/delete/{corp_id}/{empcode}/{id}", desc: "Delete employee skill" },
+                { method: "GET", path: "/employee/skills/{corp_id}/{empcode}", desc: "Get employee skills" }
+            ]
+        },
+        {
+            category: "Insurance Policy",
+            icon: "🛡️",
+            color: "#4dd0e1",
+            endpoints: [
+                { method: "POST", path: "/employee/insurance-policy/add", desc: "Add insurance policy", body: '{\n  "corp_id": "",\n  "empcode": ""\n}' },
+                { method: "PUT", path: "/employee/insurance-policy/update/{corp_id}/{empcode}/{id}", desc: "Update insurance policy", body: '{}' },
+                { method: "DELETE", path: "/employee/insurance-policy/delete/{corp_id}/{empcode}/{id}", desc: "Delete insurance policy" },
+                { method: "GET", path: "/employee/insurance-policy/{corp_id}/{empcode}", desc: "Get insurance policies" }
+            ]
+        },
+        {
+            category: "Nominee Details",
+            icon: "📋",
+            color: "#ef9a9a",
+            endpoints: [
+                { method: "POST", path: "/employee/nominee/add", desc: "Add nominee", body: '{\n  "corp_id": "",\n  "empcode": ""\n}' },
+                { method: "PUT", path: "/employee/nominee/update/{corp_id}/{empcode}/{id}", desc: "Update nominee", body: '{}' },
+                { method: "DELETE", path: "/employee/nominee/delete/{corp_id}/{empcode}/{id}", desc: "Delete nominee" },
+                { method: "GET", path: "/employee/nominee/{corp_id}/{empcode}", desc: "Get nominees" }
+            ]
+        },
+        {
+            category: "Employee Bank",
+            icon: "🏧",
+            color: "#80cbc4",
+            endpoints: [
+                { method: "POST", path: "/employee/bank/add", desc: "Add employee bank", body: '{\n  "corp_id": "",\n  "empcode": ""\n}' },
+                { method: "PUT", path: "/employee/bank/update/{corp_id}/{empcode}", desc: "Update employee bank", body: '{}' },
+                { method: "DELETE", path: "/employee/bank/delete/{corp_id}/{empcode}", desc: "Delete employee bank" },
+                { method: "POST", path: "/employee/bank/check-empcode", desc: "Check emp code for bank", body: '{\n  "corp_id": "",\n  "empcode": ""\n}' },
+                { method: "GET", path: "/employee/bank/{corp_id}/{empcode}", desc: "Get employee bank" }
+            ]
+        },
+        {
+            category: "Region",
+            icon: "🌍",
+            color: "#b388ff",
+            endpoints: [
+                { method: "POST", path: "/region/add", desc: "Add region", body: '{\n  "corp_id": "",\n  "region_name": ""\n}' },
+                { method: "PUT", path: "/region/update/{corp_id}/{id}", desc: "Update region", body: '{\n  "region_name": ""\n}' },
+                { method: "DELETE", path: "/region/delete/{corp_id}/{id}", desc: "Delete region" },
+                { method: "GET", path: "/region/all/{corp_id}", desc: "Get all regions" }
+            ]
+        },
+        {
+            category: "Branch",
+            icon: "🏪",
+            color: "#ff8a65",
+            endpoints: [
+                { method: "POST", path: "/branch/add", desc: "Add branch", body: '{\n  "corp_id": "",\n  "branch_name": ""\n}' },
+                { method: "PUT", path: "/branch/update/{corp_id}/{id}", desc: "Update branch", body: '{\n  "branch_name": ""\n}' },
+                { method: "DELETE", path: "/branch/delete/{corp_id}/{id}", desc: "Delete branch" },
+                { method: "GET", path: "/branch/all/{corp_id}", desc: "Get all branches" }
+            ]
+        },
+        {
+            category: "Sub-Branch",
+            icon: "🏬",
+            color: "#aed581",
+            endpoints: [
+                { method: "POST", path: "/subbranch/add", desc: "Add sub-branch", body: '{\n  "corp_id": "",\n  "sub_branch_name": ""\n}' },
+                { method: "PUT", path: "/subbranch/update/{corp_id}/{id}", desc: "Update sub-branch", body: '{\n  "sub_branch_name": ""\n}' },
+                { method: "DELETE", path: "/subbranch/delete/{corp_id}/{id}", desc: "Delete sub-branch" },
+                { method: "GET", path: "/subbranch/all/{corp_id}", desc: "Get all sub-branches" }
+            ]
+        },
+        {
+            category: "Employment Type",
+            icon: "📌",
+            color: "#f48fb1",
+            endpoints: [
+                { method: "POST", path: "/employment-type/add", desc: "Add employment type", body: '{\n  "corp_id": "",\n  "type_name": ""\n}' },
+                { method: "PUT", path: "/employment-type/update/{corp_id}/{id}", desc: "Update employment type", body: '{\n  "type_name": ""\n}' },
+                { method: "DELETE", path: "/employment-type/delete/{corp_id}/{id}", desc: "Delete employment type" },
+                { method: "GET", path: "/employment-type/all/{corp_id}", desc: "Get all employment types" }
+            ]
+        },
+        {
+            category: "Employment Status",
+            icon: "📊",
+            color: "#69f0ae",
+            endpoints: [
+                { method: "POST", path: "/employment-status/add", desc: "Add employment status", body: '{\n  "corp_id": "",\n  "status_name": ""\n}' },
+                { method: "PUT", path: "/employment-status/update/{corp_id}/{id}", desc: "Update employment status", body: '{}' },
+                { method: "DELETE", path: "/employment-status/delete/{corp_id}/{id}", desc: "Delete employment status" },
+                { method: "GET", path: "/employment-status/all/{corp_id}", desc: "Get all employment statuses" }
+            ]
+        },
+        {
+            category: "Confirmation Status",
+            icon: "✅",
+            color: "#66ffb4",
+            endpoints: [
+                { method: "POST", path: "/confirmation-status/add", desc: "Add confirmation status", body: '{\n  "corp_id": "",\n  "status_name": ""\n}' },
+                { method: "PUT", path: "/confirmation-status/update/{corp_id}/{id}", desc: "Update confirmation status", body: '{}' },
+                { method: "DELETE", path: "/confirmation-status/delete/{corp_id}/{id}", desc: "Delete confirmation status" },
+                { method: "GET", path: "/confirmation-status/all/{corp_id}", desc: "Get all confirmation statuses" }
+            ]
+        },
+        {
+            category: "Corporate ID",
+            icon: "🆔",
+            color: "#90caf9",
+            endpoints: [
+                { method: "POST", path: "/corporateid/add", desc: "Add corporate ID", body: '{\n  "corp_id_name": ""\n}' },
+                { method: "DELETE", path: "/corporateid/delete/{corp_id_name}", desc: "Delete corporate ID" },
+                { method: "GET", path: "/corporateid/all", desc: "Get all corporate IDs" }
+            ]
+        },
+        {
+            category: "Role",
+            icon: "🎭",
+            color: "#b39ddb",
+            endpoints: [
+                { method: "POST", path: "/role/add", desc: "Add role", body: '{\n  "corp_id": "",\n  "role_name": ""\n}' },
+                { method: "GET", path: "/role/all/{corp_id}", desc: "Get all roles" },
+                { method: "DELETE", path: "/role/delete/{corp_id}/{role_name}", desc: "Delete role" }
+            ]
+        },
+        {
+            category: "Employee Assigned Role",
+            icon: "👤",
+            color: "#ffab91",
+            endpoints: [
+                { method: "POST", path: "/employee-assigned-role/add", desc: "Assign role to employee", body: '{\n  "corp_id": "",\n  "empcode": "",\n  "role_name": ""\n}' },
+                { method: "PUT", path: "/employee-assigned-role/update/{corp_id}/{id}", desc: "Update assigned role", body: '{}' },
+                { method: "DELETE", path: "/employee-assigned-role/delete/{corp_id}/{id}", desc: "Delete assigned role" },
+                { method: "GET", path: "/employee-assigned-role/all/{corp_id}", desc: "Get all assigned roles" }
+            ]
+        },
+        {
+            category: "Level",
+            icon: "📐",
+            color: "#80deea",
+            endpoints: [
+                { method: "POST", path: "/level/add", desc: "Add level", body: '{\n  "corp_id": "",\n  "level_name": ""\n}' },
+                { method: "GET", path: "/level/all/{corp_id}", desc: "Get all levels" },
+                { method: "DELETE", path: "/level/delete/{corp_id}/{id}", desc: "Delete level" }
+            ]
+        },
+        {
+            category: "Workflow",
+            icon: "🔄",
+            color: "#4fc3f7",
+            endpoints: [
+                { method: "POST", path: "/workflow/add", desc: "Add workflow", body: '{\n  "corpid": ""\n}' },
+                { method: "DELETE", path: "/workflow/delete/{corpid}", desc: "Delete workflow" },
+                { method: "GET", path: "/workflow/{corpid}", desc: "Get workflow" }
+            ]
+        },
+        {
+            category: "Request Type",
+            icon: "📨",
+            color: "#ffa726",
+            endpoints: [
+                { method: "POST", path: "/requesttype/add", desc: "Add request type", body: '{\n  "corp_id": ""\n}' },
+                { method: "DELETE", path: "/requesttype/delete/{corp_id}", desc: "Delete request type" },
+                { method: "GET", path: "/requesttype/{corp_id}", desc: "Get request types" }
+            ]
+        },
+        {
+            category: "Approver",
+            icon: "✍️",
+            color: "#66ffb4",
+            endpoints: [
+                { method: "POST", path: "/approver/add", desc: "Add approver", body: '{\n  "corp_id": "",\n  "puid": ""\n}' },
+                { method: "DELETE", path: "/approver/delete/{puid}", desc: "Delete approver" },
+                { method: "POST", path: "/approver/fetch", desc: "Fetch approver", body: '{\n  "puid": ""\n}' },
+                { method: "PUT", path: "/approver/update/{corp_id}/{puid}", desc: "Update approver", body: '{}' }
+            ]
+        },
+        {
+            category: "Conditional Workflow",
+            icon: "⚙️",
+            color: "#ce93d8",
+            endpoints: [
+                { method: "POST", path: "/conditional-workflow/add", desc: "Add conditional workflow", body: '{}' },
+                { method: "DELETE", path: "/conditional-workflow/delete/{puid}", desc: "Delete conditional workflow" },
+                { method: "PUT", path: "/conditional-workflow/update/{puid}", desc: "Update conditional workflow", body: '{}' },
+                { method: "POST", path: "/conditional-workflow/fetch", desc: "Fetch conditional workflow", body: '{}' }
+            ]
+        },
+        {
+            category: "Condition Type",
+            icon: "🔀",
+            color: "#ff8a65",
+            endpoints: [
+                { method: "POST", path: "/condition-type/add", desc: "Add condition type", body: '{\n  "corp_id": ""\n}' },
+                { method: "GET", path: "/condition-type/all/{corp_id}", desc: "Get all condition types" },
+                { method: "DELETE", path: "/condition-type/delete/{corp_id}/{id}", desc: "Delete condition type" }
+            ]
+        },
+        {
+            category: "Workflow Automation",
+            icon: "🤖",
+            color: "#00e5ff",
+            endpoints: [
+                { method: "POST", path: "/workflow-automation/add", desc: "Add workflow automation", body: '{}' },
+                { method: "POST", path: "/workflow-automation/fetch", desc: "Fetch automation data", body: '{}' },
+                { method: "GET", path: "/workflow-automation/generate-public-uid", desc: "Generate public UID" },
+                { method: "DELETE", path: "/workflow-automation/delete/{puid}", desc: "Delete automation" },
+                { method: "PUT", path: "/workflow-automation/update/{puid}", desc: "Update automation", body: '{}' }
+            ]
+        },
+        {
+            category: "Custom Country",
+            icon: "🌎",
+            color: "#69f0ae",
+            endpoints: [
+                { method: "POST", path: "/custom-country/add", desc: "Add custom country", body: '{\n  "corp_id": "",\n  "country_name": ""\n}' },
+                { method: "GET", path: "/custom-country/{corp_id}", desc: "Get custom countries" },
+                { method: "DELETE", path: "/custom-country/delete/{corp_id}/{country_name}", desc: "Delete custom country" }
+            ]
+        },
+        {
+            category: "Custom State",
+            icon: "🗺️",
+            color: "#f48fb1",
+            endpoints: [
+                { method: "POST", path: "/custom-state/add", desc: "Add custom state", body: '{\n  "corp_id": "",\n  "state_name": ""\n}' },
+                { method: "GET", path: "/custom-state/{corp_id}", desc: "Get custom states" },
+                { method: "DELETE", path: "/custom-state/delete/{corp_id}/{state_name}", desc: "Delete custom state" }
+            ]
+        },
+        {
+            category: "Custom City",
+            icon: "🏙️",
+            color: "#b388ff",
+            endpoints: [
+                { method: "POST", path: "/custom-city/add", desc: "Add custom city", body: '{\n  "corp_id": "",\n  "city_name": ""\n}' },
+                { method: "GET", path: "/custom-city/{corp_id}", desc: "Get custom cities" },
+                { method: "DELETE", path: "/custom-city/delete/{corp_id}/{city_name}", desc: "Delete custom city" }
+            ]
+        },
+        {
+            category: "Shift Policy",
+            icon: "⏰",
+            color: "#ffd740",
+            endpoints: [
+                { method: "POST", path: "/shiftpolicy/add", desc: "Add shift policy", body: '{\n  "corp_id": ""\n}' },
+                { method: "PUT", path: "/shiftpolicy/update/{corp_id}/{puid}", desc: "Update shift policy", body: '{}' },
+                { method: "GET", path: "/shiftpolicy/all/{corp_id}", desc: "Get all shift policies" },
+                { method: "DELETE", path: "/shiftpolicy/delete/{puid}", desc: "Delete shift policy" },
+                { method: "GET", path: "/shift-policy/shift-codes/{corp_id}", desc: "Get shift codes" },
+                { method: "GET", path: "/shift-policy/shift-names/{corp_id}/{shift_code}", desc: "Get shift names by code" }
+            ]
+        },
+        {
+            category: "Shift Weekly Schedule",
+            icon: "📅",
+            color: "#81d4fa",
+            endpoints: [
+                { method: "POST", path: "/shift-policy-weekly-schedule/add", desc: "Add weekly schedule", body: '{\n  "puid": ""\n}' },
+                { method: "PUT", path: "/shift-policy-weekly-schedule/update/{puid}/{id}", desc: "Update weekly schedule", body: '{}' },
+                { method: "DELETE", path: "/shift-policy-weekly-schedule/delete/{puid}/{id}", desc: "Delete weekly schedule" },
+                { method: "DELETE", path: "/shift-policy-weekly-schedule/delete/{puid}", desc: "Delete all by puid" },
+                { method: "GET", path: "/shift-policy-weekly-schedule/{puid}", desc: "Get weekly schedule" }
+            ]
+        },
+        {
+            category: "Check-in Policy",
+            icon: "📲",
+            color: "#ff6b9d",
+            endpoints: [
+                { method: "POST", path: "/checkin-policy/add", desc: "Add check-in policy", body: '{\n  "corp_id": ""\n}' },
+                { method: "DELETE", path: "/checkin-policy/delete/{puid}", desc: "Delete check-in policy" },
+                { method: "PUT", path: "/checkin-policy/update/{puid}", desc: "Update check-in policy", body: '{}' },
+                { method: "GET", path: "/checkin-policy/all/{corp_id}", desc: "Get all check-in policies" },
+                { method: "POST", path: "/checkin-policy-on-duty-type/add", desc: "Add on-duty type", body: '{}' },
+                { method: "DELETE", path: "/checkin-policy-on-duty-type/delete/{puid}", desc: "Delete on-duty type" },
+                { method: "GET", path: "/checkin-policy-on-duty-type/{puid}", desc: "Get on-duty type" }
+            ]
+        },
+        {
+            category: "Leave Type Configuration",
+            icon: "🏖️",
+            color: "#4dd0e1",
+            endpoints: [
+                { method: "POST", path: "/leave-type-basic-configuration/add", desc: "Add basic config", body: '{}' },
+                { method: "PUT", path: "/leave-type-basic-configuration/update/{puid}", desc: "Update basic config", body: '{}' },
+                { method: "DELETE", path: "/leave-type-basic-configuration/delete/{puid}", desc: "Delete basic config" },
+                { method: "GET", path: "/leave-type-basic-configuration/all/{corpid}", desc: "Get all basic configs" },
+                { method: "POST", path: "/leave-type-full-configuration/add", desc: "Add full config", body: '{}' },
+                { method: "PUT", path: "/leave-type-full-configuration/update/{puid}", desc: "Update full config", body: '{}' },
+                { method: "DELETE", path: "/leave-type-full-configuration/delete/{puid}", desc: "Delete full config" },
+                { method: "GET", path: "/leave-type-full-configuration/all/{corpid}", desc: "Get all full configs" },
+                { method: "GET", path: "/leave-type-full-configuration/{puid}", desc: "Get full config by puid" }
+            ]
+        },
+        {
+            category: "Leave Policy",
+            icon: "📋",
+            color: "#aed581",
+            endpoints: [
+                { method: "POST", path: "/leave-policy/add", desc: "Add leave policy", body: '{}' },
+                { method: "PUT", path: "/leave-policy/update/{puid}", desc: "Update leave policy", body: '{}' },
+                { method: "DELETE", path: "/leave-policy/delete/{puid}", desc: "Delete leave policy" },
+                { method: "GET", path: "/leave-policy/by-corpid/{corpid}", desc: "Get leave policies" }
+            ]
+        },
+        {
+            category: "Employee Profile Photo",
+            icon: "📸",
+            color: "#ef9a9a",
+            endpoints: [
+                { method: "POST", path: "/employee-profile-photo/add", desc: "Add profile photo", body: '(multipart form data)' },
+                { method: "POST", path: "/employee-profile-photo/update/{corp_id}/{emp_code}", desc: "Update profile photo", body: '(multipart form data)' },
+                { method: "GET", path: "/employee-profile-photo/{corp_id}/{emp_code}", desc: "Get profile photo" },
+                { method: "DELETE", path: "/employee-profile-photo/delete/{corp_id}/{emp_code}", desc: "Delete profile photo" }
+            ]
+        },
+        {
+            category: "Pay Component",
+            icon: "💵",
+            color: "#66ffb4",
+            endpoints: [
+                { method: "POST", path: "/paycomponent/add-or-update", desc: "Add or update pay component", body: '{\n  "corpId": ""\n}' },
+                { method: "GET", path: "/paycomponent/all/{corpId}", desc: "Get all pay components" },
+                { method: "GET", path: "/paycomponent/{puid}", desc: "Get pay component by puid" },
+                { method: "DELETE", path: "/paycomponent/delete/{puid}", desc: "Delete pay component" }
+            ]
+        },
+        {
+            category: "Component Type",
+            icon: "🧩",
+            color: "#ffa726",
+            endpoints: [
+                { method: "POST", path: "/component-type/add-or-update", desc: "Add or update component type", body: '{\n  "corpId": ""\n}' },
+                { method: "GET", path: "/component-type/all/{corpId}", desc: "Get all component types" },
+                { method: "DELETE", path: "/component-type/delete/{corpId}/{id}", desc: "Delete component type" }
+            ]
+        },
+        {
+            category: "Paygroup Configuration",
+            icon: "⚙️",
+            color: "#4fc3f7",
+            endpoints: [
+                { method: "POST", path: "/paygroup-configuration/add-or-update", desc: "Add or update paygroup", body: '{\n  "corpId": ""\n}' },
+                { method: "GET", path: "/paygroup-configuration/by-corpid/{corpId}", desc: "Get paygroup by corp" },
+                { method: "GET", path: "/paygroup-configuration/{puid}", desc: "Get paygroup by puid" },
+                { method: "DELETE", path: "/paygroup-configuration/delete/{puid}", desc: "Delete paygroup" },
+                { method: "GET", path: "/paygroup/included-components/{puid}", desc: "Get included components" },
+                { method: "GET", path: "/paygroup-configuration/groupnames/by-employment-details/{corp_id}/{EmpCode}", desc: "Get group names by emp" },
+                { method: "GET", path: "/paygroup-configuration/gross/{groupName}/{basicSalary}", desc: "Get gross by group" },
+                { method: "GET", path: "/paygroup/benefits/{groupName}/{corpId}/{basicSalary?}", desc: "Get other benefits" },
+                { method: "GET", path: "/paygroup-configuration/deductions/{groupName}/{basicSalary}", desc: "Get deductions" },
+                { method: "GET", path: "/paygroup/complete/{groupName}/{corpId}/{basicSalary}", desc: "Complete payroll breakdown" },
+                { method: "GET", path: "/paygroup/complete-with-statutory/{groupName}/{corpId}/{basicSalary}/{ctc}/{empCode}/{companyName}", desc: "Breakdown with statutory" },
+                { method: "GET", path: "/paygroup/complete-improved/{groupName}/{corpId}/{basicSalary}/{ctc}/{empCode}/{companyName}", desc: "Improved breakdown" }
+            ]
+        },
+        {
+            category: "Formula Builder",
+            icon: "🔢",
+            color: "#ff6b9d",
+            endpoints: [
+                { method: "POST", path: "/formula-builder/add-or-update", desc: "Add or update formula", body: '{}' },
+                { method: "GET", path: "/formula-builder/{corpId}/{componentGroupName}", desc: "Get formula" },
+                { method: "DELETE", path: "/formula-builder/delete/{puid}/{paygroupPuid}", desc: "Delete formula" }
+            ]
+        },
+        {
+            category: "Employee Salary Structure",
+            icon: "💰",
+            color: "#ffd740",
+            endpoints: [
+                { method: "POST", path: "/employee-salary-structure/add-or-update", desc: "Add or update salary structure", body: '{}' },
+                { method: "GET", path: "/employee-salary-structure/{empCode}/{companyName}/{corpId}", desc: "Get salary structure" },
+                { method: "DELETE", path: "/employee-salary-structure/delete/{puid}", desc: "Delete salary structure" },
+                { method: "POST", path: "/employee-salary-structure/salary-revision", desc: "Process salary revision", body: '{}' }
+            ]
+        },
+        {
+            category: "Attendance",
+            icon: "⏱️",
+            color: "#00e5ff",
+            endpoints: [
+                { method: "POST", path: "/attendance/check", desc: "Check in or out", body: '{\n  "corpId": "",\n  "userName": "",\n  "empCode": "",\n  "companyName": ""\n}' },
+                { method: "GET", path: "/attendance/today/{corpId}/{userName}/{empCode}/{companyName}", desc: "Get today's attendance" },
+                { method: "GET", path: "/attendance/today-hours/{empCode}/{corpId}/{companyName}", desc: "Today attendance with hours" },
+                { method: "GET", path: "/attendance/check-exists/{corpId}/{empCode}/{companyName}", desc: "Check attendance exists" },
+                { method: "GET", path: "/attendance/history/{corpId}/{filter?}", desc: "Get attendance history" },
+                { method: "POST", path: "/attendance/bulk-insert", desc: "Bulk insert attendance", body: '{}' },
+                { method: "GET", path: "/attendance/monthly", desc: "Get monthly attendance (GET)" },
+                { method: "POST", path: "/attendance/monthly", desc: "Get monthly attendance (POST)", body: '{}' },
+                { method: "GET", path: "/attendance/current-month-year", desc: "Get current month and year" }
+            ]
+        },
+        {
+            category: "Holiday List",
+            icon: "🎉",
+            color: "#b388ff",
+            endpoints: [
+                { method: "POST", path: "/holiday-list", desc: "Add or update holiday", body: '{}' },
+                { method: "GET", path: "/holiday-list/puid/{puid}", desc: "Get holiday by puid" },
+                { method: "DELETE", path: "/holiday-list/{puid}", desc: "Delete holiday" },
+                { method: "GET", path: "/holiday-list/corp/{corpId}", desc: "Get holidays by corp" },
+                { method: "GET", path: "/holiday-list/company/{corpId}/{companyNames}/{year?}", desc: "Get holidays by company" },
+                { method: "GET", path: "/holiday-list/location/{country}/{state?}/{city?}/{year?}", desc: "Get holidays by location" },
+                { method: "GET", path: "/holiday-list/date-range/{startDate}/{endDate}/{corpId?}/{year?}", desc: "Get holidays by date range" },
+                { method: "GET", path: "/holiday-list/year/{year}/{corpId?}", desc: "Get holidays by year" }
+            ]
+        },
+        {
+            category: "Payroll Salary Process",
+            icon: "💳",
+            color: "#66ffb4",
+            endpoints: [
+                { method: "POST", path: "/employee-payroll-salary/add-or-update", desc: "Add or update payroll salary", body: '{}' },
+                { method: "GET", path: "/employee-payroll-salary/all/{corpId}/{companyName?}", desc: "Get all payroll salary" },
+                { method: "GET", path: "/employee-payroll-salary/{corpId}/{empCode}/{year}/{month}/{companyName?}", desc: "Get specific payroll salary" },
+                { method: "POST", path: "/employee-payroll/bulk-process", desc: "Bulk process payroll", body: '{}' },
+                { method: "POST", path: "/employee-payroll/initiate-selected", desc: "Initiate selected employees", body: '{}' },
+                { method: "DELETE", path: "/employee-payroll/rollback-initiated", desc: "Rollback initiated salary", body: '{}' },
+                { method: "DELETE", path: "/employee-payroll/rollback-released", desc: "Rollback released salary", body: '{}' },
+                { method: "DELETE", path: "/employee-payroll/delete-month", desc: "Delete salary by month", body: '{}' },
+                { method: "POST", path: "/employee-payroll/employee-status", desc: "Employee salary status", body: '{}' },
+                { method: "POST", path: "/employee-payroll/salary-summary", desc: "Salary summary", body: '{}' },
+                { method: "POST", path: "/employee-payroll/detailed-payroll-with-branches", desc: "Detailed payroll with branches", body: '{}' },
+                { method: "POST", path: "/employee-payroll/branch-list", desc: "Get branch list", body: '{}' },
+                { method: "GET", path: "/payroll-salary-process/check-initiated/{corpId}/{companyName}/{year}/{month}", desc: "Check payroll initiated" },
+                { method: "POST", path: "/payroll-salary-process/release-salary", desc: "Release salary", body: '{}' },
+                { method: "POST", path: "/payroll-salary-process/release-salary-initiated-only", desc: "Release initiated only", body: '{}' },
+                { method: "GET", path: "/payroll-salary-process/export-excel", desc: "Export payroll Excel" },
+                { method: "GET", path: "/payroll/export-released-excel", desc: "Export released payroll Excel" },
+                { method: "GET", path: "/payroll/export-with-arrears", desc: "Export payroll with arrears" }
+            ]
+        },
+        {
+            category: "Salary Slip PDF",
+            icon: "📄",
+            color: "#ff8a65",
+            endpoints: [
+                { method: "GET", path: "/salary-slip/download-pdf/{corpId}/{empCode}/{year}/{month}/{companyName?}", desc: "Download salary slip PDF" },
+                { method: "POST", path: "/salary-slips/download-all-pdf", desc: "Download all salary slips PDF", body: '{}' },
+                { method: "GET", path: "/salary-slips/download-all-pdf", desc: "Download all (GET)" },
+                { method: "GET", path: "/salary-slip/download-custom-pdf/{corpId}/{empCode}/{year}/{month}/{companyName?}", desc: "Download custom salary PDF" },
+                { method: "POST", path: "/salary-slips/download-all-custom-pdf", desc: "Download all custom PDF", body: '{}' },
+                { method: "GET", path: "/salary-slips/download-all-custom-pdf", desc: "Download all custom (GET)" },
+                { method: "GET", path: "/salary-slip/download-dynamic-pdf/{corpId}/{empCode}/{year}/{month}/{companyName}", desc: "Download dynamic salary PDF" },
+                { method: "POST", path: "/salary-slips/download-all-dynamic-pdf", desc: "Download all dynamic PDF", body: '{}' },
+                { method: "GET", path: "/salary-slips/download-all-dynamic-pdf", desc: "Download all dynamic (GET)" }
+            ]
+        },
+        {
+            category: "Company Shift Policy",
+            icon: "🔄",
+            color: "#4dd0e1",
+            endpoints: [
+                { method: "POST", path: "/company-shift-policy", desc: "Add company shift policy", body: '{}' },
+                { method: "DELETE", path: "/company-shift-policy/{id}", desc: "Delete company shift policy" },
+                { method: "GET", path: "/company-shift-policy", desc: "Get all shift policies" },
+                { method: "GET", path: "/company-shift-policy/corp/{corp_id}", desc: "Get by corp ID" }
+            ]
+        },
+        {
+            category: "Leave Request",
+            icon: "✈️",
+            color: "#ce93d8",
+            endpoints: [
+                { method: "POST", path: "/leave-request", desc: "Submit leave request", body: '{}' },
+                { method: "GET", path: "/leave-requests/{status}/{corp_id}/{empcode}", desc: "Get requests by status (Admin)" },
+                { method: "PATCH", path: "/leave-request/{id}", desc: "Update leave request status", body: '{\n  "status": ""\n}' },
+                { method: "GET", path: "/leave-requests/employee/{corp_id}/{company_name}/{empcode}", desc: "Get employee leave requests" },
+                { method: "GET", path: "/employee/leave-requests/{status}/{corp_id}/{company_name}/{empcode}", desc: "Employee leaves by status" },
+                { method: "GET", path: "/people-on-leave-today/{corp_id}/{empcode}", desc: "People on leave today" },
+                { method: "GET", path: "/people-on-leave-today/company/{corp_id}/{company_name}/{empcode}", desc: "People on leave by company" }
+            ]
+        },
+        {
+            category: "Attendance Summary",
+            icon: "📊",
+            color: "#ffcc02",
+            endpoints: [
+                { method: "POST", path: "/attendance-summary/bulk-insert", desc: "Bulk insert summary", body: '{}' },
+                { method: "POST", path: "/attendance-summary/bulk-insert-with-fallback", desc: "Bulk insert with fallback", body: '{}' },
+                { method: "GET", path: "/attendance-summary", desc: "Get all summaries" },
+                { method: "GET", path: "/attendance-summary/{id}", desc: "Get summary by ID" },
+                { method: "PUT", path: "/attendance-summary/{id}", desc: "Update summary", body: '{}' },
+                { method: "DELETE", path: "/attendance-summary/{id}", desc: "Delete summary" },
+                { method: "GET", path: "/check-attendance-summary/check-exists/{corpId}/{companyName}/{month}/{year}", desc: "Check summary exists" },
+                { method: "POST", path: "/attendance-summary/recalculate", desc: "Recalculate summaries", body: '{}' },
+                { method: "POST", path: "/attendance-summary/export", desc: "Export summary (POST)", body: '{}' },
+                { method: "GET", path: "/attendance-summary/export/{corpId}/{companyName}/{year}/{month}", desc: "Export summary (GET)" },
+                { method: "GET", path: "/attendance-summary/download/{corpId}/{companyName}/{year}/{month}", desc: "Download exported summary" },
+                { method: "POST", path: "/attendance-summary/import", desc: "Import attendance summary", body: '(multipart form data)' }
+            ]
+        },
+        {
+            category: "Professional Tax",
+            icon: "🏛️",
+            color: "#aed581",
+            endpoints: [
+                { method: "POST", path: "/professional-tax/add", desc: "Add professional tax", body: '{}' },
+                { method: "POST", path: "/professional-tax/get", desc: "Get professional tax", body: '{}' },
+                { method: "POST", path: "/professional-tax/get-by-corp-company", desc: "Get by corp & company", body: '{}' },
+                { method: "PUT", path: "/professional-tax/edit/{id}", desc: "Edit professional tax", body: '{}' },
+                { method: "DELETE", path: "/professional-tax/delete/{id}", desc: "Delete professional tax" },
+                { method: "GET", path: "/professional-tax/{id}", desc: "Get professional tax by ID" }
+            ]
+        },
+        {
+            category: "ESI",
+            icon: "🏥",
+            color: "#ef9a9a",
+            endpoints: [
+                { method: "POST", path: "/esi/add", desc: "Add ESI", body: '{}' },
+                { method: "POST", path: "/esi/get", desc: "Get ESI", body: '{}' },
+                { method: "PUT", path: "/esi/edit/{id}", desc: "Edit ESI", body: '{}' },
+                { method: "DELETE", path: "/esi/delete/{id}", desc: "Delete ESI" },
+                { method: "GET", path: "/esi/{id}", desc: "Get ESI by ID" }
+            ]
+        },
+        {
+            category: "NewsFeed",
+            icon: "📰",
+            color: "#ff6b9d",
+            endpoints: [
+                { method: "POST", path: "/newsfeed", desc: "Create news feed post", body: '{}' },
+                { method: "GET", path: "/newsfeed-with-reviews", desc: "Get feeds with reviews" },
+                { method: "GET", path: "/newsfeed/{puid}", desc: "Get feed by puid" },
+                { method: "PUT", path: "/newsfeed/{puid}", desc: "Update news feed", body: '{}' },
+                { method: "DELETE", path: "/newsfeed/{puid}", desc: "Delete news feed" },
+                { method: "POST", path: "/newsfeed/{puid}/like", desc: "Like a post", body: '{}' },
+                { method: "DELETE", path: "/newsfeed/{puid}/unlike", desc: "Unlike a post" },
+                { method: "GET", path: "/newsfeed/{puid}/likes", desc: "Get all likes" },
+                { method: "GET", path: "/newsfeed/{puid}/likes-count", desc: "Get likes count" },
+                { method: "GET", path: "/newsfeed/{puid}/comments", desc: "Get comments" },
+                { method: "POST", path: "/newsfeed-comments", desc: "Add comment", body: '{}' },
+                { method: "DELETE", path: "/newsfeed-comments/{id}", desc: "Delete comment" },
+                { method: "POST", path: "/newsfeed-reviews", desc: "Create/update review", body: '{}' },
+                { method: "DELETE", path: "/newsfeed-reviews/{puid}", desc: "Delete review" }
+            ]
+        },
+        {
+            category: "Company Storage",
+            icon: "💾",
+            color: "#90caf9",
+            endpoints: [
+                { method: "GET", path: "/company-storage", desc: "Get all storage" },
+                { method: "POST", path: "/company-storage/{corpId}", desc: "Add storage", body: '{}' },
+                { method: "PUT", path: "/company-storage/{corpId}/{id}", desc: "Update storage", body: '{}' },
+                { method: "DELETE", path: "/company-storage/{corpId}/{id}", desc: "Delete storage" },
+                { method: "GET", path: "/company-storage/summary/{corpId}", desc: "Get storage summary" },
+                { method: "DELETE", path: "/company-storage/all/{corpId}", desc: "Delete all storage" }
+            ]
+        },
+        {
+            category: "FMS (File Management)",
+            icon: "📁",
+            color: "#4fc3f7",
+            endpoints: [
+                { method: "POST", path: "/fms/upload-document", desc: "Upload document", body: '(multipart form data)' },
+                { method: "GET", path: "/fms/summary-by-company", desc: "Summary by company" },
+                { method: "GET", path: "/fms/files-by-category", desc: "Files by category" },
+                { method: "GET", path: "/fms/company-storage-overview", desc: "Storage overview" },
+                { method: "DELETE", path: "/fms/document/{id}", desc: "Delete document" },
+                { method: "GET", path: "/fms/storage-statistics", desc: "Storage statistics" },
+                { method: "GET", path: "/fms/employee-file-summary", desc: "Employee file summary" },
+                { method: "GET", path: "/fms/download/{id}", desc: "Download file" }
+            ]
+        },
+        {
+            category: "FMS Category",
+            icon: "🏷️",
+            color: "#ffa726",
+            endpoints: [
+                { method: "POST", path: "/fms/category", desc: "Add FMS category", body: '{}' },
+                { method: "PUT", path: "/fms/category/{id}", desc: "Update FMS category", body: '{}' },
+                { method: "DELETE", path: "/fms/category/{id}", desc: "Delete FMS category" },
+                { method: "GET", path: "/fms/category-summary", desc: "Get category summary" }
+            ]
+        },
+        {
+            category: "Employee List & Birthdays",
+            icon: "🎂",
+            color: "#ce93d8",
+            endpoints: [
+                { method: "GET", path: "/employee-list", desc: "Get employee list" },
+                { method: "GET", path: "/birthdays/today", desc: "Get today's birthdays" },
+                { method: "GET", path: "/employee/leave-summary", desc: "Get employee leave summary" }
+            ]
+        },
+        {
+            category: "Employee Leave Balance",
+            icon: "🏝️",
+            color: "#69f0ae",
+            endpoints: [
+                { method: "POST", path: "/employee-leave-balance/allot", desc: "Allot leaves (Admin)", body: '{}' },
+                { method: "POST", path: "/employee-leave-balance/process-monthly", desc: "Process monthly credits", body: '{}' },
+                { method: "POST", path: "/employee-leave-balance/update-used", desc: "Update leave used", body: '{}' },
+                { method: "POST", path: "/employee-leave-balance/revert-used", desc: "Revert leave used", body: '{}' },
+                { method: "POST", path: "/employee-leave-balance/deduct-by-request", desc: "Deduct by request", body: '{}' },
+                { method: "GET", path: "/employee-leave-balance/list/{corpId}/{empCode?}", desc: "Get leave list" },
+                { method: "GET", path: "/employee-leave-balance/summary/{corpId}", desc: "Get leave summary" },
+                { method: "GET", path: "/employee-leave-balance/leave-names/{corpId}/{empCode?}", desc: "Get leave names" },
+                { method: "GET", path: "/employee-leave-balance/{corpId}/{empCode}", desc: "Get employee leave balance" }
+            ]
+        },
+        {
+            category: "Recruitment - Job Postings",
+            icon: "📢",
+            color: "#ff8a65",
+            endpoints: [
+                { method: "GET", path: "/recruitment/job-postings/{corp_id}", desc: "Get all job postings" },
+                { method: "GET", path: "/recruitment/job-postings/{corp_id}/{id}", desc: "Get job posting by ID" },
+                { method: "POST", path: "/recruitment/job-postings", desc: "Create job posting", body: '{}' },
+                { method: "PUT", path: "/recruitment/job-postings/{corp_id}/{id}", desc: "Update job posting", body: '{}' },
+                { method: "DELETE", path: "/recruitment/job-postings/{corp_id}/{id}", desc: "Delete job posting" },
+                { method: "PATCH", path: "/recruitment/job-postings/{corp_id}/{id}/status", desc: "Change posting status", body: '{\n  "status": ""\n}' }
+            ]
+        },
+        {
+            category: "Recruitment - Candidates",
+            icon: "🧑‍💻",
+            color: "#80deea",
+            endpoints: [
+                { method: "GET", path: "/recruitment/candidates/{corp_id}", desc: "Get all candidates" },
+                { method: "GET", path: "/recruitment/candidates/{corp_id}/{id}", desc: "Get candidate by ID" },
+                { method: "POST", path: "/recruitment/candidates", desc: "Create candidate", body: '{}' },
+                { method: "POST", path: "/recruitment/candidates/{corp_id}/{id}", desc: "Update candidate", body: '(multipart form data)' },
+                { method: "DELETE", path: "/recruitment/candidates/{corp_id}/{id}", desc: "Delete candidate" },
+                { method: "GET", path: "/recruitment/candidates/{corp_id}/{id}/resume", desc: "Download resume" }
+            ]
+        },
+        {
+            category: "Recruitment - Stages",
+            icon: "📋",
+            color: "#f48fb1",
+            endpoints: [
+                { method: "GET", path: "/recruitment/stages/{corp_id}", desc: "Get all stages" },
+                { method: "GET", path: "/recruitment/stages/{corp_id}/{id}", desc: "Get stage by ID" },
+                { method: "POST", path: "/recruitment/stages", desc: "Create stage", body: '{}' },
+                { method: "PUT", path: "/recruitment/stages/{corp_id}/{id}", desc: "Update stage", body: '{}' },
+                { method: "DELETE", path: "/recruitment/stages/{corp_id}/{id}", desc: "Delete stage" }
+            ]
+        },
+        {
+            category: "Recruitment - Applications",
+            icon: "📝",
+            color: "#b388ff",
+            endpoints: [
+                { method: "GET", path: "/recruitment/applications/{corp_id}", desc: "Get all applications" },
+                { method: "GET", path: "/recruitment/applications/{corp_id}/{id}", desc: "Get application by ID" },
+                { method: "POST", path: "/recruitment/applications", desc: "Create application", body: '{}' },
+                { method: "PUT", path: "/recruitment/applications/{corp_id}/{id}", desc: "Update application", body: '{}' },
+                { method: "DELETE", path: "/recruitment/applications/{corp_id}/{id}", desc: "Delete application" },
+                { method: "PATCH", path: "/recruitment/applications/{corp_id}/{id}/decide", desc: "Decide candidate", body: '{}' },
+                { method: "GET", path: "/recruitment/applications/{corp_id}/{application_id}/stage-results", desc: "Get stage results" },
+                { method: "POST", path: "/recruitment/applications/{corp_id}/{application_id}/stage-results", desc: "Add stage result", body: '{}' },
+                { method: "PUT", path: "/recruitment/applications/{corp_id}/{application_id}/stage-results/{result_id}", desc: "Update stage result", body: '{}' },
+                { method: "DELETE", path: "/recruitment/applications/{corp_id}/{application_id}/stage-results/{result_id}", desc: "Delete stage result" }
+            ]
+        },
+        {
+            category: "Offer Letter Templates",
+            icon: "📑",
+            color: "#ffd740",
+            endpoints: [
+                { method: "GET", path: "/offer-letter-templates/{corp_id}", desc: "Get all templates" },
+                { method: "GET", path: "/offer-letter-templates/{corp_id}/{id}", desc: "Get template by ID" },
+                { method: "POST", path: "/offer-letter-templates", desc: "Create template", body: '{}' },
+                { method: "POST", path: "/offer-letter-templates/{corp_id}/{id}", desc: "Update template", body: '(multipart form data)' },
+                { method: "DELETE", path: "/offer-letter-templates/{corp_id}/{id}", desc: "Delete template" },
+                { method: "POST", path: "/offer-letter-templates/{corp_id}/{id}/upload-logo", desc: "Upload logo", body: '(multipart form data)' },
+                { method: "POST", path: "/offer-letter-templates/{corp_id}/{id}/upload-signature", desc: "Upload signature", body: '(multipart form data)' }
+            ]
+        },
+        {
+            category: "Offer Letters",
+            icon: "✉️",
+            color: "#66ffb4",
+            endpoints: [
+                { method: "GET", path: "/offer-letters/{corp_id}", desc: "Get all offer letters" },
+                { method: "GET", path: "/offer-letters/{corp_id}/{id}", desc: "Get offer letter by ID" },
+                { method: "POST", path: "/offer-letters/generate", desc: "Generate offer letter", body: '{}' },
+                { method: "GET", path: "/offer-letters/{corp_id}/{id}/download-pdf", desc: "Download offer PDF" },
+                { method: "GET", path: "/offer-letters/{corp_id}/{id}/preview", desc: "Preview offer letter" },
+                { method: "PATCH", path: "/offer-letters/{corp_id}/{id}/status", desc: "Update offer status", body: '{\n  "status": ""\n}' },
+                { method: "DELETE", path: "/offer-letters/{corp_id}/{id}", desc: "Delete offer letter" }
+            ]
+        },
+        {
+            category: "Utility",
+            icon: "🔧",
+            color: "#80cbc4",
+            endpoints: [
+                { method: "GET", path: "/utility/years/{count?}", desc: "Get years list" },
+                { method: "GET", path: "/current-datetime", desc: "Get current date & time" },
+                { method: "POST", path: "/payroll-data/save", desc: "Save payroll data (deprecated)", body: '{}' },
+                { method: "GET", path: "/debug/formula-builder/{componentName?}", desc: "Debug formula builder" },
+                { method: "GET", path: "/debug/statutory/{corpId}/{empCode}/{companyName}", desc: "Debug statutory data" }
+            ]
+        }
+    ];
+
+    // =========== RENDER ===========
+    let totalEndpoints = 0;
+    API_DATA.forEach(c => totalEndpoints += c.endpoints.length);
+
+    document.getElementById('totalEndpoints').textContent = totalEndpoints;
+    document.getElementById('totalCategories').textContent = API_DATA.length;
+
+    function getParamsFromPath(path) {
+        const matches = path.match(/\{([^}]+)\}/g);
+        return matches ? matches.map(m => m.replace(/[{}?]/g, '')) : [];
+    }
+
+    function renderPath(path) {
+        return path.replace(/\{([^}]+)\}/g, '<span class="param">{$1}</span>');
+    }
+
+    function generateId(cat, idx) {
+        return 'ep-' + cat.replace(/[^a-zA-Z0-9]/g, '') + '-' + idx;
+    }
+
+    function buildSidebar() {
+        const nav = document.getElementById('sidebarNav');
+        let html = '';
+        API_DATA.forEach((cat, ci) => {
+            const catId = 'cat-' + ci;
+            html += `<div class="nav-category" data-target="${catId}" onclick="toggleNavGroup(this)">
+                <span>${cat.icon} ${cat.category}</span>
+                <span class="arrow">▼</span>
+            </div>`;
+            html += `<div class="nav-group" id="${catId}">`;
+            cat.endpoints.forEach((ep, ei) => {
+                const epId = generateId(cat.category, ei);
+                html += `<div class="nav-item" data-endpoint="${epId}" onclick="scrollToEndpoint('${epId}')">
+                    <span class="nav-method ${ep.method.toLowerCase()}">${ep.method}</span>
+                    <span style="flex:1; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${ep.path}</span>
+                </div>`;
+            });
+            html += '</div>';
+        });
+        nav.innerHTML = html;
+    }
+
+    function buildMainContent() {
+        const container = document.getElementById('apiSections');
+        let html = '';
+        API_DATA.forEach((cat, ci) => {
+            html += `<div class="category-section" data-category="${cat.category}" id="section-${ci}">`;
+            html += `<div class="category-title">
+                <span class="category-icon" style="background:${cat.color}22; color:${cat.color}">${cat.icon}</span>
+                <span>${cat.category}</span>
+                <span class="category-badge">${cat.endpoints.length} endpoints</span>
+            </div>`;
+            cat.endpoints.forEach((ep, ei) => {
+                const epId = generateId(cat.category, ei);
+                const params = getParamsFromPath(ep.path);
+                const hasBody = ep.body && !['GET', 'DELETE'].includes(ep.method);
+                html += `<div class="endpoint-card" id="${epId}" data-method="${ep.method}" data-path="${ep.path}" data-desc="${ep.desc}">
+                    <div class="endpoint-header" onclick="toggleEndpoint('${epId}')">
+                        <span class="method-badge ${ep.method.toLowerCase()}">${ep.method}</span>
+                        <span class="endpoint-path">${renderPath(ep.path)}</span>
+                        <span class="endpoint-desc">${ep.desc}</span>
+                        <span class="expand-icon">▼</span>
+                    </div>
+                    <div class="endpoint-body">
+                        <div class="test-tabs">
+                            <div class="test-tab active" onclick="switchTab(this, '${epId}', 'try')">🚀 Try It</div>
+                            <div class="test-tab" onclick="switchTab(this, '${epId}', 'curl')">📋 cURL</div>
+                        </div>
+
+                        <!-- TRY IT TAB -->
+                        <div class="tab-content active" id="${epId}-try">
+                            ${params.length ? `
+                            <div class="form-group">
+                                <label class="form-label">URL Parameters</label>
+                                <div class="param-inputs">
+                                    ${params.map(p => `
+                                    <div class="param-chip">
+                                        <label>${p}</label>
+                                        <input type="text" class="param-input" data-param="${p}" placeholder="Enter ${p}">
+                                    </div>`).join('')}
+                                </div>
+                            </div>` : ''}
+
+                            <div class="headers-section">
+                                <label class="form-label">Headers</label>
+                                <div class="headers-list" id="${epId}-headers">
+                                    <div class="header-row">
+                                        <input type="text" placeholder="Key" value="Accept">
+                                        <input type="text" placeholder="Value" value="application/json">
+                                        <button class="btn-remove-header" onclick="removeHeader(this)">✕</button>
+                                    </div>
+                                    <div class="header-row">
+                                        <input type="text" placeholder="Key" value="Content-Type">
+                                        <input type="text" placeholder="Value" value="application/json">
+                                        <button class="btn-remove-header" onclick="removeHeader(this)">✕</button>
+                                    </div>
+                                </div>
+                                <button class="btn-add-header" onclick="addHeader('${epId}')">+ Add Header</button>
+                            </div>
+
+                            ${ep.body ? `
+                            <div class="form-group">
+                                <label class="form-label">Request Body (JSON)</label>
+                                <textarea class="form-textarea" id="${epId}-body" placeholder="Enter JSON body">${ep.body}</textarea>
+                            </div>` : ''}
+
+                            <div class="btn-group">
+                                <button class="btn-send" onclick="sendRequest('${epId}', '${ep.method}', '${ep.path}')">
+                                    <span>⚡</span> Send Request
+                                </button>
+                                <button class="btn-copy-curl" onclick="generateAndShowCurl('${epId}', '${ep.method}', '${ep.path}')">
+                                    <span>📋</span> Show cURL
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- CURL TAB -->
+                        <div class="tab-content" id="${epId}-curl">
+                            <div class="form-group">
+                                <label class="form-label">Generated cURL Command</label>
+                                <div class="curl-display visible" id="${epId}-curl-output">Click "Generate cURL" below or fill in the Try It tab first</div>
+                            </div>
+                            <div class="btn-group">
+                                <button class="btn-copy-curl" onclick="copyCurl('${epId}')">
+                                    <span>📋</span> Copy to Clipboard
+                                </button>
+                                <button class="btn-send" onclick="generateCurlFromTab('${epId}', '${ep.method}', '${ep.path}')">
+                                    <span>⚙️</span> Generate cURL
+                                </button>
+                            </div>
+                        </div>
+
+                        <div class="curl-display" id="${epId}-curl-inline"></div>
+
+                        <div class="response-area" id="${epId}-response">
+                            <div class="response-header">
+                                <span class="response-status" id="${epId}-status"></span>
+                                <span class="response-time" id="${epId}-time"></span>
+                            </div>
+                            <pre class="response-body" id="${epId}-response-body"></pre>
+                        </div>
+                    </div>
+                </div>`;
+            });
+            html += '</div>';
+        });
+        container.innerHTML = html;
+    }
+
+    // =========== INTERACTIONS ===========
+    function toggleEndpoint(id) {
+        const card = document.getElementById(id);
+        card.classList.toggle('expanded');
+    }
+
+    function scrollToEndpoint(id) {
+        const el = document.getElementById(id);
+        if (!el) return;
+        el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        if (!el.classList.contains('expanded')) {
+            el.classList.add('expanded');
+        }
+        el.style.borderColor = 'var(--accent-cyan)';
+        setTimeout(() => el.style.borderColor = '', 1500);
+        // Close mobile sidebar
+        document.getElementById('sidebar').classList.remove('open');
+        document.querySelector('.sidebar-backdrop').classList.remove('visible');
+    }
+
+    function toggleNavGroup(el) {
+        el.classList.toggle('collapsed');
+        const target = document.getElementById(el.dataset.target);
+        target.classList.toggle('collapsed');
+    }
+
+    function switchTab(tabEl, epId, tabName) {
+        const parent = tabEl.parentElement;
+        parent.querySelectorAll('.test-tab').forEach(t => t.classList.remove('active'));
+        tabEl.classList.add('active');
+        const card = document.getElementById(epId);
+        card.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+        document.getElementById(`${epId}-${tabName}`).classList.add('active');
+    }
+
+    function addHeader(epId) {
+        const list = document.getElementById(`${epId}-headers`);
+        const row = document.createElement('div');
+        row.className = 'header-row';
+        row.innerHTML = `
+            <input type="text" placeholder="Key">
+            <input type="text" placeholder="Value">
+            <button class="btn-remove-header" onclick="removeHeader(this)">✕</button>`;
+        list.appendChild(row);
+    }
+
+    function removeHeader(btn) {
+        btn.parentElement.remove();
+    }
+
+    function getHeaders(epId) {
+        const headers = {};
+        const rows = document.querySelectorAll(`#${epId}-headers .header-row`);
+        rows.forEach(row => {
+            const inputs = row.querySelectorAll('input');
+            const key = inputs[0].value.trim();
+            const val = inputs[1].value.trim();
+            if (key) headers[key] = val;
+        });
+        return headers;
+    }
+
+    function buildUrl(epId, path) {
+        const baseUrl = document.getElementById('baseUrl').value.replace(/\/$/, '');
+        let finalPath = path;
+        const card = document.getElementById(epId);
+        const paramInputs = card.querySelectorAll('.param-input');
+        paramInputs.forEach(input => {
+            const param = input.dataset.param;
+            const value = input.value.trim();
+            if (value) {
+                finalPath = finalPath.replace(`{${param}}`, encodeURIComponent(value));
+                finalPath = finalPath.replace(`{${param}?}`, encodeURIComponent(value));
+            } else {
+                // Remove optional params with trailing slash
+                finalPath = finalPath.replace(`/{${param}?}`, '');
+                finalPath = finalPath.replace(`{${param}?}`, '');
+            }
+        });
+        return baseUrl + finalPath;
+    }
+
+    function getBody(epId) {
+        const bodyEl = document.getElementById(`${epId}-body`);
+        return bodyEl ? bodyEl.value : null;
+    }
+
+    function buildCurlCommand(epId, method, path) {
+        const url = buildUrl(epId, path);
+        const headers = getHeaders(epId);
+        const body = getBody(epId);
+        let cmd = `curl -X ${method}`;
+        cmd += ` \\\n  '${url}'`;
+        Object.entries(headers).forEach(([k, v]) => {
+            cmd += ` \\\n  -H '${k}: ${v}'`;
+        });
+        if (body && !['GET', 'DELETE'].includes(method)) {
+            try {
+                const parsed = JSON.parse(body);
+                cmd += ` \\\n  -d '${JSON.stringify(parsed)}'`;
+            } catch {
+                cmd += ` \\\n  -d '${body}'`;
+            }
+        }
+        return cmd;
+    }
+
+    function generateAndShowCurl(epId, method, path) {
+        const cmd = buildCurlCommand(epId, method, path);
+        const inlineEl = document.getElementById(`${epId}-curl-inline`);
+        inlineEl.textContent = cmd;
+        inlineEl.classList.add('visible');
+        // Also update curl tab
+        document.getElementById(`${epId}-curl-output`).textContent = cmd;
+    }
+
+    function generateCurlFromTab(epId, method, path) {
+        const cmd = buildCurlCommand(epId, method, path);
+        document.getElementById(`${epId}-curl-output`).textContent = cmd;
+    }
+
+    function copyCurl(epId) {
+        const text = document.getElementById(`${epId}-curl-output`).textContent;
+        navigator.clipboard.writeText(text).then(() => {
+            showToast('cURL command copied to clipboard!', 'success');
+        }).catch(() => {
+            showToast('Failed to copy', 'error');
+        });
+    }
+
+    async function sendRequest(epId, method, path) {
+        const url = buildUrl(epId, path);
+        const headers = getHeaders(epId);
+        const body = getBody(epId);
+        const btn = document.querySelector(`#${epId} .btn-send`);
+        const responseArea = document.getElementById(`${epId}-response`);
+        const statusEl = document.getElementById(`${epId}-status`);
+        const timeEl = document.getElementById(`${epId}-time`);
+        const bodyEl = document.getElementById(`${epId}-response-body`);
+
+        btn.classList.add('loading');
+        btn.innerHTML = '<span class="spinner"></span> Sending...';
+
+        const startTime = performance.now();
+
+        try {
+            const options = {
+                method: method,
+                headers: headers
+            };
+            if (body && !['GET', 'HEAD'].includes(method)) {
+                options.body = body;
+            }
+            const response = await fetch(url, options);
+            const endTime = performance.now();
+            const duration = Math.round(endTime - startTime);
+            const responseText = await response.text();
+
+            let formattedResponse;
+            try {
+                formattedResponse = JSON.stringify(JSON.parse(responseText), null, 2);
+            } catch {
+                formattedResponse = responseText;
+            }
+
+            statusEl.textContent = `${response.status} ${response.statusText}`;
+            statusEl.className = `response-status ${response.ok ? 'success' : 'error'}`;
+            timeEl.textContent = `${duration}ms`;
+            bodyEl.textContent = formattedResponse;
+            responseArea.classList.add('visible');
+
+            showToast(`${response.status} - Request completed in ${duration}ms`, response.ok ? 'success' : 'error');
+        } catch (err) {
+            const endTime = performance.now();
+            const duration = Math.round(endTime - startTime);
+            statusEl.textContent = 'Error';
+            statusEl.className = 'response-status error';
+            timeEl.textContent = `${duration}ms`;
+            bodyEl.textContent = `Network Error: ${err.message}\n\nMake sure the API server is running and CORS is enabled.`;
+            responseArea.classList.add('visible');
+            showToast('Request failed - check console for details', 'error');
+        } finally {
+            btn.classList.remove('loading');
+            btn.innerHTML = '<span>⚡</span> Send Request';
+        }
+    }
+
+    function showToast(message, type = 'info') {
+        const toast = document.getElementById('toast');
+        toast.textContent = message;
+        toast.className = `toast ${type} show`;
+        setTimeout(() => toast.classList.remove('show'), 3000);
+    }
+
+    function toggleSidebar() {
+        document.getElementById('sidebar').classList.toggle('open');
+        document.querySelector('.sidebar-backdrop').classList.toggle('visible');
+    }
+
+    // =========== SEARCH ===========
+    function filterAPIs() {
+        const query = document.getElementById('searchInput').value.toLowerCase().trim();
+        const sections = document.querySelectorAll('.category-section');
+        const navItems = document.querySelectorAll('.nav-item');
+        const navCategories = document.querySelectorAll('.nav-category');
+        const navGroups = document.querySelectorAll('.nav-group');
+        let visibleCount = 0;
+        let visibleCats = 0;
+
+        if (!query) {
+            sections.forEach(s => s.style.display = '');
+            document.querySelectorAll('.endpoint-card').forEach(c => c.style.display = '');
+            navItems.forEach(n => n.style.display = '');
+            navCategories.forEach(n => n.style.display = '');
+            navGroups.forEach(g => { g.style.display = ''; g.classList.remove('collapsed'); });
+            document.getElementById('searchCount').textContent = '';
+            document.getElementById('noResults').classList.remove('visible');
+            return;
+        }
+
+        sections.forEach((section, si) => {
+            const cards = section.querySelectorAll('.endpoint-card');
+            let catVisible = false;
+            cards.forEach((card, ci) => {
+                const method = card.dataset.method.toLowerCase();
+                const path = card.dataset.path.toLowerCase();
+                const desc = card.dataset.desc.toLowerCase();
+                const catName = section.dataset.category.toLowerCase();
+                const match = method.includes(query) || path.includes(query) || desc.includes(query) || catName.includes(query);
+                card.style.display = match ? '' : 'none';
+                if (match) { visibleCount++; catVisible = true; }
+            });
+            section.style.display = catVisible ? '' : 'none';
+            if (catVisible) visibleCats++;
+        });
+
+        // Update sidebar visibility too
+        navCategories.forEach((navCat, i) => {
+            const group = document.getElementById(navCat.dataset.target);
+            const items = group.querySelectorAll('.nav-item');
+            let groupVisible = false;
+            items.forEach(item => {
+                const epId = item.dataset.endpoint;
+                const card = document.getElementById(epId);
+                if (card) {
+                    const visible = card.style.display !== 'none';
+                    item.style.display = visible ? '' : 'none';
+                    if (visible) groupVisible = true;
+                }
+            });
+            navCat.style.display = groupVisible ? '' : 'none';
+            group.style.display = groupVisible ? '' : 'none';
+            if (groupVisible) group.classList.remove('collapsed');
+        });
+
+        document.getElementById('searchCount').textContent = `${visibleCount} endpoint${visibleCount !== 1 ? 's' : ''} found in ${visibleCats} categor${visibleCats !== 1 ? 'ies' : 'y'}`;
+        document.getElementById('noResults').classList.toggle('visible', visibleCount === 0);
+    }
+
+    // =========== KEYBOARD SHORTCUTS ===========
+    document.addEventListener('keydown', (e) => {
+        if ((e.ctrlKey || e.metaKey) && e.key === 'k') {
+            e.preventDefault();
+            document.getElementById('searchInput').focus();
+        }
+    });
+
+    // =========== INIT ===========
+    buildSidebar();
+    buildMainContent();
+    </script>
+</body>
+</html>
