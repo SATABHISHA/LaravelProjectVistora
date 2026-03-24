@@ -2447,7 +2447,11 @@
     // Auto-detect base URL from current page location
     (function() {
         const loc = window.location;
-        const baseUrl = loc.protocol + '//' + loc.host + '/api';
+        // Derive the base path from the current page URL
+        // e.g. if page is at /public/apidocs, base is /public/api
+        const pagePath = loc.pathname;
+        const basePath = pagePath.substring(0, pagePath.lastIndexOf('/'));
+        const baseUrl = loc.protocol + '//' + loc.host + basePath + '/api';
         document.getElementById('baseUrl').value = baseUrl;
     })();
     buildSidebar();
