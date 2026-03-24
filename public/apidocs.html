@@ -1001,13 +1001,13 @@
             icon: "🔐",
             color: "#6c63ff",
             endpoints: [
-                { method: "POST", path: "/userlogin/register", desc: "Register a new user", body: '{\n  "name": "",\n  "email": "",\n  "password": "",\n  "corp_id": ""\n}' },
-                { method: "POST", path: "/userlogin/login", desc: "User login", body: '{\n  "email": "",\n  "password": "",\n  "corp_id": ""\n}' },
+                { method: "POST", path: "/userlogin/register", desc: "Register a new user", body: '{\n  "corp_id": "",\n  "email_id": "",\n  "username": "",\n  "password": "",\n  "empcode": "",\n  "company_name": "",\n  "active_yn": 1,\n  "admin_yn": 0,\n  "supervisor_yn": 0\n}' },
+                { method: "POST", path: "/userlogin/login", desc: "User login", body: '{\n  "corp_id": "",\n  "email_id": "",\n  "password": ""\n}' },
                 { method: "GET", path: "/userlogin/userslist", desc: "Get all users list" },
-                { method: "PUT", path: "/users/update/{corp_id}/{email_id}", desc: "Update user details", body: '{\n  "name": "",\n  "password": ""\n}' },
+                { method: "PUT", path: "/users/update/{corp_id}/{email_id}", desc: "Update user details", body: '{\n  "username": "",\n  "password": ""\n}' },
                 { method: "GET", path: "/users/{corp_id}/{email_id}", desc: "Get user by corp_id & email" },
                 { method: "GET", path: "/user/check-details/{corp_id}/{email_id}", desc: "Check user details exist" },
-                { method: "POST", path: "/userlogin/empcode-fullname", desc: "Get empcode with full name", body: '{\n  "corp_id": "",\n  "email": ""\n}' }
+                { method: "POST", path: "/userlogin/empcode-fullname", desc: "Get empcode with full name", body: '{\n  "corp_id": "",\n  "company_name": ""\n}' }
             ]
         },
         {
@@ -1015,9 +1015,9 @@
             icon: "🏢",
             color: "#4fc3f7",
             endpoints: [
-                { method: "POST", path: "/company/register_company_details", desc: "Register company details", body: '{\n  "corp_id": "",\n  "company_name": "",\n  "address": ""\n}' },
+                { method: "POST", path: "/company/register_company_details", desc: "Register company details", body: '{\n  "corp_id": "",\n  "company_name": "",\n  "company_logo": "",\n  "registered_address": "",\n  "pin": "",\n  "country": "",\n  "state": "",\n  "city": "",\n  "phone": "",\n  "fax": "",\n  "currency": "",\n  "contact_person": "",\n  "industry": "",\n  "signatory_name": "",\n  "gstin": "",\n  "fcbk_url": "",\n  "youtube_url": "",\n  "twiter_url": "",\n  "insta_url": "",\n  "active_yn": 1\n}' },
                 { method: "GET", path: "/company/details/{corp_id}", desc: "Get company details" },
-                { method: "PUT", path: "/company/update/{company_id}/{corp_id}", desc: "Update company", body: '{\n  "company_name": "",\n  "address": ""\n}' },
+                { method: "PUT", path: "/company/update/{company_id}/{corp_id}", desc: "Update company", body: '{\n  "company_name": "",\n  "registered_address": "",\n  "pin": "",\n  "country": "",\n  "state": "",\n  "city": "",\n  "phone": "",\n  "active_yn": 1\n}' },
                 { method: "DELETE", path: "/company/delete/{company_id}/{corp_id}", desc: "Delete company" },
                 { method: "GET", path: "/company/name/{corp_id}", desc: "Get company name by corp_id" }
             ]
@@ -1027,7 +1027,7 @@
             icon: "🏗️",
             color: "#66ffb4",
             endpoints: [
-                { method: "POST", path: "/business_unit/add", desc: "Add business unit", body: '{\n  "corp_id": "",\n  "business_unit_name": ""\n}' },
+                { method: "POST", path: "/business_unit/add", desc: "Add business unit", body: '{\n  "corp_id": "",\n  "company_name": "",\n  "business_unit_name": "",\n  "active_yn": 1\n}' },
                 { method: "PUT", path: "/business_unit/update/{corp_id}/{business_unit_id}", desc: "Update business unit", body: '{\n  "business_unit_name": ""\n}' },
                 { method: "DELETE", path: "/business_unit/delete/{corp_id}/{business_unit_id}", desc: "Delete business unit" },
                 { method: "GET", path: "/business_unit/all/{corp_id}", desc: "Get all business units" }
@@ -1038,7 +1038,7 @@
             icon: "🏛️",
             color: "#ffa726",
             endpoints: [
-                { method: "POST", path: "/department/add", desc: "Add department", body: '{\n  "corp_id": "",\n  "department_name": ""\n}' },
+                { method: "POST", path: "/department/add", desc: "Add department", body: '{\n  "corp_id": "",\n  "department_name": "",\n  "active_yn": 1\n}' },
                 { method: "PUT", path: "/department/update/{department_id}", desc: "Update department", body: '{\n  "department_name": ""\n}' },
                 { method: "DELETE", path: "/department/delete/{department_id}", desc: "Delete department" },
                 { method: "GET", path: "/department/all/{corp_id}", desc: "Get all departments" }
@@ -1055,7 +1055,7 @@
                 { method: "POST", path: "/location/add-state", desc: "Add state", body: '{\n  "corp_id": "",\n  "country_id": "",\n  "state_name": ""\n}' },
                 { method: "DELETE", path: "/location/delete-state/{corp_id}/{state_id}", desc: "Delete state" },
                 { method: "GET", path: "/location/states/{corp_id}/{country_id}", desc: "Get states by country" },
-                { method: "POST", path: "/location/add-city", desc: "Add city", body: '{\n  "corp_id": "",\n  "state_id": "",\n  "city_name": ""\n}' },
+                { method: "POST", path: "/location/add-city", desc: "Add city", body: '{\n  "corp_id": "",\n  "country_id": "",\n  "state_id": "",\n  "city_name": ""\n}' },
                 { method: "DELETE", path: "/location/delete-city/{corp_id}/{city_id}", desc: "Delete city" },
                 { method: "GET", path: "/location/cities/{corp_id}/{state_id}", desc: "Get cities by state" }
             ]
@@ -1075,7 +1075,7 @@
             icon: "💰",
             color: "#ffd740",
             endpoints: [
-                { method: "POST", path: "/currency/add", desc: "Add currency", body: '{\n  "corp_id": "",\n  "currency_name": "",\n  "currency_code": ""\n}' },
+                { method: "POST", path: "/currency/add", desc: "Add currency", body: '{\n  "corp_id": "",\n  "name": ""\n}' },
                 { method: "GET", path: "/currency/all/{corp_id}", desc: "Get all currencies" },
                 { method: "DELETE", path: "/currency/delete/{corp_id}", desc: "Delete currency", body: '{\n  "id": ""\n}' }
             ]
@@ -1085,9 +1085,9 @@
             icon: "🗂️",
             color: "#b388ff",
             endpoints: [
-                { method: "POST", path: "/subdepartment/add", desc: "Add sub-department", body: '{\n  "corp_id": "",\n  "sub_dept_name": "",\n  "dept_id": ""\n}' },
+                { method: "POST", path: "/subdepartment/add", desc: "Add sub-department", body: '{\n  "corp_id": "",\n  "department_name": "",\n  "sub_department_name": "",\n  "active_yn": 1\n}' },
                 { method: "GET", path: "/subdepartment/all/{corp_id}", desc: "Get all sub-departments" },
-                { method: "PUT", path: "/subdepartment/update/{sub_dept_id}", desc: "Update sub-department", body: '{\n  "sub_dept_name": ""\n}' },
+                { method: "PUT", path: "/subdepartment/update/{sub_dept_id}", desc: "Update sub-department", body: '{\n  "sub_department_name": ""\n}' },
                 { method: "DELETE", path: "/subdepartment/delete/{corp_id}/{sub_dept_id}", desc: "Delete sub-department" }
             ]
         },
@@ -1107,7 +1107,7 @@
             icon: "📊",
             color: "#69f0ae",
             endpoints: [
-                { method: "POST", path: "/grade/add", desc: "Add grade", body: '{\n  "corp_id": "",\n  "grade_name": ""\n}' },
+                { method: "POST", path: "/grade/add", desc: "Add grade", body: '{\n  "corp_id": "",\n  "grade": ""\n}' },
                 { method: "GET", path: "/grade/all/{corp_id}", desc: "Get all grades" },
                 { method: "DELETE", path: "/grade/delete/{corp_id}/{grade_id}", desc: "Delete grade" }
             ]
@@ -1117,7 +1117,7 @@
             icon: "📋",
             color: "#80deea",
             endpoints: [
-                { method: "POST", path: "/document_type/add", desc: "Add document type", body: '{\n  "corp_id": "",\n  "type_name": ""\n}' },
+                { method: "POST", path: "/document_type/add", desc: "Add document type", body: '{\n  "corp_id": "",\n  "name": ""\n}' },
                 { method: "GET", path: "/document_type/all/{corp_id}", desc: "Get all document types" },
                 { method: "DELETE", path: "/document_type/delete/{corp_id}/{id}", desc: "Delete document type" }
             ]
@@ -1127,7 +1127,7 @@
             icon: "📝",
             color: "#a5d6a7",
             endpoints: [
-                { method: "POST", path: "/document_form_list/add", desc: "Add document form", body: '{\n  "corp_id": "",\n  "form_name": ""\n}' },
+                { method: "POST", path: "/document_form_list/add", desc: "Add document form", body: '{\n  "corp_id": "",\n  "name": ""\n}' },
                 { method: "GET", path: "/document_form_list/all/{corp_id}", desc: "Get all document forms" },
                 { method: "DELETE", path: "/document_form_list/delete/{corp_id}/{id}", desc: "Delete document form" }
             ]
@@ -1137,7 +1137,7 @@
             icon: "📑",
             color: "#ce93d8",
             endpoints: [
-                { method: "POST", path: "/document_field_list/add", desc: "Add document field", body: '{\n  "corp_id": "",\n  "field_name": ""\n}' },
+                { method: "POST", path: "/document_field_list/add", desc: "Add document field", body: '{\n  "corp_id": "",\n  "name": ""\n}' },
                 { method: "GET", path: "/document_field_list/all/{corp_id}", desc: "Get all document fields" },
                 { method: "DELETE", path: "/document_field_list/delete/{corp_id}/{id}", desc: "Delete document field" }
             ]
@@ -1147,10 +1147,10 @@
             icon: "📄",
             color: "#90caf9",
             endpoints: [
-                { method: "POST", path: "/document/add", desc: "Add document", body: '{\n  "corp_id": "",\n  "document_name": ""\n}' },
+                { method: "POST", path: "/document/add", desc: "Add document", body: '{\n  "corp_id": "",\n  "name": "",\n  "doc_type": "",\n  "track_send_alert_yn": 0,\n  "candidate_view_yn": 0,\n  "candidate_edit_yn": 0,\n  "emp_view_yn": 0,\n  "emp_edit_yn": 0,\n  "mandatory_employee_yn": 0,\n  "mandatory_candidate_yn": 0,\n  "mandatory_to_convert_emp_yn": 0,\n  "mandatory_upcoming_join_yn": 0,\n  "form_list": "",\n  "field_list": "",\n  "doc_upload": ""\n}' },
                 { method: "GET", path: "/document/all/{corp_id}", desc: "Get all documents" },
                 { method: "DELETE", path: "/document/delete/{corp_id}/{id}", desc: "Delete document" },
-                { method: "POST", path: "/document/update/{corp_id}/{id}", desc: "Update document", body: '{\n  "document_name": ""\n}' }
+                { method: "POST", path: "/document/update/{corp_id}/{id}", desc: "Update document", body: '{\n  "name": ""\n}' }
             ]
         },
         {
@@ -1168,7 +1168,7 @@
             icon: "🔬",
             color: "#ef9a9a",
             endpoints: [
-                { method: "POST", path: "/specialization/add", desc: "Add specialization", body: '{\n  "corp_id": "",\n  "specialization_name": "",\n  "qualification_id": ""\n}' },
+                { method: "POST", path: "/specialization/add", desc: "Add specialization", body: '{\n  "corp_id": "",\n  "qualification_name": "",\n  "specialization_name": ""\n}' },
                 { method: "DELETE", path: "/specialization/delete/{corp_id}/{id}", desc: "Delete specialization" },
                 { method: "GET", path: "/specialization/qualifications/{corp_id}", desc: "Get qualifications with specialization count" }
             ]
@@ -1178,7 +1178,7 @@
             icon: "🚫",
             color: "#ff5252",
             endpoints: [
-                { method: "POST", path: "/blacklist/add", desc: "Add to blacklist", body: '{\n  "corp_id": "",\n  "name": "",\n  "reason": ""\n}' },
+                { method: "POST", path: "/blacklist/add", desc: "Add to blacklist", body: '{\n  "corp_id": "",\n  "blacklist_name": ""\n}' },
                 { method: "DELETE", path: "/blacklist/delete/{corp_id}/{id}", desc: "Remove from blacklist" },
                 { method: "GET", path: "/blacklist/all/{corp_id}", desc: "Get blacklist" }
             ]
@@ -1188,7 +1188,7 @@
             icon: "💼",
             color: "#81d4fa",
             endpoints: [
-                { method: "POST", path: "/jobfunction/add", desc: "Add job function", body: '{\n  "corp_id": "",\n  "function_name": ""\n}' },
+                { method: "POST", path: "/jobfunction/add", desc: "Add job function", body: '{\n  "corp_id": "",\n  "jobfunction_name": ""\n}' },
                 { method: "DELETE", path: "/jobfunction/delete/{corp_id}/{id}", desc: "Delete job function" },
                 { method: "GET", path: "/jobfunction/all/{corp_id}", desc: "Get all job functions" }
             ]
@@ -1208,7 +1208,7 @@
             icon: "📈",
             color: "#a5d6a7",
             endpoints: [
-                { method: "POST", path: "/skillproficiency/add", desc: "Add skill proficiency", body: '{\n  "corp_id": "",\n  "proficiency_name": ""\n}' },
+                { method: "POST", path: "/skillproficiency/add", desc: "Add skill proficiency", body: '{\n  "corp_id": "",\n  "skillproficiency_name": ""\n}' },
                 { method: "DELETE", path: "/skillproficiency/delete/{corp_id}/{id}", desc: "Delete skill proficiency" },
                 { method: "GET", path: "/skillproficiency/all/{corp_id}", desc: "Get all skill proficiencies" }
             ]
@@ -1228,7 +1228,7 @@
             icon: "🧾",
             color: "#aed581",
             endpoints: [
-                { method: "POST", path: "/bankchallanreport/add", desc: "Add bank challan report", body: '{\n  "corp_id": "",\n  "bank_name": ""\n}' },
+                { method: "POST", path: "/bankchallanreport/add", desc: "Add bank challan report", body: '{\n  "corp_id": "",\n  "bankchallanreport_name": ""\n}' },
                 { method: "DELETE", path: "/bankchallanreport/delete/{corp_id}/{id}", desc: "Delete bank challan report" },
                 { method: "GET", path: "/bankchallanreport/all/{corp_id}", desc: "Get all bank challan reports" }
             ]
@@ -1238,7 +1238,7 @@
             icon: "💳",
             color: "#f48fb1",
             endpoints: [
-                { method: "POST", path: "/paymentbank/add", desc: "Add payment bank", body: '{\n  "corp_id": "",\n  "bank_name": ""\n}' },
+                { method: "POST", path: "/paymentbank/add", desc: "Add payment bank", body: '{\n  "corp_id": "",\n  "bank_name": "",\n  "account_no": ""\n}' },
                 { method: "GET", path: "/paymentbank/all/{corp_id}", desc: "Get all payment banks" },
                 { method: "PUT", path: "/paymentbank/update/{corp_id}/{id}", desc: "Update payment bank", body: '{\n  "bank_name": ""\n}' },
                 { method: "DELETE", path: "/paymentbank/delete/{corp_id}/{id}", desc: "Delete payment bank" }
@@ -1249,8 +1249,8 @@
             icon: "🤝",
             color: "#ffab91",
             endpoints: [
-                { method: "POST", path: "/vendor/add", desc: "Add vendor", body: '{\n  "corp_id": "",\n  "vendor_name": ""\n}' },
-                { method: "PUT", path: "/vendor/update/{corp_id}/{id}", desc: "Update vendor", body: '{\n  "vendor_name": ""\n}' },
+                { method: "POST", path: "/vendor/add", desc: "Add vendor", body: '{\n  "corp_id": "",\n  "vendor_code": ""\n}' },
+                { method: "PUT", path: "/vendor/update/{corp_id}/{id}", desc: "Update vendor", body: '{\n  "vendor_code": ""\n}' },
                 { method: "DELETE", path: "/vendor/delete/{corp_id}/{id}", desc: "Delete vendor" },
                 { method: "GET", path: "/vendor/all/{corp_id}", desc: "Get all vendors" }
             ]
@@ -1260,9 +1260,9 @@
             icon: "👥",
             color: "#80cbc4",
             endpoints: [
-                { method: "POST", path: "/customer/add", desc: "Add customer", body: '{\n  "corp_id": "",\n  "customer_name": ""\n}' },
+                { method: "POST", path: "/customer/add", desc: "Add customer", body: '{\n  "corp_id": "",\n  "cust_code": ""\n}' },
                 { method: "GET", path: "/customer/all/{corp_id}", desc: "Get all customers" },
-                { method: "PUT", path: "/customer/update/{corp_id}/{id}", desc: "Update customer", body: '{\n  "customer_name": ""\n}' },
+                { method: "PUT", path: "/customer/update/{corp_id}/{id}", desc: "Update customer", body: '{\n  "cust_code": ""\n}' },
                 { method: "DELETE", path: "/customer/delete/{corp_id}/{id}", desc: "Delete customer" }
             ]
         },
@@ -1271,9 +1271,9 @@
             icon: "🔒",
             color: "#b39ddb",
             endpoints: [
-                { method: "POST", path: "/profileaccess/add", desc: "Add profile access", body: '{\n  "corp_id": ""\n}' },
+                { method: "POST", path: "/profileaccess/add", desc: "Add profile access", body: '{\n  "corp_id": "",\n  "profile_tab_name": ""\n}' },
                 { method: "GET", path: "/profileaccess/all/{corp_id}", desc: "Get all profile access" },
-                { method: "PUT", path: "/profileaccess/update/{corp_id}/{id}", desc: "Update profile access", body: '{}' },
+                { method: "PUT", path: "/profileaccess/update/{corp_id}/{id}", desc: "Update profile access", body: '{\n  "corp_id": "",\n  "profile_tab_name": ""\n}' },
                 { method: "DELETE", path: "/profileaccess/delete/{corp_id}/{id}", desc: "Delete profile access" }
             ]
         },
@@ -1282,9 +1282,9 @@
             icon: "🌐",
             color: "#90caf9",
             endpoints: [
-                { method: "POST", path: "/socialprofileaccess/add", desc: "Add social profile access", body: '{\n  "corp_id": ""\n}' },
+                { method: "POST", path: "/socialprofileaccess/add", desc: "Add social profile access", body: '{\n  "corp_id": "",\n  "profile_menu_name": ""\n}' },
                 { method: "GET", path: "/socialprofileaccess/all/{corp_id}", desc: "Get all social profile access" },
-                { method: "PUT", path: "/socialprofileaccess/update/{corp_id}/{id}", desc: "Update social profile access", body: '{}' },
+                { method: "PUT", path: "/socialprofileaccess/update/{corp_id}/{id}", desc: "Update social profile access", body: '{\n  "corp_id": "",\n  "profile_menu_name": ""\n}' },
                 { method: "DELETE", path: "/socialprofileaccess/delete/{corp_id}/{id}", desc: "Delete social profile access" }
             ]
         },
@@ -1293,8 +1293,8 @@
             icon: "👔",
             color: "#4fc3f7",
             endpoints: [
-                { method: "POST", path: "/employment/add", desc: "Add employment details", body: '{\n  "corp_id": "",\n  "EmpCode": "",\n  "company_name": ""\n}' },
-                { method: "PUT", path: "/employment/update/{corp_id}/{EmpCode}", desc: "Update employment details", body: '{}' },
+                { method: "POST", path: "/employment/add", desc: "Add employment details", body: '{\n  "corp_id": "",\n  "EmpCode": "",\n  "ActiveYn": 1\n}' },
+                { method: "PUT", path: "/employment/update/{corp_id}/{EmpCode}", desc: "Update employment details", body: '{\n  "corp_id": "",\n  "EmpCode": "",\n  "ActiveYn": 1\n}' },
                 { method: "DELETE", path: "/employment/delete/{corp_id}/{EmpCode}", desc: "Delete employment details" },
                 { method: "GET", path: "/employment/next-empcode/{corp_id}", desc: "Get next emp code" },
                 { method: "GET", path: "/employment/summary/{corp_id}/{company_name}", desc: "Get employment summary" },
@@ -1309,7 +1309,7 @@
             color: "#66ffb4",
             endpoints: [
                 { method: "POST", path: "/employee/add", desc: "Add employee", body: '{\n  "corp_id": "",\n  "EmpCode": "",\n  "first_name": "",\n  "last_name": ""\n}' },
-                { method: "PUT", path: "/employee/update/{corp_id}/{EmpCode}/{id}", desc: "Update employee", body: '{}' },
+                { method: "PUT", path: "/employee/update/{corp_id}/{EmpCode}/{id}", desc: "Update employee", body: '{\n  "corp_id": "",\n  "EmpCode": "",\n  "first_name": "",\n  "last_name": ""\n}' },
                 { method: "DELETE", path: "/employee/delete/{corp_id}/{EmpCode}/{id}", desc: "Delete employee" },
                 { method: "POST", path: "/employee/check-empcode", desc: "Check emp code exists", body: '{\n  "corp_id": "",\n  "EmpCode": ""\n}' },
                 { method: "GET", path: "/employee/empcode-fullname/{corp_id}", desc: "Get empcode with fullname" },
@@ -1323,7 +1323,7 @@
             color: "#ffa726",
             endpoints: [
                 { method: "POST", path: "/statutory/add", desc: "Add statutory details", body: '{\n  "corp_id": "",\n  "EmpCode": ""\n}' },
-                { method: "PUT", path: "/statutory/update/{corp_id}/{EmpCode}/{id}", desc: "Update statutory details", body: '{}' },
+                { method: "PUT", path: "/statutory/update/{corp_id}/{EmpCode}/{id}", desc: "Update statutory details", body: '{\n  "corp_id": "",\n  "EmpCode": ""\n}' },
                 { method: "DELETE", path: "/statutory/delete/{corp_id}/{EmpCode}/{id}", desc: "Delete statutory details" },
                 { method: "GET", path: "/statutory/exists/{corp_id}/{EmpCode}", desc: "Check if statutory exists" },
                 { method: "GET", path: "/statutory/{corp_id}/{EmpCode}", desc: "Get statutory details" }
@@ -1335,7 +1335,7 @@
             color: "#ff6b9d",
             endpoints: [
                 { method: "POST", path: "/family/add", desc: "Add family details", body: '{\n  "corp_id": "",\n  "EmpCode": ""\n}' },
-                { method: "PUT", path: "/family/update/{corp_id}/{EmpCode}", desc: "Update family details", body: '{}' },
+                { method: "PUT", path: "/family/update/{corp_id}/{EmpCode}", desc: "Update family details", body: '{\n  "corp_id": "",\n  "EmpCode": ""\n}' },
                 { method: "DELETE", path: "/family/delete/{corp_id}/{EmpCode}", desc: "Delete family details" },
                 { method: "GET", path: "/family/exists/{corp_id}/{EmpCode}", desc: "Check family exists" },
                 { method: "GET", path: "/family/{corp_id}/{EmpCode}", desc: "Get family details" }
@@ -1346,8 +1346,8 @@
             icon: "👶",
             color: "#ce93d8",
             endpoints: [
-                { method: "POST", path: "/child/add", desc: "Add child details", body: '{\n  "corp_id": "",\n  "EmpCode": ""\n}' },
-                { method: "PUT", path: "/child/update/{corp_id}/{EmpCode}", desc: "Update child details", body: '{}' },
+                { method: "POST", path: "/child/add", desc: "Add child details", body: '{\n  "corp_id": "",\n  "EmpCode": "",\n  "ChildName": "",\n  "ChildDob": "",\n  "ChildGender": ""\n}' },
+                { method: "PUT", path: "/child/update/{corp_id}/{EmpCode}", desc: "Update child details", body: '{\n  "corp_id": "",\n  "EmpCode": "",\n  "ChildName": "",\n  "ChildDob": "",\n  "ChildGender": ""\n}' },
                 { method: "DELETE", path: "/child/delete/{corp_id}/{EmpCode}/{id}", desc: "Delete child details" },
                 { method: "GET", path: "/child/{corp_id}/{EmpCode}", desc: "Get child details" }
             ]
@@ -1357,8 +1357,8 @@
             icon: "💼",
             color: "#81d4fa",
             endpoints: [
-                { method: "POST", path: "/workexperience/add", desc: "Add work experience", body: '{\n  "corp_id": "",\n  "empcode": ""\n}' },
-                { method: "PUT", path: "/workexperience/update/{corp_id}/{empcode}/{id}", desc: "Update work experience", body: '{}' },
+                { method: "POST", path: "/workexperience/add", desc: "Add work experience", body: '{\n  "corp_id": "",\n  "empcode": "",\n  "CompanyName": "",\n  "Designation": "",\n  "FromDate": "",\n  "ToDate": ""\n}' },
+                { method: "PUT", path: "/workexperience/update/{corp_id}/{empcode}/{id}", desc: "Update work experience", body: '{\n  "corp_id": "",\n  "empcode": "",\n  "CompanyName": "",\n  "Designation": "",\n  "FromDate": "",\n  "ToDate": ""\n}' },
                 { method: "DELETE", path: "/workexperience/delete/{corp_id}/{empcode}/{id}", desc: "Delete work experience" },
                 { method: "GET", path: "/workexperience/{corp_id}/{empcode}", desc: "Get work experience" }
             ]
@@ -1378,8 +1378,8 @@
             icon: "📚",
             color: "#fff176",
             endpoints: [
-                { method: "POST", path: "/education/add", desc: "Add education", body: '{\n  "corp_id": "",\n  "empcode": ""\n}' },
-                { method: "PUT", path: "/education/update/{corp_id}/{empcode}/{id}", desc: "Update education", body: '{}' },
+                { method: "POST", path: "/education/add", desc: "Add education", body: '{\n  "corp_id": "",\n  "empcode": "",\n  "Degree": "",\n  "Type": "",\n  "FromYear": "",\n  "ToYear": "",\n  "Specialization": "",\n  "University": "",\n  "Institute": "",\n  "Grade": ""\n}' },
+                { method: "PUT", path: "/education/update/{corp_id}/{empcode}/{id}", desc: "Update education", body: '{\n  "corp_id": "",\n  "empcode": "",\n  "Degree": "",\n  "Type": "",\n  "FromYear": "",\n  "ToYear": "",\n  "Specialization": "",\n  "University": "",\n  "Institute": "",\n  "Grade": ""\n}' },
                 { method: "DELETE", path: "/education/delete/{corp_id}/{empcode}/{id}", desc: "Delete education" },
                 { method: "GET", path: "/education/{corp_id}/{empcode}", desc: "Get education details" }
             ]
@@ -1389,8 +1389,8 @@
             icon: "🛠️",
             color: "#ffcc02",
             endpoints: [
-                { method: "POST", path: "/employee/skills/add", desc: "Add employee skill", body: '{\n  "corp_id": "",\n  "empcode": ""\n}' },
-                { method: "PUT", path: "/employee/skills/update/{corp_id}/{empcode}/{id}", desc: "Update employee skill", body: '{}' },
+                { method: "POST", path: "/employee/skills/add", desc: "Add employee skill", body: '{\n  "corp_id": "",\n  "empcode": "",\n  "SkillName": "",\n  "Proficiency": ""\n}' },
+                { method: "PUT", path: "/employee/skills/update/{corp_id}/{empcode}/{id}", desc: "Update employee skill", body: '{\n  "corp_id": "",\n  "empcode": "",\n  "SkillName": "",\n  "Proficiency": ""\n}' },
                 { method: "DELETE", path: "/employee/skills/delete/{corp_id}/{empcode}/{id}", desc: "Delete employee skill" },
                 { method: "GET", path: "/employee/skills/{corp_id}/{empcode}", desc: "Get employee skills" }
             ]
@@ -1401,7 +1401,7 @@
             color: "#4dd0e1",
             endpoints: [
                 { method: "POST", path: "/employee/insurance-policy/add", desc: "Add insurance policy", body: '{\n  "corp_id": "",\n  "empcode": ""\n}' },
-                { method: "PUT", path: "/employee/insurance-policy/update/{corp_id}/{empcode}/{id}", desc: "Update insurance policy", body: '{}' },
+                { method: "PUT", path: "/employee/insurance-policy/update/{corp_id}/{empcode}/{id}", desc: "Update insurance policy", body: '{\n  "corp_id": "",\n  "empcode": ""\n}' },
                 { method: "DELETE", path: "/employee/insurance-policy/delete/{corp_id}/{empcode}/{id}", desc: "Delete insurance policy" },
                 { method: "GET", path: "/employee/insurance-policy/{corp_id}/{empcode}", desc: "Get insurance policies" }
             ]
@@ -1412,7 +1412,7 @@
             color: "#ef9a9a",
             endpoints: [
                 { method: "POST", path: "/employee/nominee/add", desc: "Add nominee", body: '{\n  "corp_id": "",\n  "empcode": ""\n}' },
-                { method: "PUT", path: "/employee/nominee/update/{corp_id}/{empcode}/{id}", desc: "Update nominee", body: '{}' },
+                { method: "PUT", path: "/employee/nominee/update/{corp_id}/{empcode}/{id}", desc: "Update nominee", body: '{\n  "corp_id": "",\n  "empcode": ""\n}' },
                 { method: "DELETE", path: "/employee/nominee/delete/{corp_id}/{empcode}/{id}", desc: "Delete nominee" },
                 { method: "GET", path: "/employee/nominee/{corp_id}/{empcode}", desc: "Get nominees" }
             ]
@@ -1423,7 +1423,7 @@
             color: "#80cbc4",
             endpoints: [
                 { method: "POST", path: "/employee/bank/add", desc: "Add employee bank", body: '{\n  "corp_id": "",\n  "empcode": ""\n}' },
-                { method: "PUT", path: "/employee/bank/update/{corp_id}/{empcode}", desc: "Update employee bank", body: '{}' },
+                { method: "PUT", path: "/employee/bank/update/{corp_id}/{empcode}", desc: "Update employee bank", body: '{\n  "corp_id": "",\n  "empcode": ""\n}' },
                 { method: "DELETE", path: "/employee/bank/delete/{corp_id}/{empcode}", desc: "Delete employee bank" },
                 { method: "POST", path: "/employee/bank/check-empcode", desc: "Check emp code for bank", body: '{\n  "corp_id": "",\n  "empcode": ""\n}' },
                 { method: "GET", path: "/employee/bank/{corp_id}/{empcode}", desc: "Get employee bank" }
@@ -1434,8 +1434,8 @@
             icon: "🌍",
             color: "#b388ff",
             endpoints: [
-                { method: "POST", path: "/region/add", desc: "Add region", body: '{\n  "corp_id": "",\n  "region_name": ""\n}' },
-                { method: "PUT", path: "/region/update/{corp_id}/{id}", desc: "Update region", body: '{\n  "region_name": ""\n}' },
+                { method: "POST", path: "/region/add", desc: "Add region", body: '{\n  "corp_id": "",\n  "region": ""\n}' },
+                { method: "PUT", path: "/region/update/{corp_id}/{id}", desc: "Update region", body: '{\n  "region": ""\n}' },
                 { method: "DELETE", path: "/region/delete/{corp_id}/{id}", desc: "Delete region" },
                 { method: "GET", path: "/region/all/{corp_id}", desc: "Get all regions" }
             ]
@@ -1445,8 +1445,8 @@
             icon: "🏪",
             color: "#ff8a65",
             endpoints: [
-                { method: "POST", path: "/branch/add", desc: "Add branch", body: '{\n  "corp_id": "",\n  "branch_name": ""\n}' },
-                { method: "PUT", path: "/branch/update/{corp_id}/{id}", desc: "Update branch", body: '{\n  "branch_name": ""\n}' },
+                { method: "POST", path: "/branch/add", desc: "Add branch", body: '{\n  "corp_id": "",\n  "branch": ""\n}' },
+                { method: "PUT", path: "/branch/update/{corp_id}/{id}", desc: "Update branch", body: '{\n  "branch": ""\n}' },
                 { method: "DELETE", path: "/branch/delete/{corp_id}/{id}", desc: "Delete branch" },
                 { method: "GET", path: "/branch/all/{corp_id}", desc: "Get all branches" }
             ]
@@ -1456,8 +1456,8 @@
             icon: "🏬",
             color: "#aed581",
             endpoints: [
-                { method: "POST", path: "/subbranch/add", desc: "Add sub-branch", body: '{\n  "corp_id": "",\n  "sub_branch_name": ""\n}' },
-                { method: "PUT", path: "/subbranch/update/{corp_id}/{id}", desc: "Update sub-branch", body: '{\n  "sub_branch_name": ""\n}' },
+                { method: "POST", path: "/subbranch/add", desc: "Add sub-branch", body: '{\n  "corp_id": "",\n  "subbranch": ""\n}' },
+                { method: "PUT", path: "/subbranch/update/{corp_id}/{id}", desc: "Update sub-branch", body: '{\n  "subbranch": ""\n}' },
                 { method: "DELETE", path: "/subbranch/delete/{corp_id}/{id}", desc: "Delete sub-branch" },
                 { method: "GET", path: "/subbranch/all/{corp_id}", desc: "Get all sub-branches" }
             ]
@@ -1467,8 +1467,8 @@
             icon: "📌",
             color: "#f48fb1",
             endpoints: [
-                { method: "POST", path: "/employment-type/add", desc: "Add employment type", body: '{\n  "corp_id": "",\n  "type_name": ""\n}' },
-                { method: "PUT", path: "/employment-type/update/{corp_id}/{id}", desc: "Update employment type", body: '{\n  "type_name": ""\n}' },
+                { method: "POST", path: "/employment-type/add", desc: "Add employment type", body: '{\n  "corp_id": "",\n  "emptype": ""\n}' },
+                { method: "PUT", path: "/employment-type/update/{corp_id}/{id}", desc: "Update employment type", body: '{\n  "emptype": ""\n}' },
                 { method: "DELETE", path: "/employment-type/delete/{corp_id}/{id}", desc: "Delete employment type" },
                 { method: "GET", path: "/employment-type/all/{corp_id}", desc: "Get all employment types" }
             ]
@@ -1478,8 +1478,8 @@
             icon: "📊",
             color: "#69f0ae",
             endpoints: [
-                { method: "POST", path: "/employment-status/add", desc: "Add employment status", body: '{\n  "corp_id": "",\n  "status_name": ""\n}' },
-                { method: "PUT", path: "/employment-status/update/{corp_id}/{id}", desc: "Update employment status", body: '{}' },
+                { method: "POST", path: "/employment-status/add", desc: "Add employment status", body: '{\n  "corp_id": "",\n  "emp_status": ""\n}' },
+                { method: "PUT", path: "/employment-status/update/{corp_id}/{id}", desc: "Update employment status", body: '{\n  "emp_status": ""\n}' },
                 { method: "DELETE", path: "/employment-status/delete/{corp_id}/{id}", desc: "Delete employment status" },
                 { method: "GET", path: "/employment-status/all/{corp_id}", desc: "Get all employment statuses" }
             ]
@@ -1489,8 +1489,8 @@
             icon: "✅",
             color: "#66ffb4",
             endpoints: [
-                { method: "POST", path: "/confirmation-status/add", desc: "Add confirmation status", body: '{\n  "corp_id": "",\n  "status_name": ""\n}' },
-                { method: "PUT", path: "/confirmation-status/update/{corp_id}/{id}", desc: "Update confirmation status", body: '{}' },
+                { method: "POST", path: "/confirmation-status/add", desc: "Add confirmation status", body: '{\n  "corp_id": "",\n  "confirmation_status": ""\n}' },
+                { method: "PUT", path: "/confirmation-status/update/{corp_id}/{id}", desc: "Update confirmation status", body: '{\n  "confirmation_status": ""\n}' },
                 { method: "DELETE", path: "/confirmation-status/delete/{corp_id}/{id}", desc: "Delete confirmation status" },
                 { method: "GET", path: "/confirmation-status/all/{corp_id}", desc: "Get all confirmation statuses" }
             ]
@@ -1500,7 +1500,7 @@
             icon: "🆔",
             color: "#90caf9",
             endpoints: [
-                { method: "POST", path: "/corporateid/add", desc: "Add corporate ID", body: '{\n  "corp_id_name": ""\n}' },
+                { method: "POST", path: "/corporateid/add", desc: "Add corporate ID", body: '{\n  "corp_id_name": "",\n  "created_date": "",\n  "active_yn": 1,\n  "one_time_payment_yn": 0,\n  "subscription_yn": 0\n}' },
                 { method: "DELETE", path: "/corporateid/delete/{corp_id_name}", desc: "Delete corporate ID" },
                 { method: "GET", path: "/corporateid/all", desc: "Get all corporate IDs" }
             ]
@@ -1520,8 +1520,8 @@
             icon: "👤",
             color: "#ffab91",
             endpoints: [
-                { method: "POST", path: "/employee-assigned-role/add", desc: "Assign role to employee", body: '{\n  "corp_id": "",\n  "empcode": "",\n  "role_name": ""\n}' },
-                { method: "PUT", path: "/employee-assigned-role/update/{corp_id}/{id}", desc: "Update assigned role", body: '{}' },
+                { method: "POST", path: "/employee-assigned-role/add", desc: "Assign role to employee", body: '{\n  "corp_id": "",\n  "role_name": "",\n  "employee_name": "",\n  "empcode": "",\n  "company_names": "",\n  "business_unit": "",\n  "department": "",\n  "sub_department_names": "",\n  "designation": "",\n  "grade": "",\n  "level": "",\n  "region": "",\n  "branch": "",\n  "sub_branch": ""\n}' },
+                { method: "PUT", path: "/employee-assigned-role/update/{corp_id}/{id}", desc: "Update assigned role", body: '{\n  "role_name": "",\n  "employee_name": "",\n  "empcode": "",\n  "company_names": "",\n  "business_unit": "",\n  "department": "",\n  "sub_department_names": "",\n  "designation": "",\n  "grade": "",\n  "level": "",\n  "region": "",\n  "branch": "",\n  "sub_branch": ""\n}' },
                 { method: "DELETE", path: "/employee-assigned-role/delete/{corp_id}/{id}", desc: "Delete assigned role" },
                 { method: "GET", path: "/employee-assigned-role/all/{corp_id}", desc: "Get all assigned roles" }
             ]
@@ -1531,7 +1531,7 @@
             icon: "📐",
             color: "#80deea",
             endpoints: [
-                { method: "POST", path: "/level/add", desc: "Add level", body: '{\n  "corp_id": "",\n  "level_name": ""\n}' },
+                { method: "POST", path: "/level/add", desc: "Add level", body: '{\n  "corp_id": "",\n  "level": "",\n  "activeYN": 1\n}' },
                 { method: "GET", path: "/level/all/{corp_id}", desc: "Get all levels" },
                 { method: "DELETE", path: "/level/delete/{corp_id}/{id}", desc: "Delete level" }
             ]
@@ -1541,7 +1541,7 @@
             icon: "🔄",
             color: "#4fc3f7",
             endpoints: [
-                { method: "POST", path: "/workflow/add", desc: "Add workflow", body: '{\n  "corpid": ""\n}' },
+                { method: "POST", path: "/workflow/add", desc: "Add workflow", body: '{\n  "corpid": "",\n  "workflow": ""\n}' },
                 { method: "DELETE", path: "/workflow/delete/{corpid}", desc: "Delete workflow" },
                 { method: "GET", path: "/workflow/{corpid}", desc: "Get workflow" }
             ]
@@ -1551,7 +1551,7 @@
             icon: "📨",
             color: "#ffa726",
             endpoints: [
-                { method: "POST", path: "/requesttype/add", desc: "Add request type", body: '{\n  "corp_id": ""\n}' },
+                { method: "POST", path: "/requesttype/add", desc: "Add request type", body: '{\n  "corp_id": "",\n  "request_type_name": ""\n}' },
                 { method: "DELETE", path: "/requesttype/delete/{corp_id}", desc: "Delete request type" },
                 { method: "GET", path: "/requesttype/{corp_id}", desc: "Get request types" }
             ]
@@ -1561,10 +1561,10 @@
             icon: "✍️",
             color: "#66ffb4",
             endpoints: [
-                { method: "POST", path: "/approver/add", desc: "Add approver", body: '{\n  "corp_id": "",\n  "puid": ""\n}' },
+                { method: "POST", path: "/approver/add", desc: "Add approver", body: '{\n  "puid": "",\n  "corp_id": "",\n  "workflow_name": "",\n  "request_type": "",\n  "workflow_recruitment_yn": 0,\n  "workflow_workforce_yn": 0,\n  "workflow_officetime_yn": 0,\n  "workflow_payroll_yn": 0,\n  "workflow_expense_yn": 0,\n  "workflow_performance_yn": 0,\n  "workflow_asset_yn": 0,\n  "approver": "",\n  "intimationYN": 0,\n  "due_day": "",\n  "turnaround_time": "",\n  "active_yn": 1\n}' },
                 { method: "DELETE", path: "/approver/delete/{puid}", desc: "Delete approver" },
-                { method: "POST", path: "/approver/fetch", desc: "Fetch approver", body: '{\n  "puid": ""\n}' },
-                { method: "PUT", path: "/approver/update/{corp_id}/{puid}", desc: "Update approver", body: '{}' }
+                { method: "POST", path: "/approver/fetch", desc: "Fetch approver", body: '{\n  "puid": "",\n  "corp_id": "",\n  "workflow_name": "",\n  "request_type": ""\n}' },
+                { method: "PUT", path: "/approver/update/{corp_id}/{puid}", desc: "Update approver", body: '{\n  "workflow_name": "",\n  "request_type": "",\n  "workflow_recruitment_yn": 0,\n  "workflow_workforce_yn": 0,\n  "workflow_officetime_yn": 0,\n  "workflow_payroll_yn": 0,\n  "workflow_expense_yn": 0,\n  "workflow_performance_yn": 0,\n  "workflow_asset_yn": 0,\n  "approver": "",\n  "intimationYN": 0,\n  "due_day": "",\n  "turnaround_time": "",\n  "active_yn": 1\n}' }
             ]
         },
         {
@@ -1572,10 +1572,10 @@
             icon: "⚙️",
             color: "#ce93d8",
             endpoints: [
-                { method: "POST", path: "/conditional-workflow/add", desc: "Add conditional workflow", body: '{}' },
+                { method: "POST", path: "/conditional-workflow/add", desc: "Add conditional workflow", body: '{\n  "puid": "",\n  "corp_id": "",\n  "workflow_name": "",\n  "request_type": "",\n  "workflow_recruitment_yn": 0,\n  "workflow_workforce_yn": 0,\n  "workflow_officetime_yn": 0,\n  "workflow_payroll_yn": 0,\n  "workflow_expense_yn": 0,\n  "workflow_performance_yn": 0,\n  "workflow_asset_yn": 0,\n  "condition_type": "",\n  "operation_type": "",\n  "value": "",\n  "role_name": "",\n  "intimationYn": 0,\n  "due_day": "",\n  "turaround_time": ""\n}' },
                 { method: "DELETE", path: "/conditional-workflow/delete/{puid}", desc: "Delete conditional workflow" },
-                { method: "PUT", path: "/conditional-workflow/update/{puid}", desc: "Update conditional workflow", body: '{}' },
-                { method: "POST", path: "/conditional-workflow/fetch", desc: "Fetch conditional workflow", body: '{}' }
+                { method: "PUT", path: "/conditional-workflow/update/{puid}", desc: "Update conditional workflow", body: '{\n  "workflow_name": "",\n  "request_type": "",\n  "condition_type": "",\n  "operation_type": "",\n  "value": "",\n  "role_name": ""\n}' },
+                { method: "POST", path: "/conditional-workflow/fetch", desc: "Fetch conditional workflow", body: '{\n  "puid": "",\n  "corp_id": "",\n  "workflow_name": "",\n  "request_type": ""\n}' }
             ]
         },
         {
@@ -1583,7 +1583,7 @@
             icon: "🔀",
             color: "#ff8a65",
             endpoints: [
-                { method: "POST", path: "/condition-type/add", desc: "Add condition type", body: '{\n  "corp_id": ""\n}' },
+                { method: "POST", path: "/condition-type/add", desc: "Add condition type", body: '{\n  "corp_id": "",\n  "condition_type": ""\n}' },
                 { method: "GET", path: "/condition-type/all/{corp_id}", desc: "Get all condition types" },
                 { method: "DELETE", path: "/condition-type/delete/{corp_id}/{id}", desc: "Delete condition type" }
             ]
@@ -1593,11 +1593,11 @@
             icon: "🤖",
             color: "#00e5ff",
             endpoints: [
-                { method: "POST", path: "/workflow-automation/add", desc: "Add workflow automation", body: '{}' },
-                { method: "POST", path: "/workflow-automation/fetch", desc: "Fetch automation data", body: '{}' },
+                { method: "POST", path: "/workflow-automation/add", desc: "Add workflow automation", body: '{\n  "puid": "",\n  "corp_id": "",\n  "workflow_name": "",\n  "request_type": "",\n  "workflow_recruitment_yn": 0,\n  "workflow_workforce_yn": 0,\n  "workflow_officetime_yn": 0,\n  "workflow_payroll_yn": 0,\n  "workflow_expense_yn": 0,\n  "workflow_performance_yn": 0,\n  "workflow_asset_yn": 0,\n  "description": "",\n  "flow_type": "",\n  "applicability": "",\n  "advance_applicability": "",\n  "from_days": "",\n  "to_days": "",\n  "conditional_workflowYN": 0,\n  "activeYN": 1\n}' },
+                { method: "POST", path: "/workflow-automation/fetch", desc: "Fetch automation data", body: '{\n  "corp_id": "",\n  "workflow_recruitment_yn": 0,\n  "workflow_workforce_yn": 0,\n  "workflow_officetime_yn": 0,\n  "workflow_payroll_yn": 0,\n  "workflow_expense_yn": 0,\n  "workflow_performance_yn": 0,\n  "workflow_asset_yn": 0\n}' },
                 { method: "GET", path: "/workflow-automation/generate-public-uid", desc: "Generate public UID" },
                 { method: "DELETE", path: "/workflow-automation/delete/{puid}", desc: "Delete automation" },
-                { method: "PUT", path: "/workflow-automation/update/{puid}", desc: "Update automation", body: '{}' }
+                { method: "PUT", path: "/workflow-automation/update/{puid}", desc: "Update automation", body: '{\n  "corp_id": "",\n  "workflow_name": "",\n  "request_type": "",\n  "workflow_recruitment_yn": 0,\n  "workflow_workforce_yn": 0,\n  "workflow_officetime_yn": 0,\n  "workflow_payroll_yn": 0,\n  "workflow_expense_yn": 0,\n  "workflow_performance_yn": 0,\n  "workflow_asset_yn": 0,\n  "description": "",\n  "flow_type": "",\n  "applicability": "",\n  "advance_applicability": "",\n  "from_days": "",\n  "to_days": "",\n  "conditional_workflowYN": 0,\n  "activeYN": 1\n}' }
             ]
         },
         {
@@ -1635,8 +1635,8 @@
             icon: "⏰",
             color: "#ffd740",
             endpoints: [
-                { method: "POST", path: "/shiftpolicy/add", desc: "Add shift policy", body: '{\n  "corp_id": ""\n}' },
-                { method: "PUT", path: "/shiftpolicy/update/{corp_id}/{puid}", desc: "Update shift policy", body: '{}' },
+                { method: "POST", path: "/shiftpolicy/add", desc: "Add shift policy", body: '{\n  "corp_id": "",\n  "shift_code": "",\n  "shift_start_time": "",\n  "first_half": "",\n  "second_half": "",\n  "checkin": "",\n  "gracetime_early": "",\n  "gracetime_late": "",\n  "absence_halfday": "",\n  "absence_fullday": "",\n  "define_weekly_off_yn": 0\n}' },
+                { method: "PUT", path: "/shiftpolicy/update/{corp_id}/{puid}", desc: "Update shift policy", body: '{\n  "corp_id": "",\n  "shift_code": "",\n  "shift_start_time": "",\n  "first_half": "",\n  "second_half": "",\n  "checkin": "",\n  "gracetime_early": "",\n  "gracetime_late": "",\n  "absence_halfday": "",\n  "absence_fullday": "",\n  "define_weekly_off_yn": 0\n}' },
                 { method: "GET", path: "/shiftpolicy/all/{corp_id}", desc: "Get all shift policies" },
                 { method: "DELETE", path: "/shiftpolicy/delete/{puid}", desc: "Delete shift policy" },
                 { method: "GET", path: "/shift-policy/shift-codes/{corp_id}", desc: "Get shift codes" },
@@ -1648,8 +1648,8 @@
             icon: "📅",
             color: "#81d4fa",
             endpoints: [
-                { method: "POST", path: "/shift-policy-weekly-schedule/add", desc: "Add weekly schedule", body: '{\n  "puid": ""\n}' },
-                { method: "PUT", path: "/shift-policy-weekly-schedule/update/{puid}/{id}", desc: "Update weekly schedule", body: '{}' },
+                { method: "POST", path: "/shift-policy-weekly-schedule/add", desc: "Add weekly schedule", body: '{\n  "corp_id": "",\n  "puid": "",\n  "week_no": "",\n  "day_name": "",\n  "time": ""\n}' },
+                { method: "PUT", path: "/shift-policy-weekly-schedule/update/{puid}/{id}", desc: "Update weekly schedule", body: '{\n  "corp_id": "",\n  "puid": "",\n  "week_no": "",\n  "day_name": "",\n  "time": ""\n}' },
                 { method: "DELETE", path: "/shift-policy-weekly-schedule/delete/{puid}/{id}", desc: "Delete weekly schedule" },
                 { method: "DELETE", path: "/shift-policy-weekly-schedule/delete/{puid}", desc: "Delete all by puid" },
                 { method: "GET", path: "/shift-policy-weekly-schedule/{puid}", desc: "Get weekly schedule" }
@@ -1660,11 +1660,11 @@
             icon: "📲",
             color: "#ff6b9d",
             endpoints: [
-                { method: "POST", path: "/checkin-policy/add", desc: "Add check-in policy", body: '{\n  "corp_id": ""\n}' },
+                { method: "POST", path: "/checkin-policy/add", desc: "Add check-in policy", body: '{\n  "puid": "",\n  "corp_id": "",\n  "policy_name": "",\n  "applicability_type": "",\n  "applicability_for": "",\n  "web_checkin_yn": 0,\n  "mobile_chckin_yn": 0,\n  "photo_attdnc_yn": 0,\n  "location_attdnc_yn": 0,\n  "attdnc_regularization_yn": 0,\n  "on_duty_yn": 0\n}' },
                 { method: "DELETE", path: "/checkin-policy/delete/{puid}", desc: "Delete check-in policy" },
-                { method: "PUT", path: "/checkin-policy/update/{puid}", desc: "Update check-in policy", body: '{}' },
+                { method: "PUT", path: "/checkin-policy/update/{puid}", desc: "Update check-in policy", body: '{\n  "puid": "",\n  "corp_id": "",\n  "policy_name": "",\n  "applicability_type": "",\n  "applicability_for": "",\n  "web_checkin_yn": 0,\n  "mobile_chckin_yn": 0,\n  "photo_attdnc_yn": 0,\n  "location_attdnc_yn": 0,\n  "attdnc_regularization_yn": 0,\n  "on_duty_yn": 0\n}' },
                 { method: "GET", path: "/checkin-policy/all/{corp_id}", desc: "Get all check-in policies" },
-                { method: "POST", path: "/checkin-policy-on-duty-type/add", desc: "Add on-duty type", body: '{}' },
+                { method: "POST", path: "/checkin-policy-on-duty-type/add", desc: "Add on-duty type", body: '{\n  "puid": "",\n  "corp_id": "",\n  "onduty_type": "",\n  "onduty_applicability_type": "",\n  "onduty_limit": ""\n}' },
                 { method: "DELETE", path: "/checkin-policy-on-duty-type/delete/{puid}", desc: "Delete on-duty type" },
                 { method: "GET", path: "/checkin-policy-on-duty-type/{puid}", desc: "Get on-duty type" }
             ]
@@ -1674,12 +1674,12 @@
             icon: "🏖️",
             color: "#4dd0e1",
             endpoints: [
-                { method: "POST", path: "/leave-type-basic-configuration/add", desc: "Add basic config", body: '{}' },
-                { method: "PUT", path: "/leave-type-basic-configuration/update/{puid}", desc: "Update basic config", body: '{}' },
+                { method: "POST", path: "/leave-type-basic-configuration/add", desc: "Add basic config", body: '{\n  "puid": "",\n  "corpid": "",\n  "leaveCode": "",\n  "leaveName": "",\n  "leaveCycleStartMonth": "",\n  "leaveCycleEndMonth": "",\n  "leaveTypeTobeCredited": "",\n  "LimitDays": "",\n  "LeaveType": "",\n  "encahsmentAllowedYN": 0,\n  "isConfigurationCompletedYN": 0\n}' },
+                { method: "PUT", path: "/leave-type-basic-configuration/update/{puid}", desc: "Update basic config", body: '{\n  "puid": "",\n  "corpid": "",\n  "leaveCode": "",\n  "leaveName": "",\n  "leaveCycleStartMonth": "",\n  "leaveCycleEndMonth": "",\n  "leaveTypeTobeCredited": "",\n  "LimitDays": "",\n  "LeaveType": "",\n  "encahsmentAllowedYN": 0,\n  "isConfigurationCompletedYN": 0\n}' },
                 { method: "DELETE", path: "/leave-type-basic-configuration/delete/{puid}", desc: "Delete basic config" },
                 { method: "GET", path: "/leave-type-basic-configuration/all/{corpid}", desc: "Get all basic configs" },
-                { method: "POST", path: "/leave-type-full-configuration/add", desc: "Add full config", body: '{}' },
-                { method: "PUT", path: "/leave-type-full-configuration/update/{puid}", desc: "Update full config", body: '{}' },
+                { method: "POST", path: "/leave-type-full-configuration/add", desc: "Add full config", body: '{\n  "puid": "",\n  "corpid": ""\n}' },
+                { method: "PUT", path: "/leave-type-full-configuration/update/{puid}", desc: "Update full config", body: '{\n  "puid": "",\n  "corpid": ""\n}' },
                 { method: "DELETE", path: "/leave-type-full-configuration/delete/{puid}", desc: "Delete full config" },
                 { method: "GET", path: "/leave-type-full-configuration/all/{corpid}", desc: "Get all full configs" },
                 { method: "GET", path: "/leave-type-full-configuration/{puid}", desc: "Get full config by puid" }
@@ -1690,8 +1690,8 @@
             icon: "📋",
             color: "#aed581",
             endpoints: [
-                { method: "POST", path: "/leave-policy/add", desc: "Add leave policy", body: '{}' },
-                { method: "PUT", path: "/leave-policy/update/{puid}", desc: "Update leave policy", body: '{}' },
+                { method: "POST", path: "/leave-policy/add", desc: "Add leave policy", body: '{\n  "corpid": "",\n  "puid": "",\n  "policyName": "",\n  "leaveType": "",\n  "applicabilityType": "",\n  "applicabilityOn": "",\n  "advanceApplicabilityType": "",\n  "advanceApplicabilityOn": "",\n  "fromDays": "",\n  "toDays": ""\n}' },
+                { method: "PUT", path: "/leave-policy/update/{puid}", desc: "Update leave policy", body: '{\n  "corpid": "",\n  "puid": "",\n  "policyName": "",\n  "leaveType": "",\n  "applicabilityType": "",\n  "applicabilityOn": "",\n  "advanceApplicabilityType": "",\n  "advanceApplicabilityOn": "",\n  "fromDays": "",\n  "toDays": ""\n}' },
                 { method: "DELETE", path: "/leave-policy/delete/{puid}", desc: "Delete leave policy" },
                 { method: "GET", path: "/leave-policy/by-corpid/{corpid}", desc: "Get leave policies" }
             ]
@@ -1712,7 +1712,7 @@
             icon: "💵",
             color: "#66ffb4",
             endpoints: [
-                { method: "POST", path: "/paycomponent/add-or-update", desc: "Add or update pay component", body: '{\n  "corpId": ""\n}' },
+                { method: "POST", path: "/paycomponent/add-or-update", desc: "Add or update pay component", body: '{\n  "corpId": "",\n  "puid": "",\n  "componentName": ""\n}' },
                 { method: "GET", path: "/paycomponent/all/{corpId}", desc: "Get all pay components" },
                 { method: "GET", path: "/paycomponent/{puid}", desc: "Get pay component by puid" },
                 { method: "DELETE", path: "/paycomponent/delete/{puid}", desc: "Delete pay component" }
@@ -1723,7 +1723,7 @@
             icon: "🧩",
             color: "#ffa726",
             endpoints: [
-                { method: "POST", path: "/component-type/add-or-update", desc: "Add or update component type", body: '{\n  "corpId": ""\n}' },
+                { method: "POST", path: "/component-type/add-or-update", desc: "Add or update component type", body: '{\n  "corpId": "",\n  "componentType": ""\n}' },
                 { method: "GET", path: "/component-type/all/{corpId}", desc: "Get all component types" },
                 { method: "DELETE", path: "/component-type/delete/{corpId}/{id}", desc: "Delete component type" }
             ]
@@ -1733,7 +1733,7 @@
             icon: "⚙️",
             color: "#4fc3f7",
             endpoints: [
-                { method: "POST", path: "/paygroup-configuration/add-or-update", desc: "Add or update paygroup", body: '{\n  "corpId": ""\n}' },
+                { method: "POST", path: "/paygroup-configuration/add-or-update", desc: "Add or update paygroup", body: '{\n  "corpId": "",\n  "puid": "",\n  "GroupName": ""\n}' },
                 { method: "GET", path: "/paygroup-configuration/by-corpid/{corpId}", desc: "Get paygroup by corp" },
                 { method: "GET", path: "/paygroup-configuration/{puid}", desc: "Get paygroup by puid" },
                 { method: "DELETE", path: "/paygroup-configuration/delete/{puid}", desc: "Delete paygroup" },
@@ -1752,7 +1752,7 @@
             icon: "🔢",
             color: "#ff6b9d",
             endpoints: [
-                { method: "POST", path: "/formula-builder/add-or-update", desc: "Add or update formula", body: '{}' },
+                { method: "POST", path: "/formula-builder/add-or-update", desc: "Add or update formula", body: '{\n  "corpId": "",\n  "puid": "",\n  "paygroupPuid": "",\n  "componentGroupName": "",\n  "componentName": "",\n  "componentNameRefersTo": "",\n  "referenceValue": "",\n  "formula": ""\n}' },
                 { method: "GET", path: "/formula-builder/{corpId}/{componentGroupName}", desc: "Get formula" },
                 { method: "DELETE", path: "/formula-builder/delete/{puid}/{paygroupPuid}", desc: "Delete formula" }
             ]
@@ -1762,10 +1762,10 @@
             icon: "💰",
             color: "#ffd740",
             endpoints: [
-                { method: "POST", path: "/employee-salary-structure/add-or-update", desc: "Add or update salary structure", body: '{}' },
+                { method: "POST", path: "/employee-salary-structure/add-or-update", desc: "Add or update salary structure", body: '{\n  "corpId": "",\n  "puid": "",\n  "empCode": "",\n  "companyName": "",\n  "salaryRevisionMonth": "",\n  "arrearWithEffectFrom": "",\n  "payGroup": "",\n  "ctc": "",\n  "ctcYearly": "",\n  "monthlyBasic": "",\n  "leaveEnchashOnGross": "",\n  "grossList": "",\n  "year": "",\n  "increment": ""\n}' },
                 { method: "GET", path: "/employee-salary-structure/{empCode}/{companyName}/{corpId}", desc: "Get salary structure" },
                 { method: "DELETE", path: "/employee-salary-structure/delete/{puid}", desc: "Delete salary structure" },
-                { method: "POST", path: "/employee-salary-structure/salary-revision", desc: "Process salary revision", body: '{}' }
+                { method: "POST", path: "/employee-salary-structure/salary-revision", desc: "Process salary revision", body: '{\n  "corpId": "",\n  "companyName": "",\n  "empCode": "",\n  "year": "",\n  "salaryRevisionMonth": "",\n  "arrearWithEffectFrom": "",\n  "increment": 0\n}' }
             ]
         },
         {
@@ -1773,14 +1773,14 @@
             icon: "⏱️",
             color: "#00e5ff",
             endpoints: [
-                { method: "POST", path: "/attendance/check", desc: "Check in or out", body: '{\n  "corpId": "",\n  "userName": "",\n  "empCode": "",\n  "companyName": ""\n}' },
+                { method: "POST", path: "/attendance/check", desc: "Check in or out", body: '{\n  "puid": "",\n  "corpId": "",\n  "userName": "",\n  "empCode": "",\n  "companyName": "",\n  "time": "",\n  "Lat": "",\n  "Long": "",\n  "Address": ""\n}' },
                 { method: "GET", path: "/attendance/today/{corpId}/{userName}/{empCode}/{companyName}", desc: "Get today's attendance" },
                 { method: "GET", path: "/attendance/today-hours/{empCode}/{corpId}/{companyName}", desc: "Today attendance with hours" },
                 { method: "GET", path: "/attendance/check-exists/{corpId}/{empCode}/{companyName}", desc: "Check attendance exists" },
                 { method: "GET", path: "/attendance/history/{corpId}/{filter?}", desc: "Get attendance history" },
-                { method: "POST", path: "/attendance/bulk-insert", desc: "Bulk insert attendance", body: '{}' },
+                { method: "POST", path: "/attendance/bulk-insert", desc: "Bulk insert attendance", body: '{\n  "records": [{\n    "corpId": "",\n    "userName": "",\n    "empCode": "",\n    "companyName": "",\n    "checkIn": "",\n    "checkOut": "",\n    "date": "",\n    "Lat": "",\n    "Long": "",\n    "Address": ""\n  }]\n}' },
                 { method: "GET", path: "/attendance/monthly", desc: "Get monthly attendance (GET)" },
-                { method: "POST", path: "/attendance/monthly", desc: "Get monthly attendance (POST)", body: '{}' },
+                { method: "POST", path: "/attendance/monthly", desc: "Get monthly attendance (POST)", body: '{\n  "corpId": "",\n  "empCode": "",\n  "companyName": "",\n  "month": "",\n  "year": ""\n}' },
                 { method: "GET", path: "/attendance/current-month-year", desc: "Get current month and year" }
             ]
         },
@@ -1789,7 +1789,7 @@
             icon: "🎉",
             color: "#b388ff",
             endpoints: [
-                { method: "POST", path: "/holiday-list", desc: "Add or update holiday", body: '{}' },
+                { method: "POST", path: "/holiday-list", desc: "Add or update holiday", body: '{\n  "corpId": "",\n  "puid": "",\n  "companyNames": "",\n  "country": "",\n  "state": "",\n  "city": "",\n  "holidayName": "",\n  "holidayDate": "",\n  "year": "",\n  "holidayType": "",\n  "recurringType": ""\n}' },
                 { method: "GET", path: "/holiday-list/puid/{puid}", desc: "Get holiday by puid" },
                 { method: "DELETE", path: "/holiday-list/{puid}", desc: "Delete holiday" },
                 { method: "GET", path: "/holiday-list/corp/{corpId}", desc: "Get holidays by corp" },
@@ -1804,21 +1804,21 @@
             icon: "💳",
             color: "#66ffb4",
             endpoints: [
-                { method: "POST", path: "/employee-payroll-salary/add-or-update", desc: "Add or update payroll salary", body: '{}' },
+                { method: "POST", path: "/employee-payroll-salary/add-or-update", desc: "Add or update payroll salary", body: '{\n  "corpId": "",\n  "empCode": "",\n  "companyName": "",\n  "year": "",\n  "month": "",\n  "grossList": "",\n  "status": "",\n  "isShownToEmployeeYn": 0\n}' },
                 { method: "GET", path: "/employee-payroll-salary/all/{corpId}/{companyName?}", desc: "Get all payroll salary" },
                 { method: "GET", path: "/employee-payroll-salary/{corpId}/{empCode}/{year}/{month}/{companyName?}", desc: "Get specific payroll salary" },
-                { method: "POST", path: "/employee-payroll/bulk-process", desc: "Bulk process payroll", body: '{}' },
-                { method: "POST", path: "/employee-payroll/initiate-selected", desc: "Initiate selected employees", body: '{}' },
-                { method: "DELETE", path: "/employee-payroll/rollback-initiated", desc: "Rollback initiated salary", body: '{}' },
-                { method: "DELETE", path: "/employee-payroll/rollback-released", desc: "Rollback released salary", body: '{}' },
-                { method: "DELETE", path: "/employee-payroll/delete-month", desc: "Delete salary by month", body: '{}' },
-                { method: "POST", path: "/employee-payroll/employee-status", desc: "Employee salary status", body: '{}' },
-                { method: "POST", path: "/employee-payroll/salary-summary", desc: "Salary summary", body: '{}' },
-                { method: "POST", path: "/employee-payroll/detailed-payroll-with-branches", desc: "Detailed payroll with branches", body: '{}' },
-                { method: "POST", path: "/employee-payroll/branch-list", desc: "Get branch list", body: '{}' },
+                { method: "POST", path: "/employee-payroll/bulk-process", desc: "Bulk process payroll", body: '{\n  "corpId": "",\n  "companyName": "",\n  "year": "",\n  "month": "",\n  "status": "",\n  "isShownToEmployeeYn": 0\n}' },
+                { method: "POST", path: "/employee-payroll/initiate-selected", desc: "Initiate selected employees", body: '{\n  "corpId": "",\n  "companyName": "",\n  "year": "",\n  "month": "",\n  "empCodes": [],\n  "status": "",\n  "isShownToEmployeeYn": 0\n}' },
+                { method: "DELETE", path: "/employee-payroll/rollback-initiated", desc: "Rollback initiated salary", body: '{\n  "corpId": "",\n  "companyName": "",\n  "year": "",\n  "month": "",\n  "empCodes": []\n}' },
+                { method: "DELETE", path: "/employee-payroll/rollback-released", desc: "Rollback released salary", body: '{\n  "corpId": "",\n  "companyName": "",\n  "year": "",\n  "month": "",\n  "empCodes": []\n}' },
+                { method: "DELETE", path: "/employee-payroll/delete-month", desc: "Delete salary by month", body: '{\n  "corpId": "",\n  "companyName": "",\n  "year": "",\n  "month": ""\n}' },
+                { method: "POST", path: "/employee-payroll/employee-status", desc: "Employee salary status", body: '{\n  "corpId": "",\n  "companyName": "",\n  "year": "",\n  "month": ""\n}' },
+                { method: "POST", path: "/employee-payroll/salary-summary", desc: "Salary summary", body: '{\n  "corpId": "",\n  "companyName": "",\n  "year": "",\n  "month": ""\n}' },
+                { method: "POST", path: "/employee-payroll/detailed-payroll-with-branches", desc: "Detailed payroll with branches", body: '{\n  "corpId": "",\n  "companyName": "",\n  "year": "",\n  "month": "",\n  "branch": "",\n  "subBranch": "",\n  "status": ""\n}' },
+                { method: "POST", path: "/employee-payroll/branch-list", desc: "Get branch list", body: '{\n  "corpId": "",\n  "companyName": ""\n}' },
                 { method: "GET", path: "/payroll-salary-process/check-initiated/{corpId}/{companyName}/{year}/{month}", desc: "Check payroll initiated" },
-                { method: "POST", path: "/payroll-salary-process/release-salary", desc: "Release salary", body: '{}' },
-                { method: "POST", path: "/payroll-salary-process/release-salary-initiated-only", desc: "Release initiated only", body: '{}' },
+                { method: "POST", path: "/payroll-salary-process/release-salary", desc: "Release salary", body: '{\n  "corpId": "",\n  "companyName": "",\n  "year": "",\n  "month": ""\n}' },
+                { method: "POST", path: "/payroll-salary-process/release-salary-initiated-only", desc: "Release initiated only", body: '{\n  "corpId": "",\n  "companyName": "",\n  "year": "",\n  "month": ""\n}' },
                 { method: "GET", path: "/payroll-salary-process/export-excel", desc: "Export payroll Excel" },
                 { method: "GET", path: "/payroll/export-released-excel", desc: "Export released payroll Excel" },
                 { method: "GET", path: "/payroll/export-with-arrears", desc: "Export payroll with arrears" }
@@ -1830,13 +1830,13 @@
             color: "#ff8a65",
             endpoints: [
                 { method: "GET", path: "/salary-slip/download-pdf/{corpId}/{empCode}/{year}/{month}/{companyName?}", desc: "Download salary slip PDF" },
-                { method: "POST", path: "/salary-slips/download-all-pdf", desc: "Download all salary slips PDF", body: '{}' },
+                { method: "POST", path: "/salary-slips/download-all-pdf", desc: "Download all salary slips PDF", body: '{\n  "corpId": "",\n  "companyName": "",\n  "year": "",\n  "month": "",\n  "status": ""\n}' },
                 { method: "GET", path: "/salary-slips/download-all-pdf", desc: "Download all (GET)" },
                 { method: "GET", path: "/salary-slip/download-custom-pdf/{corpId}/{empCode}/{year}/{month}/{companyName?}", desc: "Download custom salary PDF" },
-                { method: "POST", path: "/salary-slips/download-all-custom-pdf", desc: "Download all custom PDF", body: '{}' },
+                { method: "POST", path: "/salary-slips/download-all-custom-pdf", desc: "Download all custom PDF", body: '{\n  "corpId": "",\n  "companyName": "",\n  "year": "",\n  "month": "",\n  "status": ""\n}' },
                 { method: "GET", path: "/salary-slips/download-all-custom-pdf", desc: "Download all custom (GET)" },
                 { method: "GET", path: "/salary-slip/download-dynamic-pdf/{corpId}/{empCode}/{year}/{month}/{companyName}", desc: "Download dynamic salary PDF" },
-                { method: "POST", path: "/salary-slips/download-all-dynamic-pdf", desc: "Download all dynamic PDF", body: '{}' },
+                { method: "POST", path: "/salary-slips/download-all-dynamic-pdf", desc: "Download all dynamic PDF", body: '{\n  "corpId": "",\n  "companyName": "",\n  "year": "",\n  "month": "",\n  "status": ""\n}' },
                 { method: "GET", path: "/salary-slips/download-all-dynamic-pdf", desc: "Download all dynamic (GET)" }
             ]
         },
@@ -1845,7 +1845,7 @@
             icon: "🔄",
             color: "#4dd0e1",
             endpoints: [
-                { method: "POST", path: "/company-shift-policy", desc: "Add company shift policy", body: '{}' },
+                { method: "POST", path: "/company-shift-policy", desc: "Add company shift policy", body: '{\n  "corp_id": "",\n  "company_name": "",\n  "shift_code": ""\n}' },
                 { method: "DELETE", path: "/company-shift-policy/{id}", desc: "Delete company shift policy" },
                 { method: "GET", path: "/company-shift-policy", desc: "Get all shift policies" },
                 { method: "GET", path: "/company-shift-policy/corp/{corp_id}", desc: "Get by corp ID" }
@@ -1856,9 +1856,9 @@
             icon: "✈️",
             color: "#ce93d8",
             endpoints: [
-                { method: "POST", path: "/leave-request", desc: "Submit leave request", body: '{}' },
+                { method: "POST", path: "/leave-request", desc: "Submit leave request", body: '{\n  "corp_id": "",\n  "company_name": "",\n  "empcode": "",\n  "from_date": "",\n  "to_date": "",\n  "reason": "",\n  "leave_reason_description": ""\n}' },
                 { method: "GET", path: "/leave-requests/{status}/{corp_id}/{empcode}", desc: "Get requests by status (Admin)" },
-                { method: "PATCH", path: "/leave-request/{id}", desc: "Update leave request status", body: '{\n  "status": ""\n}' },
+                { method: "PATCH", path: "/leave-request/{id}", desc: "Update leave request status", body: '{\n  "corp_id": "",\n  "empcode": "",\n  "status": "",\n  "reject_reason": ""\n}' },
                 { method: "GET", path: "/leave-requests/employee/{corp_id}/{company_name}/{empcode}", desc: "Get employee leave requests" },
                 { method: "GET", path: "/employee/leave-requests/{status}/{corp_id}/{company_name}/{empcode}", desc: "Employee leaves by status" },
                 { method: "GET", path: "/people-on-leave-today/{corp_id}/{empcode}", desc: "People on leave today" },
@@ -1870,15 +1870,15 @@
             icon: "📊",
             color: "#ffcc02",
             endpoints: [
-                { method: "POST", path: "/attendance-summary/bulk-insert", desc: "Bulk insert summary", body: '{}' },
-                { method: "POST", path: "/attendance-summary/bulk-insert-with-fallback", desc: "Bulk insert with fallback", body: '{}' },
+                { method: "POST", path: "/attendance-summary/bulk-insert", desc: "Bulk insert summary", body: '{\n  "corpId": "",\n  "companyName": "",\n  "month": "",\n  "year": ""\n}' },
+                { method: "POST", path: "/attendance-summary/bulk-insert-with-fallback", desc: "Bulk insert with fallback", body: '{\n  "corpId": "",\n  "companyName": "",\n  "month": "",\n  "year": ""\n}' },
                 { method: "GET", path: "/attendance-summary", desc: "Get all summaries" },
                 { method: "GET", path: "/attendance-summary/{id}", desc: "Get summary by ID" },
-                { method: "PUT", path: "/attendance-summary/{id}", desc: "Update summary", body: '{}' },
+                { method: "PUT", path: "/attendance-summary/{id}", desc: "Update summary", body: '{\n  "corpId": "",\n  "empCode": "",\n  "companyName": "",\n  "totalPresent": 0,\n  "workingDays": 0,\n  "holidays": 0,\n  "weekOff": 0,\n  "leave": 0,\n  "month": "",\n  "year": ""\n}' },
                 { method: "DELETE", path: "/attendance-summary/{id}", desc: "Delete summary" },
                 { method: "GET", path: "/check-attendance-summary/check-exists/{corpId}/{companyName}/{month}/{year}", desc: "Check summary exists" },
-                { method: "POST", path: "/attendance-summary/recalculate", desc: "Recalculate summaries", body: '{}' },
-                { method: "POST", path: "/attendance-summary/export", desc: "Export summary (POST)", body: '{}' },
+                { method: "POST", path: "/attendance-summary/recalculate", desc: "Recalculate summaries", body: '{\n  "corpId": "",\n  "companyName": "",\n  "month": "",\n  "year": ""\n}' },
+                { method: "POST", path: "/attendance-summary/export", desc: "Export summary (POST)", body: '{\n  "corpId": "",\n  "companyName": "",\n  "year": "",\n  "month": ""\n}' },
                 { method: "GET", path: "/attendance-summary/export/{corpId}/{companyName}/{year}/{month}", desc: "Export summary (GET)" },
                 { method: "GET", path: "/attendance-summary/download/{corpId}/{companyName}/{year}/{month}", desc: "Download exported summary" },
                 { method: "POST", path: "/attendance-summary/import", desc: "Import attendance summary", body: '(multipart form data)' }
@@ -1889,10 +1889,10 @@
             icon: "🏛️",
             color: "#aed581",
             endpoints: [
-                { method: "POST", path: "/professional-tax/add", desc: "Add professional tax", body: '{}' },
-                { method: "POST", path: "/professional-tax/get", desc: "Get professional tax", body: '{}' },
-                { method: "POST", path: "/professional-tax/get-by-corp-company", desc: "Get by corp & company", body: '{}' },
-                { method: "PUT", path: "/professional-tax/edit/{id}", desc: "Edit professional tax", body: '{}' },
+                { method: "POST", path: "/professional-tax/add", desc: "Add professional tax", body: '{\n  "corpId": "",\n  "companyName": "",\n  "state": "",\n  "minIncome": "",\n  "maxIncome": "",\n  "aboveIncome": "",\n  "taxAmount": ""\n}' },
+                { method: "POST", path: "/professional-tax/get", desc: "Get professional tax", body: '{\n  "corpId": "",\n  "companyName": "",\n  "state": ""\n}' },
+                { method: "POST", path: "/professional-tax/get-by-corp-company", desc: "Get by corp & company", body: '{\n  "corpId": "",\n  "companyName": "",\n  "exactMatch": true\n}' },
+                { method: "PUT", path: "/professional-tax/edit/{id}", desc: "Edit professional tax", body: '{\n  "corpId": "",\n  "companyName": "",\n  "state": "",\n  "minIncome": "",\n  "maxIncome": "",\n  "aboveIncome": "",\n  "taxAmount": ""\n}' },
                 { method: "DELETE", path: "/professional-tax/delete/{id}", desc: "Delete professional tax" },
                 { method: "GET", path: "/professional-tax/{id}", desc: "Get professional tax by ID" }
             ]
@@ -1902,9 +1902,9 @@
             icon: "🏥",
             color: "#ef9a9a",
             endpoints: [
-                { method: "POST", path: "/esi/add", desc: "Add ESI", body: '{}' },
-                { method: "POST", path: "/esi/get", desc: "Get ESI", body: '{}' },
-                { method: "PUT", path: "/esi/edit/{id}", desc: "Edit ESI", body: '{}' },
+                { method: "POST", path: "/esi/add", desc: "Add ESI", body: '{\n  "corpId": "",\n  "companyName": "",\n  "state": "",\n  "incomeRange": "",\n  "esiAmount": ""\n}' },
+                { method: "POST", path: "/esi/get", desc: "Get ESI", body: '{\n  "corpId": "",\n  "companyName": "",\n  "state": ""\n}' },
+                { method: "PUT", path: "/esi/edit/{id}", desc: "Edit ESI", body: '{\n  "corpId": "",\n  "companyName": "",\n  "state": "",\n  "incomeRange": "",\n  "esiAmount": ""\n}' },
                 { method: "DELETE", path: "/esi/delete/{id}", desc: "Delete ESI" },
                 { method: "GET", path: "/esi/{id}", desc: "Get ESI by ID" }
             ]
@@ -1914,19 +1914,19 @@
             icon: "📰",
             color: "#ff6b9d",
             endpoints: [
-                { method: "POST", path: "/newsfeed", desc: "Create news feed post", body: '{}' },
+                { method: "POST", path: "/newsfeed", desc: "Create news feed post", body: '{\n  "corpId": "",\n  "EmpCode": "",\n  "companyName": "",\n  "body": "",\n  "date": "",\n  "time": ""\n}' },
                 { method: "GET", path: "/newsfeed-with-reviews", desc: "Get feeds with reviews" },
                 { method: "GET", path: "/newsfeed/{puid}", desc: "Get feed by puid" },
-                { method: "PUT", path: "/newsfeed/{puid}", desc: "Update news feed", body: '{}' },
+                { method: "PUT", path: "/newsfeed/{puid}", desc: "Update news feed", body: '{\n  "corpId": "",\n  "EmpCode": "",\n  "body": "",\n  "date": "",\n  "time": ""\n}' },
                 { method: "DELETE", path: "/newsfeed/{puid}", desc: "Delete news feed" },
-                { method: "POST", path: "/newsfeed/{puid}/like", desc: "Like a post", body: '{}' },
+                { method: "POST", path: "/newsfeed/{puid}/like", desc: "Like a post", body: '{\n  "corpId": "",\n  "EmpCode": "",\n  "companyName": "",\n  "date": "",\n  "time": ""\n}' },
                 { method: "DELETE", path: "/newsfeed/{puid}/unlike", desc: "Unlike a post" },
                 { method: "GET", path: "/newsfeed/{puid}/likes", desc: "Get all likes" },
                 { method: "GET", path: "/newsfeed/{puid}/likes-count", desc: "Get likes count" },
                 { method: "GET", path: "/newsfeed/{puid}/comments", desc: "Get comments" },
-                { method: "POST", path: "/newsfeed-comments", desc: "Add comment", body: '{}' },
+                { method: "POST", path: "/newsfeed-comments", desc: "Add comment", body: '{\n  "corpId": "",\n  "puid": "",\n  "EmpCode": "",\n  "companyName": "",\n  "comment": "",\n  "date": "",\n  "time": ""\n}' },
                 { method: "DELETE", path: "/newsfeed-comments/{id}", desc: "Delete comment" },
-                { method: "POST", path: "/newsfeed-reviews", desc: "Create/update review", body: '{}' },
+                { method: "POST", path: "/newsfeed-reviews", desc: "Create/update review", body: '{\n  "corpId": "",\n  "puid": "",\n  "EmpCode": "",\n  "companyName": "",\n  "isLiked": "",\n  "comment": "",\n  "date": "",\n  "time": ""\n}' },
                 { method: "DELETE", path: "/newsfeed-reviews/{puid}", desc: "Delete review" }
             ]
         },
@@ -1936,8 +1936,8 @@
             color: "#90caf9",
             endpoints: [
                 { method: "GET", path: "/company-storage", desc: "Get all storage" },
-                { method: "POST", path: "/company-storage/{corpId}", desc: "Add storage", body: '{}' },
-                { method: "PUT", path: "/company-storage/{corpId}/{id}", desc: "Update storage", body: '{}' },
+                { method: "POST", path: "/company-storage/{corpId}", desc: "Add storage", body: '{\n  "corpId": "",\n  "size": 0,\n  "sizeUit": "MB"\n}' },
+                { method: "PUT", path: "/company-storage/{corpId}/{id}", desc: "Update storage", body: '{\n  "corpId": "",\n  "id": "",\n  "size": 0,\n  "sizeUit": "MB"\n}' },
                 { method: "DELETE", path: "/company-storage/{corpId}/{id}", desc: "Delete storage" },
                 { method: "GET", path: "/company-storage/summary/{corpId}", desc: "Get storage summary" },
                 { method: "DELETE", path: "/company-storage/all/{corpId}", desc: "Delete all storage" }
@@ -1963,8 +1963,8 @@
             icon: "🏷️",
             color: "#ffa726",
             endpoints: [
-                { method: "POST", path: "/fms/category", desc: "Add FMS category", body: '{}' },
-                { method: "PUT", path: "/fms/category/{id}", desc: "Update FMS category", body: '{}' },
+                { method: "POST", path: "/fms/category", desc: "Add FMS category", body: '{\n  "corpId": "",\n  "companyName": "",\n  "empCode": "",\n  "fullName": "",\n  "fileCategory": ""\n}' },
+                { method: "PUT", path: "/fms/category/{id}", desc: "Update FMS category", body: '{\n  "fullName": "",\n  "fileCategory": ""\n}' },
                 { method: "DELETE", path: "/fms/category/{id}", desc: "Delete FMS category" },
                 { method: "GET", path: "/fms/category-summary", desc: "Get category summary" }
             ]
@@ -1984,11 +1984,11 @@
             icon: "🏝️",
             color: "#69f0ae",
             endpoints: [
-                { method: "POST", path: "/employee-leave-balance/allot", desc: "Allot leaves (Admin)", body: '{}' },
-                { method: "POST", path: "/employee-leave-balance/process-monthly", desc: "Process monthly credits", body: '{}' },
-                { method: "POST", path: "/employee-leave-balance/update-used", desc: "Update leave used", body: '{}' },
-                { method: "POST", path: "/employee-leave-balance/revert-used", desc: "Revert leave used", body: '{}' },
-                { method: "POST", path: "/employee-leave-balance/deduct-by-request", desc: "Deduct by request", body: '{}' },
+                { method: "POST", path: "/employee-leave-balance/allot", desc: "Allot leaves (Admin)", body: '{\n  "corp_id": "",\n  "emp_code": "",\n  "year": 2025\n}' },
+                { method: "POST", path: "/employee-leave-balance/process-monthly", desc: "Process monthly credits", body: '{\n  "corp_id": "",\n  "emp_code": "",\n  "year": 2025,\n  "month": 1\n}' },
+                { method: "POST", path: "/employee-leave-balance/update-used", desc: "Update leave used", body: '{\n  "corp_id": "",\n  "emp_code": "",\n  "leave_type_puid": "",\n  "days_used": 1,\n  "year": 2025\n}' },
+                { method: "POST", path: "/employee-leave-balance/revert-used", desc: "Revert leave used", body: '{\n  "corp_id": "",\n  "emp_code": "",\n  "leave_type_puid": "",\n  "days_to_revert": 1,\n  "year": 2025\n}' },
+                { method: "POST", path: "/employee-leave-balance/deduct-by-request", desc: "Deduct by request", body: '{\n  "corp_id": "",\n  "emp_code": "",\n  "leave_name": "",\n  "leave_request_puid": "",\n  "year": 2025\n}' },
                 { method: "GET", path: "/employee-leave-balance/list/{corpId}/{empCode?}", desc: "Get leave list" },
                 { method: "GET", path: "/employee-leave-balance/summary/{corpId}", desc: "Get leave summary" },
                 { method: "GET", path: "/employee-leave-balance/leave-names/{corpId}/{empCode?}", desc: "Get leave names" },
@@ -2002,10 +2002,10 @@
             endpoints: [
                 { method: "GET", path: "/recruitment/job-postings/{corp_id}", desc: "Get all job postings" },
                 { method: "GET", path: "/recruitment/job-postings/{corp_id}/{id}", desc: "Get job posting by ID" },
-                { method: "POST", path: "/recruitment/job-postings", desc: "Create job posting", body: '{}' },
-                { method: "PUT", path: "/recruitment/job-postings/{corp_id}/{id}", desc: "Update job posting", body: '{}' },
+                { method: "POST", path: "/recruitment/job-postings", desc: "Create job posting", body: '{\n  "corp_id": "",\n  "job_title": ""\n}' },
+                { method: "PUT", path: "/recruitment/job-postings/{corp_id}/{id}", desc: "Update job posting", body: '{\n  "corp_id": "",\n  "job_title": ""\n}' },
                 { method: "DELETE", path: "/recruitment/job-postings/{corp_id}/{id}", desc: "Delete job posting" },
-                { method: "PATCH", path: "/recruitment/job-postings/{corp_id}/{id}/status", desc: "Change posting status", body: '{\n  "status": ""\n}' }
+                { method: "PATCH", path: "/recruitment/job-postings/{corp_id}/{id}/status", desc: "Change posting status", body: '{\n  "status": "Open"\n}' }
             ]
         },
         {
@@ -2015,7 +2015,7 @@
             endpoints: [
                 { method: "GET", path: "/recruitment/candidates/{corp_id}", desc: "Get all candidates" },
                 { method: "GET", path: "/recruitment/candidates/{corp_id}/{id}", desc: "Get candidate by ID" },
-                { method: "POST", path: "/recruitment/candidates", desc: "Create candidate", body: '{}' },
+                { method: "POST", path: "/recruitment/candidates", desc: "Create candidate", body: '{\n  "corp_id": "",\n  "first_name": "",\n  "email": ""\n}' },
                 { method: "POST", path: "/recruitment/candidates/{corp_id}/{id}", desc: "Update candidate", body: '(multipart form data)' },
                 { method: "DELETE", path: "/recruitment/candidates/{corp_id}/{id}", desc: "Delete candidate" },
                 { method: "GET", path: "/recruitment/candidates/{corp_id}/{id}/resume", desc: "Download resume" }
@@ -2028,8 +2028,8 @@
             endpoints: [
                 { method: "GET", path: "/recruitment/stages/{corp_id}", desc: "Get all stages" },
                 { method: "GET", path: "/recruitment/stages/{corp_id}/{id}", desc: "Get stage by ID" },
-                { method: "POST", path: "/recruitment/stages", desc: "Create stage", body: '{}' },
-                { method: "PUT", path: "/recruitment/stages/{corp_id}/{id}", desc: "Update stage", body: '{}' },
+                { method: "POST", path: "/recruitment/stages", desc: "Create stage", body: '{\n  "corp_id": "",\n  "stage_name": ""\n}' },
+                { method: "PUT", path: "/recruitment/stages/{corp_id}/{id}", desc: "Update stage", body: '{\n  "corp_id": "",\n  "stage_name": ""\n}' },
                 { method: "DELETE", path: "/recruitment/stages/{corp_id}/{id}", desc: "Delete stage" }
             ]
         },
@@ -2040,13 +2040,13 @@
             endpoints: [
                 { method: "GET", path: "/recruitment/applications/{corp_id}", desc: "Get all applications" },
                 { method: "GET", path: "/recruitment/applications/{corp_id}/{id}", desc: "Get application by ID" },
-                { method: "POST", path: "/recruitment/applications", desc: "Create application", body: '{}' },
-                { method: "PUT", path: "/recruitment/applications/{corp_id}/{id}", desc: "Update application", body: '{}' },
+                { method: "POST", path: "/recruitment/applications", desc: "Create application", body: '{\n  "corp_id": "",\n  "job_posting_id": "",\n  "candidate_id": ""\n}' },
+                { method: "PUT", path: "/recruitment/applications/{corp_id}/{id}", desc: "Update application", body: '{\n  "job_posting_id": "",\n  "candidate_id": ""\n}' },
                 { method: "DELETE", path: "/recruitment/applications/{corp_id}/{id}", desc: "Delete application" },
-                { method: "PATCH", path: "/recruitment/applications/{corp_id}/{id}/decide", desc: "Decide candidate", body: '{}' },
+                { method: "PATCH", path: "/recruitment/applications/{corp_id}/{id}/decide", desc: "Decide candidate", body: '{\n  "final_decision": "Selected",\n  "decided_by": "",\n  "overall_remarks": ""\n}' },
                 { method: "GET", path: "/recruitment/applications/{corp_id}/{application_id}/stage-results", desc: "Get stage results" },
-                { method: "POST", path: "/recruitment/applications/{corp_id}/{application_id}/stage-results", desc: "Add stage result", body: '{}' },
-                { method: "PUT", path: "/recruitment/applications/{corp_id}/{application_id}/stage-results/{result_id}", desc: "Update stage result", body: '{}' },
+                { method: "POST", path: "/recruitment/applications/{corp_id}/{application_id}/stage-results", desc: "Add stage result", body: '{\n  "stage_id": "",\n  "outcome": "Pass",\n  "rating": 5\n}' },
+                { method: "PUT", path: "/recruitment/applications/{corp_id}/{application_id}/stage-results/{result_id}", desc: "Update stage result", body: '{\n  "stage_id": "",\n  "outcome": "Pass",\n  "rating": 5\n}' },
                 { method: "DELETE", path: "/recruitment/applications/{corp_id}/{application_id}/stage-results/{result_id}", desc: "Delete stage result" }
             ]
         },
@@ -2057,7 +2057,7 @@
             endpoints: [
                 { method: "GET", path: "/offer-letter-templates/{corp_id}", desc: "Get all templates" },
                 { method: "GET", path: "/offer-letter-templates/{corp_id}/{id}", desc: "Get template by ID" },
-                { method: "POST", path: "/offer-letter-templates", desc: "Create template", body: '{}' },
+                { method: "POST", path: "/offer-letter-templates", desc: "Create template", body: '{\n  "corp_id": "",\n  "template_name": "",\n  "salary_components": ""\n}' },
                 { method: "POST", path: "/offer-letter-templates/{corp_id}/{id}", desc: "Update template", body: '(multipart form data)' },
                 { method: "DELETE", path: "/offer-letter-templates/{corp_id}/{id}", desc: "Delete template" },
                 { method: "POST", path: "/offer-letter-templates/{corp_id}/{id}/upload-logo", desc: "Upload logo", body: '(multipart form data)' },
@@ -2071,10 +2071,10 @@
             endpoints: [
                 { method: "GET", path: "/offer-letters/{corp_id}", desc: "Get all offer letters" },
                 { method: "GET", path: "/offer-letters/{corp_id}/{id}", desc: "Get offer letter by ID" },
-                { method: "POST", path: "/offer-letters/generate", desc: "Generate offer letter", body: '{}' },
+                { method: "POST", path: "/offer-letters/generate", desc: "Generate offer letter", body: '{\n  "corp_id": "",\n  "application_id": "",\n  "template_id": "",\n  "date_of_joining": "",\n  "ctc_annual": 0,\n  "generated_by": ""\n}' },
                 { method: "GET", path: "/offer-letters/{corp_id}/{id}/download-pdf", desc: "Download offer PDF" },
                 { method: "GET", path: "/offer-letters/{corp_id}/{id}/preview", desc: "Preview offer letter" },
-                { method: "PATCH", path: "/offer-letters/{corp_id}/{id}/status", desc: "Update offer status", body: '{\n  "status": ""\n}' },
+                { method: "PATCH", path: "/offer-letters/{corp_id}/{id}/status", desc: "Update offer status", body: '{\n  "status": "Draft"\n}' },
                 { method: "DELETE", path: "/offer-letters/{corp_id}/{id}", desc: "Delete offer letter" }
             ]
         },
@@ -2085,7 +2085,7 @@
             endpoints: [
                 { method: "GET", path: "/utility/years/{count?}", desc: "Get years list" },
                 { method: "GET", path: "/current-datetime", desc: "Get current date & time" },
-                { method: "POST", path: "/payroll-data/save", desc: "Save payroll data (deprecated)", body: '{}' },
+                { method: "POST", path: "/payroll-data/save", desc: "Save payroll data (deprecated - not implemented)", body: '{}' },
                 { method: "GET", path: "/debug/formula-builder/{componentName?}", desc: "Debug formula builder" },
                 { method: "GET", path: "/debug/statutory/{corpId}/{empCode}/{companyName}", desc: "Debug statutory data" }
             ]
