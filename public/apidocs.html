@@ -916,7 +916,7 @@
 
             <div class="base-url-bar">
                 <span class="base-url-label">Base URL</span>
-                <input type="text" class="base-url-input" id="baseUrl" value="http://localhost:8000/api" placeholder="Enter your API base URL">
+                <input type="text" class="base-url-input" id="baseUrl" placeholder="Enter your API base URL">
             </div>
 
             <div class="api-sections" id="apiSections"></div>
@@ -2444,6 +2444,12 @@
     });
 
     // =========== INIT ===========
+    // Auto-detect base URL from current page location
+    (function() {
+        const loc = window.location;
+        const baseUrl = loc.protocol + '//' + loc.host + '/api';
+        document.getElementById('baseUrl').value = baseUrl;
+    })();
     buildSidebar();
     buildMainContent();
     </script>
