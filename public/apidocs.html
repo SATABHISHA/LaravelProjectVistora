@@ -1017,7 +1017,7 @@
             endpoints: [
                 { method: "POST", path: "/company/register_company_details", desc: "Register company details", body: '{\n  "corp_id": "",\n  "company_name": "",\n  "company_logo": "",\n  "registered_address": "",\n  "pin": "",\n  "country": "",\n  "state": "",\n  "city": "",\n  "phone": "",\n  "fax": "",\n  "currency": "",\n  "contact_person": "",\n  "industry": "",\n  "signatory_name": "",\n  "gstin": "",\n  "fcbk_url": "",\n  "youtube_url": "",\n  "twiter_url": "",\n  "insta_url": "",\n  "active_yn": 1\n}' },
                 { method: "GET", path: "/company/details/{corp_id}", desc: "Get company details" },
-                { method: "PUT", path: "/company/update/{company_id}/{corp_id}", desc: "Update company", body: '{\n  "company_name": "",\n  "registered_address": "",\n  "pin": "",\n  "country": "",\n  "state": "",\n  "city": "",\n  "phone": "",\n  "active_yn": 1\n}' },
+                { method: "PUT", path: "/company/update/{company_id}/{corp_id}", desc: "Update company", body: '{\n  "company_name": "",\n  "company_logo": "",\n  "registered_address": "",\n  "pin": "",\n  "country": "",\n  "state": "",\n  "city": "",\n  "phone": "",\n  "fax": "",\n  "currency": "",\n  "contact_person": "",\n  "industry": "",\n  "signatory_name": "",\n  "gstin": "",\n  "fcbk_url": "",\n  "youtube_url": "",\n  "twiter_url": "",\n  "insta_url": "",\n  "active_yn": 1\n}' },
                 { method: "DELETE", path: "/company/delete/{company_id}/{corp_id}", desc: "Delete company" },
                 { method: "GET", path: "/company/name/{corp_id}", desc: "Get company name by corp_id" }
             ]
@@ -1028,7 +1028,7 @@
             color: "#66ffb4",
             endpoints: [
                 { method: "POST", path: "/business_unit/add", desc: "Add business unit", body: '{\n  "corp_id": "",\n  "company_name": "",\n  "business_unit_name": "",\n  "active_yn": 1\n}' },
-                { method: "PUT", path: "/business_unit/update/{corp_id}/{business_unit_id}", desc: "Update business unit", body: '{\n  "business_unit_name": ""\n}' },
+                { method: "PUT", path: "/business_unit/update/{corp_id}/{business_unit_id}", desc: "Update business unit", body: '{\n  "company_name": "",\n  "business_unit_name": "",\n  "active_yn": 1\n}' },
                 { method: "DELETE", path: "/business_unit/delete/{corp_id}/{business_unit_id}", desc: "Delete business unit" },
                 { method: "GET", path: "/business_unit/all/{corp_id}", desc: "Get all business units" }
             ]
@@ -1150,7 +1150,7 @@
                 { method: "POST", path: "/document/add", desc: "Add document", body: '{\n  "corp_id": "",\n  "name": "",\n  "doc_type": "",\n  "track_send_alert_yn": 0,\n  "candidate_view_yn": 0,\n  "candidate_edit_yn": 0,\n  "emp_view_yn": 0,\n  "emp_edit_yn": 0,\n  "mandatory_employee_yn": 0,\n  "mandatory_candidate_yn": 0,\n  "mandatory_to_convert_emp_yn": 0,\n  "mandatory_upcoming_join_yn": 0,\n  "form_list": "",\n  "field_list": "",\n  "doc_upload": ""\n}' },
                 { method: "GET", path: "/document/all/{corp_id}", desc: "Get all documents" },
                 { method: "DELETE", path: "/document/delete/{corp_id}/{id}", desc: "Delete document" },
-                { method: "POST", path: "/document/update/{corp_id}/{id}", desc: "Update document", body: '{\n  "name": ""\n}' }
+                { method: "POST", path: "/document/update/{corp_id}/{id}", desc: "Update document", body: '{\n  "corp_id": "",\n  "name": "",\n  "doc_type": "",\n  "track_send_alert_yn": 0,\n  "candidate_view_yn": 0,\n  "candidate_edit_yn": 0,\n  "emp_view_yn": 0,\n  "emp_edit_yn": 0,\n  "mandatory_employee_yn": 0,\n  "mandatory_candidate_yn": 0,\n  "mandatory_to_convert_emp_yn": 0,\n  "mandatory_upcoming_join_yn": 0,\n  "form_list": "",\n  "field_list": "",\n  "doc_upload": ""\n}' }
             ]
         },
         {
@@ -1238,9 +1238,9 @@
             icon: "💳",
             color: "#f48fb1",
             endpoints: [
-                { method: "POST", path: "/paymentbank/add", desc: "Add payment bank", body: '{\n  "corp_id": "",\n  "bank_name": "",\n  "account_no": ""\n}' },
+                { method: "POST", path: "/paymentbank/add", desc: "Add payment bank", body: '{\n  "corp_id": "",\n  "bank_name": "",\n  "alias_name": "",\n  "account_no": "",\n  "challan_report_format": "",\n  "challan_report": "",\n  "transaction_type": "",\n  "branch_name": "",\n  "bsr_code": "",\n  "ifsc_code": "",\n  "micr_code": "",\n  "iban_no": "",\n  "location": "",\n  "address": "",\n  "activeyn": 1\n}' },
                 { method: "GET", path: "/paymentbank/all/{corp_id}", desc: "Get all payment banks" },
-                { method: "PUT", path: "/paymentbank/update/{corp_id}/{id}", desc: "Update payment bank", body: '{\n  "bank_name": ""\n}' },
+                { method: "PUT", path: "/paymentbank/update/{corp_id}/{id}", desc: "Update payment bank", body: '{\n  "corp_id": "",\n  "bank_name": "",\n  "alias_name": "",\n  "account_no": "",\n  "challan_report_format": "",\n  "challan_report": "",\n  "transaction_type": "",\n  "branch_name": "",\n  "bsr_code": "",\n  "ifsc_code": "",\n  "micr_code": "",\n  "iban_no": "",\n  "location": "",\n  "address": "",\n  "activeyn": 1\n}' },
                 { method: "DELETE", path: "/paymentbank/delete/{corp_id}/{id}", desc: "Delete payment bank" }
             ]
         },
@@ -1249,8 +1249,8 @@
             icon: "🤝",
             color: "#ffab91",
             endpoints: [
-                { method: "POST", path: "/vendor/add", desc: "Add vendor", body: '{\n  "corp_id": "",\n  "vendor_code": ""\n}' },
-                { method: "PUT", path: "/vendor/update/{corp_id}/{id}", desc: "Update vendor", body: '{\n  "vendor_code": ""\n}' },
+                { method: "POST", path: "/vendor/add", desc: "Add vendor", body: '{\n  "corp_id": "",\n  "vendor_code": "",\n  "company_name": "",\n  "vendor_address": "",\n  "country": "",\n  "state": "",\n  "city": "",\n  "pin": "",\n  "gstin": "",\n  "primary_contact_name": "",\n  "primary_mobile_no": "",\n  "primary_phone": "",\n  "primary_email_id": "",\n  "primary_contact_for": "",\n  "secondary_contact_name": "",\n  "secondary_mobile_no": "",\n  "secondary_phone": "",\n  "secondary_email_id": "",\n  "secondary_contact_for": "",\n  "vendor_field1": "",\n  "vendor_field2": "",\n  "vendor_field3": "",\n  "vendor_field4": "",\n  "vendor_field5": "",\n  "activeYn": 1\n}' },
+                { method: "PUT", path: "/vendor/update/{corp_id}/{id}", desc: "Update vendor", body: '{\n  "corp_id": "",\n  "vendor_code": "",\n  "company_name": "",\n  "vendor_address": "",\n  "country": "",\n  "state": "",\n  "city": "",\n  "pin": "",\n  "gstin": "",\n  "primary_contact_name": "",\n  "primary_mobile_no": "",\n  "primary_phone": "",\n  "primary_email_id": "",\n  "primary_contact_for": "",\n  "secondary_contact_name": "",\n  "secondary_mobile_no": "",\n  "secondary_phone": "",\n  "secondary_email_id": "",\n  "secondary_contact_for": "",\n  "vendor_field1": "",\n  "vendor_field2": "",\n  "vendor_field3": "",\n  "vendor_field4": "",\n  "vendor_field5": "",\n  "activeYn": 1\n}' },
                 { method: "DELETE", path: "/vendor/delete/{corp_id}/{id}", desc: "Delete vendor" },
                 { method: "GET", path: "/vendor/all/{corp_id}", desc: "Get all vendors" }
             ]
@@ -1260,9 +1260,9 @@
             icon: "👥",
             color: "#80cbc4",
             endpoints: [
-                { method: "POST", path: "/customer/add", desc: "Add customer", body: '{\n  "corp_id": "",\n  "cust_code": ""\n}' },
+                { method: "POST", path: "/customer/add", desc: "Add customer", body: '{\n  "corp_id": "",\n  "cust_name": "",\n  "cust_code": "",\n  "contact_name": "",\n  "email_id": "",\n  "phone": "",\n  "cust_addr": "",\n  "country": "",\n  "state": "",\n  "city": "",\n  "pin": "",\n  "activeYn": 1\n}' },
                 { method: "GET", path: "/customer/all/{corp_id}", desc: "Get all customers" },
-                { method: "PUT", path: "/customer/update/{corp_id}/{id}", desc: "Update customer", body: '{\n  "cust_code": ""\n}' },
+                { method: "PUT", path: "/customer/update/{corp_id}/{id}", desc: "Update customer", body: '{\n  "corp_id": "",\n  "cust_name": "",\n  "cust_code": "",\n  "contact_name": "",\n  "email_id": "",\n  "phone": "",\n  "cust_addr": "",\n  "country": "",\n  "state": "",\n  "city": "",\n  "pin": "",\n  "activeYn": 1\n}' },
                 { method: "DELETE", path: "/customer/delete/{corp_id}/{id}", desc: "Delete customer" }
             ]
         },
@@ -1293,8 +1293,8 @@
             icon: "👔",
             color: "#4fc3f7",
             endpoints: [
-                { method: "POST", path: "/employment/add", desc: "Add employment details", body: '{\n  "corp_id": "",\n  "EmpCode": "",\n  "ActiveYn": 1\n}' },
-                { method: "PUT", path: "/employment/update/{corp_id}/{EmpCode}", desc: "Update employment details", body: '{\n  "corp_id": "",\n  "EmpCode": "",\n  "ActiveYn": 1\n}' },
+                { method: "POST", path: "/employment/add", desc: "Add employment details", body: '{\n  "corp_id": "",\n  "company_name": "",\n  "dateOfJoining": "",\n  "EmpCode": "",\n  "BiometricId": "",\n  "BusinessUnit": "",\n  "Department": "",\n  "SubDepartment": "",\n  "Designation": "",\n  "Region": "",\n  "Branch": "",\n  "SubBranch": "",\n  "EmploymentType": "",\n  "EmploymentStatus": "",\n  "ConfirmationStatus": "",\n  "ReportingManager": "",\n  "FunctionalManager": "",\n  "ReportingManager3": "",\n  "PFNumber": "",\n  "UAN": "",\n  "EmployeeContributionLimit": "",\n  "EmployerContributionLimit": "",\n  "PensionNumber": "",\n  "PF": "",\n  "Gratuity": "",\n  "DraftYN": "",\n  "ActiveYn": 1\n}' },
+                { method: "PUT", path: "/employment/update/{corp_id}/{EmpCode}", desc: "Update employment details", body: '{\n  "corp_id": "",\n  "company_name": "",\n  "dateOfJoining": "",\n  "EmpCode": "",\n  "BiometricId": "",\n  "BusinessUnit": "",\n  "Department": "",\n  "SubDepartment": "",\n  "Designation": "",\n  "Region": "",\n  "Branch": "",\n  "SubBranch": "",\n  "EmploymentType": "",\n  "EmploymentStatus": "",\n  "ConfirmationStatus": "",\n  "ReportingManager": "",\n  "FunctionalManager": "",\n  "ReportingManager3": "",\n  "PFNumber": "",\n  "UAN": "",\n  "EmployeeContributionLimit": "",\n  "EmployerContributionLimit": "",\n  "PensionNumber": "",\n  "PF": "",\n  "Gratuity": "",\n  "DraftYN": "",\n  "ActiveYn": 1\n}' },
                 { method: "DELETE", path: "/employment/delete/{corp_id}/{EmpCode}", desc: "Delete employment details" },
                 { method: "GET", path: "/employment/next-empcode/{corp_id}", desc: "Get next emp code" },
                 { method: "GET", path: "/employment/summary/{corp_id}/{company_name}", desc: "Get employment summary" },
@@ -1308,8 +1308,8 @@
             icon: "👤",
             color: "#66ffb4",
             endpoints: [
-                { method: "POST", path: "/employee/add", desc: "Add employee", body: '{\n  "corp_id": "",\n  "EmpCode": "",\n  "first_name": "",\n  "last_name": ""\n}' },
-                { method: "PUT", path: "/employee/update/{corp_id}/{EmpCode}/{id}", desc: "Update employee", body: '{\n  "corp_id": "",\n  "EmpCode": "",\n  "first_name": "",\n  "last_name": ""\n}' },
+                { method: "POST", path: "/employee/add", desc: "Add employee", body: '{\n  "corp_id": "",\n  "EmpCode": "",\n  "prefix": "",\n  "FirstName": "",\n  "MiddleName": "",\n  "LastName": "",\n  "MaritalStatus": "",\n  "DOB": "",\n  "Gender": "",\n  "BloodGroup": "",\n  "Nationality": "",\n  "WorkEmail": "",\n  "Mobile": "",\n  "SkillType": "",\n  "Pan": "",\n  "Adhaar": "",\n  "Passport": "",\n  "PassportExpiryDate": "",\n  "PersonalEmail": "",\n  "EmgContactName": "",\n  "EmgNumber": "",\n  "EmgContactRelation": "",\n  "PmntAddress": "",\n  "PmntCountry": "",\n  "PmntState": "",\n  "PmntCity": "",\n  "PmntPincode": "",\n  "CrntAddress": "",\n  "CrntCountry": "",\n  "CrntState": "",\n  "CrntCity": "",\n  "SameAsPmntAddYN": "",\n  "DraftYN": ""\n}' },
+                { method: "PUT", path: "/employee/update/{corp_id}/{EmpCode}/{id}", desc: "Update employee", body: '{\n  "corp_id": "",\n  "EmpCode": "",\n  "prefix": "",\n  "FirstName": "",\n  "MiddleName": "",\n  "LastName": "",\n  "MaritalStatus": "",\n  "DOB": "",\n  "Gender": "",\n  "BloodGroup": "",\n  "Nationality": "",\n  "WorkEmail": "",\n  "Mobile": "",\n  "SkillType": "",\n  "Pan": "",\n  "Adhaar": "",\n  "Passport": "",\n  "PassportExpiryDate": "",\n  "PersonalEmail": "",\n  "EmgContactName": "",\n  "EmgNumber": "",\n  "EmgContactRelation": "",\n  "PmntAddress": "",\n  "PmntCountry": "",\n  "PmntState": "",\n  "PmntCity": "",\n  "PmntPincode": "",\n  "CrntAddress": "",\n  "CrntCountry": "",\n  "CrntState": "",\n  "CrntCity": "",\n  "SameAsPmntAddYN": "",\n  "DraftYN": ""\n}' },
                 { method: "DELETE", path: "/employee/delete/{corp_id}/{EmpCode}/{id}", desc: "Delete employee" },
                 { method: "POST", path: "/employee/check-empcode", desc: "Check emp code exists", body: '{\n  "corp_id": "",\n  "EmpCode": ""\n}' },
                 { method: "GET", path: "/employee/empcode-fullname/{corp_id}", desc: "Get empcode with fullname" },
@@ -1322,8 +1322,8 @@
             icon: "⚖️",
             color: "#ffa726",
             endpoints: [
-                { method: "POST", path: "/statutory/add", desc: "Add statutory details", body: '{\n  "corp_id": "",\n  "EmpCode": ""\n}' },
-                { method: "PUT", path: "/statutory/update/{corp_id}/{EmpCode}/{id}", desc: "Update statutory details", body: '{\n  "corp_id": "",\n  "EmpCode": ""\n}' },
+                { method: "POST", path: "/statutory/add", desc: "Add statutory details", body: '{\n  "corp_id": "",\n  "EmpCode": "",\n  "TaxRegime": "",\n  "AdhaarPanLinkedYN": "",\n  "ProvidentFundYN": "",\n  "PFNo": "",\n  "UAN": "",\n  "PensionYN": "",\n  "PensionNo": "",\n  "EmpStateInsuranceYN": "",\n  "EmpStateInsNo": "",\n  "EmpStateInsDispensaryName": "",\n  "ESISubUnitCode": "",\n  "LabourWelfareFundYN": "",\n  "PTYN": "",\n  "BonusYN": "",\n  "GratuityYN": "",\n  "GratuityInCtcYN": "",\n  "DateOfJoin": "",\n  "VoluntaryPfYN": "",\n  "VoluntaryPFAmount": "",\n  "VoluntaryPFPercent": "",\n  "VoluntaryPFEffectiveDate": "",\n  "EmployerCtbnToNPSYN": "",\n  "EmployerAmount": "",\n  "EmployerPercentage": "",\n  "EmployerPanNumber": "",\n  "SalaryMode": "",\n  "SalaryBank": "",\n  "ReimbursementMode": "",\n  "ReimbursementBank": "",\n  "DraftYN": ""\n}' },
+                { method: "PUT", path: "/statutory/update/{corp_id}/{EmpCode}/{id}", desc: "Update statutory details", body: '{\n  "corp_id": "",\n  "EmpCode": "",\n  "TaxRegime": "",\n  "AdhaarPanLinkedYN": "",\n  "ProvidentFundYN": "",\n  "PFNo": "",\n  "UAN": "",\n  "PensionYN": "",\n  "PensionNo": "",\n  "EmpStateInsuranceYN": "",\n  "EmpStateInsNo": "",\n  "EmpStateInsDispensaryName": "",\n  "ESISubUnitCode": "",\n  "LabourWelfareFundYN": "",\n  "PTYN": "",\n  "BonusYN": "",\n  "GratuityYN": "",\n  "GratuityInCtcYN": "",\n  "DateOfJoin": "",\n  "VoluntaryPfYN": "",\n  "VoluntaryPFAmount": "",\n  "VoluntaryPFPercent": "",\n  "VoluntaryPFEffectiveDate": "",\n  "EmployerCtbnToNPSYN": "",\n  "EmployerAmount": "",\n  "EmployerPercentage": "",\n  "EmployerPanNumber": "",\n  "SalaryMode": "",\n  "SalaryBank": "",\n  "ReimbursementMode": "",\n  "ReimbursementBank": "",\n  "DraftYN": ""\n}' },
                 { method: "DELETE", path: "/statutory/delete/{corp_id}/{EmpCode}/{id}", desc: "Delete statutory details" },
                 { method: "GET", path: "/statutory/exists/{corp_id}/{EmpCode}", desc: "Check if statutory exists" },
                 { method: "GET", path: "/statutory/{corp_id}/{EmpCode}", desc: "Get statutory details" }
@@ -1334,8 +1334,8 @@
             icon: "👨‍👩‍👧‍👦",
             color: "#ff6b9d",
             endpoints: [
-                { method: "POST", path: "/family/add", desc: "Add family details", body: '{\n  "corp_id": "",\n  "EmpCode": ""\n}' },
-                { method: "PUT", path: "/family/update/{corp_id}/{EmpCode}", desc: "Update family details", body: '{\n  "corp_id": "",\n  "EmpCode": ""\n}' },
+                { method: "POST", path: "/family/add", desc: "Add family details", body: '{\n  "corp_id": "",\n  "EmpCode": "",\n  "FatherName": "",\n  "FatherDOB": "",\n  "MotherName": "",\n  "MotherDob": "",\n  "MaritalStatus": "",\n  "SpuseName": "",\n  "SpouseDob": "",\n  "MarriageDate": "",\n  "DependentName": "",\n  "DependentRelation": "",\n  "DependentDob": "",\n  "DependentGender": "",\n  "DependentRemarks": ""\n}' },
+                { method: "PUT", path: "/family/update/{corp_id}/{EmpCode}", desc: "Update family details", body: '{\n  "corp_id": "",\n  "EmpCode": "",\n  "FatherName": "",\n  "FatherDOB": "",\n  "MotherName": "",\n  "MotherDob": "",\n  "MaritalStatus": "",\n  "SpuseName": "",\n  "SpouseDob": "",\n  "MarriageDate": "",\n  "DependentName": "",\n  "DependentRelation": "",\n  "DependentDob": "",\n  "DependentGender": "",\n  "DependentRemarks": ""\n}' },
                 { method: "DELETE", path: "/family/delete/{corp_id}/{EmpCode}", desc: "Delete family details" },
                 { method: "GET", path: "/family/exists/{corp_id}/{EmpCode}", desc: "Check family exists" },
                 { method: "GET", path: "/family/{corp_id}/{EmpCode}", desc: "Get family details" }
@@ -1346,8 +1346,8 @@
             icon: "👶",
             color: "#ce93d8",
             endpoints: [
-                { method: "POST", path: "/child/add", desc: "Add child details", body: '{\n  "corp_id": "",\n  "EmpCode": "",\n  "ChildName": "",\n  "ChildDob": "",\n  "ChildGender": ""\n}' },
-                { method: "PUT", path: "/child/update/{corp_id}/{EmpCode}", desc: "Update child details", body: '{\n  "corp_id": "",\n  "EmpCode": "",\n  "ChildName": "",\n  "ChildDob": "",\n  "ChildGender": ""\n}' },
+                { method: "POST", path: "/child/add", desc: "Add child details", body: '{\n  "corp_id": "",\n  "EmpCode": "",\n  "ChildName": "",\n  "ChildDob": "",\n  "ChildGender": "",\n  "DependentYN": "",\n  "GoingSchoolYN": "",\n  "StayingHostel": ""\n}' },
+                { method: "PUT", path: "/child/update/{corp_id}/{EmpCode}", desc: "Update child details", body: '{\n  "corp_id": "",\n  "EmpCode": "",\n  "ChildName": "",\n  "ChildDob": "",\n  "ChildGender": "",\n  "DependentYN": "",\n  "GoingSchoolYN": "",\n  "StayingHostel": ""\n}' },
                 { method: "DELETE", path: "/child/delete/{corp_id}/{EmpCode}/{id}", desc: "Delete child details" },
                 { method: "GET", path: "/child/{corp_id}/{EmpCode}", desc: "Get child details" }
             ]
@@ -1357,8 +1357,8 @@
             icon: "💼",
             color: "#81d4fa",
             endpoints: [
-                { method: "POST", path: "/workexperience/add", desc: "Add work experience", body: '{\n  "corp_id": "",\n  "empcode": "",\n  "CompanyName": "",\n  "Designation": "",\n  "FromDate": "",\n  "ToDate": ""\n}' },
-                { method: "PUT", path: "/workexperience/update/{corp_id}/{empcode}/{id}", desc: "Update work experience", body: '{\n  "corp_id": "",\n  "empcode": "",\n  "CompanyName": "",\n  "Designation": "",\n  "FromDate": "",\n  "ToDate": ""\n}' },
+                { method: "POST", path: "/workexperience/add", desc: "Add work experience", body: '{\n  "corp_id": "",\n  "empcode": "",\n  "CompanyName": "",\n  "Designation": "",\n  "FromDate": "",\n  "ToDate": "",\n  "Description": ""\n}' },
+                { method: "PUT", path: "/workexperience/update/{corp_id}/{empcode}/{id}", desc: "Update work experience", body: '{\n  "corp_id": "",\n  "empcode": "",\n  "CompanyName": "",\n  "Designation": "",\n  "FromDate": "",\n  "ToDate": "",\n  "Description": ""\n}' },
                 { method: "DELETE", path: "/workexperience/delete/{corp_id}/{empcode}/{id}", desc: "Delete work experience" },
                 { method: "GET", path: "/workexperience/{corp_id}/{empcode}", desc: "Get work experience" }
             ]
@@ -1400,8 +1400,8 @@
             icon: "🛡️",
             color: "#4dd0e1",
             endpoints: [
-                { method: "POST", path: "/employee/insurance-policy/add", desc: "Add insurance policy", body: '{\n  "corp_id": "",\n  "empcode": ""\n}' },
-                { method: "PUT", path: "/employee/insurance-policy/update/{corp_id}/{empcode}/{id}", desc: "Update insurance policy", body: '{\n  "corp_id": "",\n  "empcode": ""\n}' },
+                { method: "POST", path: "/employee/insurance-policy/add", desc: "Add insurance policy", body: '{\n  "corp_id": "",\n  "empcode": "",\n  "name": "",\n  "relationship": "",\n  "dob": "",\n  "gender": "",\n  "policy_no": "",\n  "insurance_type": "",\n  "assured_sum": "",\n  "premium": "",\n  "issue_date": "",\n  "valid_upto": ""\n}' },
+                { method: "PUT", path: "/employee/insurance-policy/update/{corp_id}/{empcode}/{id}", desc: "Update insurance policy", body: '{\n  "corp_id": "",\n  "empcode": "",\n  "name": "",\n  "relationship": "",\n  "dob": "",\n  "gender": "",\n  "policy_no": "",\n  "insurance_type": "",\n  "assured_sum": "",\n  "premium": "",\n  "issue_date": "",\n  "valid_upto": ""\n}' },
                 { method: "DELETE", path: "/employee/insurance-policy/delete/{corp_id}/{empcode}/{id}", desc: "Delete insurance policy" },
                 { method: "GET", path: "/employee/insurance-policy/{corp_id}/{empcode}", desc: "Get insurance policies" }
             ]
@@ -1411,8 +1411,8 @@
             icon: "📋",
             color: "#ef9a9a",
             endpoints: [
-                { method: "POST", path: "/employee/nominee/add", desc: "Add nominee", body: '{\n  "corp_id": "",\n  "empcode": ""\n}' },
-                { method: "PUT", path: "/employee/nominee/update/{corp_id}/{empcode}/{id}", desc: "Update nominee", body: '{\n  "corp_id": "",\n  "empcode": ""\n}' },
+                { method: "POST", path: "/employee/nominee/add", desc: "Add nominee", body: '{\n  "corp_id": "",\n  "empcode": "",\n  "statutory_type": "",\n  "nominee_name": "",\n  "relation": "",\n  "dob": "",\n  "gender": "",\n  "share_percent": "",\n  "contact_no": "",\n  "addr": "",\n  "remarks": "",\n  "minor_yn": ""\n}' },
+                { method: "PUT", path: "/employee/nominee/update/{corp_id}/{empcode}/{id}", desc: "Update nominee", body: '{\n  "corp_id": "",\n  "empcode": "",\n  "statutory_type": "",\n  "nominee_name": "",\n  "relation": "",\n  "dob": "",\n  "gender": "",\n  "share_percent": "",\n  "contact_no": "",\n  "addr": "",\n  "remarks": "",\n  "minor_yn": ""\n}' },
                 { method: "DELETE", path: "/employee/nominee/delete/{corp_id}/{empcode}/{id}", desc: "Delete nominee" },
                 { method: "GET", path: "/employee/nominee/{corp_id}/{empcode}", desc: "Get nominees" }
             ]
@@ -1422,8 +1422,8 @@
             icon: "🏧",
             color: "#80cbc4",
             endpoints: [
-                { method: "POST", path: "/employee/bank/add", desc: "Add employee bank", body: '{\n  "corp_id": "",\n  "empcode": ""\n}' },
-                { method: "PUT", path: "/employee/bank/update/{corp_id}/{empcode}", desc: "Update employee bank", body: '{\n  "corp_id": "",\n  "empcode": ""\n}' },
+                { method: "POST", path: "/employee/bank/add", desc: "Add employee bank", body: '{\n  "corp_id": "",\n  "empcode": "",\n  "SlryPayMode": "",\n  "SlryBankName": "",\n  "SlryBranchName": "",\n  "SlryIFSCCode": "",\n  "SlryAcntNo": "",\n  "RimbPayMode": "",\n  "RimbBankName": "",\n  "RimbBranchName": "",\n  "RimbIFSCCode": "",\n  "RimbAcntNo": "",\n  "same_as_salary_yn": ""\n}' },
+                { method: "PUT", path: "/employee/bank/update/{corp_id}/{empcode}", desc: "Update employee bank", body: '{\n  "corp_id": "",\n  "empcode": "",\n  "SlryPayMode": "",\n  "SlryBankName": "",\n  "SlryBranchName": "",\n  "SlryIFSCCode": "",\n  "SlryAcntNo": "",\n  "RimbPayMode": "",\n  "RimbBankName": "",\n  "RimbBranchName": "",\n  "RimbIFSCCode": "",\n  "RimbAcntNo": "",\n  "same_as_salary_yn": ""\n}' },
                 { method: "DELETE", path: "/employee/bank/delete/{corp_id}/{empcode}", desc: "Delete employee bank" },
                 { method: "POST", path: "/employee/bank/check-empcode", desc: "Check emp code for bank", body: '{\n  "corp_id": "",\n  "empcode": ""\n}' },
                 { method: "GET", path: "/employee/bank/{corp_id}/{empcode}", desc: "Get employee bank" }
@@ -1635,8 +1635,8 @@
             icon: "⏰",
             color: "#ffd740",
             endpoints: [
-                { method: "POST", path: "/shiftpolicy/add", desc: "Add shift policy", body: '{\n  "corp_id": "",\n  "shift_code": "",\n  "shift_start_time": "",\n  "first_half": "",\n  "second_half": "",\n  "checkin": "",\n  "gracetime_early": "",\n  "gracetime_late": "",\n  "absence_halfday": "",\n  "absence_fullday": "",\n  "define_weekly_off_yn": 0\n}' },
-                { method: "PUT", path: "/shiftpolicy/update/{corp_id}/{puid}", desc: "Update shift policy", body: '{\n  "corp_id": "",\n  "shift_code": "",\n  "shift_start_time": "",\n  "first_half": "",\n  "second_half": "",\n  "checkin": "",\n  "gracetime_early": "",\n  "gracetime_late": "",\n  "absence_halfday": "",\n  "absence_fullday": "",\n  "define_weekly_off_yn": 0\n}' },
+                { method: "POST", path: "/shiftpolicy/add", desc: "Add shift policy", body: '{\n  "puid": "",\n  "corp_id": "",\n  "shift_code": "",\n  "shift_name": "",\n  "shift_start_time": "",\n  "first_half": "",\n  "second_half": "",\n  "checkin": "",\n  "gracetime_early": "",\n  "gracetime_late": "",\n  "absence_halfday": "",\n  "absence_fullday": "",\n  "absence_halfday_absent_aftr": "",\n  "absence_fullday_absent_aftr": "",\n  "absence_secondhalf_absent_chckout_before": "",\n  "absence_shiftallowance_yn": 0,\n  "absence_restrict_manager_backdate_yn": 0,\n  "absence_restrict_hr_backdate_yn": 0,\n  "absence_restrict_manager_future": 0,\n  "absence_restrict_hr_future": 0,\n  "adv_settings_sihft_break_deduction_yn": 0,\n  "adv_settings_deduct_time_before_shift_yn": 0,\n  "adv_settings_restrict_work_aftr_cutoff_yn": 0,\n  "adv_settings_visible_in_wrkplan_rqst_yn": 0,\n  "define_weekly_off_yn": 0\n}' },
+                { method: "PUT", path: "/shiftpolicy/update/{corp_id}/{puid}", desc: "Update shift policy", body: '{\n  "puid": "",\n  "corp_id": "",\n  "shift_code": "",\n  "shift_name": "",\n  "shift_start_time": "",\n  "first_half": "",\n  "second_half": "",\n  "checkin": "",\n  "gracetime_early": "",\n  "gracetime_late": "",\n  "absence_halfday": "",\n  "absence_fullday": "",\n  "absence_halfday_absent_aftr": "",\n  "absence_fullday_absent_aftr": "",\n  "absence_secondhalf_absent_chckout_before": "",\n  "absence_shiftallowance_yn": 0,\n  "absence_restrict_manager_backdate_yn": 0,\n  "absence_restrict_hr_backdate_yn": 0,\n  "absence_restrict_manager_future": 0,\n  "absence_restrict_hr_future": 0,\n  "adv_settings_sihft_break_deduction_yn": 0,\n  "adv_settings_deduct_time_before_shift_yn": 0,\n  "adv_settings_restrict_work_aftr_cutoff_yn": 0,\n  "adv_settings_visible_in_wrkplan_rqst_yn": 0,\n  "define_weekly_off_yn": 0\n}' },
                 { method: "GET", path: "/shiftpolicy/all/{corp_id}", desc: "Get all shift policies" },
                 { method: "DELETE", path: "/shiftpolicy/delete/{puid}", desc: "Delete shift policy" },
                 { method: "GET", path: "/shift-policy/shift-codes/{corp_id}", desc: "Get shift codes" },
@@ -1660,9 +1660,9 @@
             icon: "📲",
             color: "#ff6b9d",
             endpoints: [
-                { method: "POST", path: "/checkin-policy/add", desc: "Add check-in policy", body: '{\n  "puid": "",\n  "corp_id": "",\n  "policy_name": "",\n  "applicability_type": "",\n  "applicability_for": "",\n  "web_checkin_yn": 0,\n  "mobile_chckin_yn": 0,\n  "photo_attdnc_yn": 0,\n  "location_attdnc_yn": 0,\n  "attdnc_regularization_yn": 0,\n  "on_duty_yn": 0\n}' },
+                { method: "POST", path: "/checkin-policy/add", desc: "Add check-in policy", body: '{\n  "puid": "",\n  "corp_id": "",\n  "policy_name": "",\n  "web_checkin_yn": 0,\n  "punches_yn": 0,\n  "punches_no": "",\n  "restrict_emp_marking_attndc_yn": 0,\n  "punch_start_time": "",\n  "punch_end_time": "",\n  "IP_validation_yn": 0,\n  "from_ip": "",\n  "to_ip": "",\n  "web_chckin_rqst_frm_whatsapp_yn": 0,\n  "web_chckin_rqst_frm_teams_yn": 0,\n  "mobile_chckin_yn": 0,\n  "photo_attdnc_yn": 0,\n  "no_of_photos": "",\n  "location_attdnc_yn": 0,\n  "adv_location_tracking_yn": 0,\n  "specific_period_wrk_location_approval_yn": 0,\n  "location_approval_days_limit": "",\n  "max_punches_allowed_yn": 0,\n  "punches_no_allowed": "",\n  "restrict_emp_attndc_yn": 0,\n  "attdnc_regularization_yn": 0,\n  "emp_bck_dated_attdnc_regularization_yn": 0,\n  "emp_bck_dated_attdnc_regularization_days": "",\n  "mngr_bck_dated_regularization_yn": 0,\n  "mngr_bck_dated_regularization_days": "",\n  "hr_bck_dated_attdnc_regularization_yn": 0,\n  "hr_bck_dated_attdnc_regularization_days": "",\n  "attdnc_regularization_limit_type": "",\n  "attdnc_regularization_total_limit": "",\n  "ar_aftr_attdnc_process_yn": 0,\n  "future_dtd_attdnc_regularization_yn": 0,\n  "atleast_one_punch_attdnc_regularization_yn": 0,\n  "for_ar_attachment_yn": 0,\n  "whatsapp_ar_rqst_yn": 0,\n  "teams_ar_rqst_yn": 0,\n  "ar_week_off_emp_restricted_yn": 0,\n  "ar_holidays_emp_restricted_yn": 0,\n  "on_duty_yn": 0,\n  "emp_bck_dtd_onduty_rqst_yn": 0,\n  "emp_bck_dtd_onduty_rqst_days": "",\n  "mngr_bck_dtd_onduty_rqst_yn": 0,\n  "mngr_bck_dtd_onduty_rqst_days": "",\n  "hr_bck_dtd_onduty_rqst_yn": 0,\n  "hr_bck_dtd_onduty_rqst_days": "",\n  "configure_overall_onduty_limit_yn": 0,\n  "project_log_time_yn": 0,\n  "raise_onduty_aftr_attdnc_process_yn": 0,\n  "future_dtd_onduty_yn": 0,\n  "restrict_manager_onduty_beyond_limit_yn": 0,\n  "restrict_hr_onduty_beyond_limit_yn": 0,\n  "attchmnt_for_od_yn": 0,\n  "whatsapp_od_rqst_yn": 0,\n  "teams_od_rqst_yn": 0,\n  "onduty_week_off_emp_restricted_yn": 0,\n  "onduty_holidays_emp_restricted_yn": 0,\n  "applicability_type": "",\n  "applicability_for": "",\n  "advnc_applicability_type": "",\n  "advnc_applicability_for": "",\n  "from_days": "",\n  "to_days": ""\n}' },
                 { method: "DELETE", path: "/checkin-policy/delete/{puid}", desc: "Delete check-in policy" },
-                { method: "PUT", path: "/checkin-policy/update/{puid}", desc: "Update check-in policy", body: '{\n  "puid": "",\n  "corp_id": "",\n  "policy_name": "",\n  "applicability_type": "",\n  "applicability_for": "",\n  "web_checkin_yn": 0,\n  "mobile_chckin_yn": 0,\n  "photo_attdnc_yn": 0,\n  "location_attdnc_yn": 0,\n  "attdnc_regularization_yn": 0,\n  "on_duty_yn": 0\n}' },
+                { method: "PUT", path: "/checkin-policy/update/{puid}", desc: "Update check-in policy", body: '{\n  "puid": "",\n  "corp_id": "",\n  "policy_name": "",\n  "web_checkin_yn": 0,\n  "punches_yn": 0,\n  "punches_no": "",\n  "restrict_emp_marking_attndc_yn": 0,\n  "punch_start_time": "",\n  "punch_end_time": "",\n  "IP_validation_yn": 0,\n  "from_ip": "",\n  "to_ip": "",\n  "web_chckin_rqst_frm_whatsapp_yn": 0,\n  "web_chckin_rqst_frm_teams_yn": 0,\n  "mobile_chckin_yn": 0,\n  "photo_attdnc_yn": 0,\n  "no_of_photos": "",\n  "location_attdnc_yn": 0,\n  "adv_location_tracking_yn": 0,\n  "specific_period_wrk_location_approval_yn": 0,\n  "location_approval_days_limit": "",\n  "max_punches_allowed_yn": 0,\n  "punches_no_allowed": "",\n  "restrict_emp_attndc_yn": 0,\n  "attdnc_regularization_yn": 0,\n  "emp_bck_dated_attdnc_regularization_yn": 0,\n  "emp_bck_dated_attdnc_regularization_days": "",\n  "mngr_bck_dated_regularization_yn": 0,\n  "mngr_bck_dated_regularization_days": "",\n  "hr_bck_dated_attdnc_regularization_yn": 0,\n  "hr_bck_dated_attdnc_regularization_days": "",\n  "attdnc_regularization_limit_type": "",\n  "attdnc_regularization_total_limit": "",\n  "ar_aftr_attdnc_process_yn": 0,\n  "future_dtd_attdnc_regularization_yn": 0,\n  "atleast_one_punch_attdnc_regularization_yn": 0,\n  "for_ar_attachment_yn": 0,\n  "whatsapp_ar_rqst_yn": 0,\n  "teams_ar_rqst_yn": 0,\n  "ar_week_off_emp_restricted_yn": 0,\n  "ar_holidays_emp_restricted_yn": 0,\n  "on_duty_yn": 0,\n  "emp_bck_dtd_onduty_rqst_yn": 0,\n  "emp_bck_dtd_onduty_rqst_days": "",\n  "mngr_bck_dtd_onduty_rqst_yn": 0,\n  "mngr_bck_dtd_onduty_rqst_days": "",\n  "hr_bck_dtd_onduty_rqst_yn": 0,\n  "hr_bck_dtd_onduty_rqst_days": "",\n  "configure_overall_onduty_limit_yn": 0,\n  "project_log_time_yn": 0,\n  "raise_onduty_aftr_attdnc_process_yn": 0,\n  "future_dtd_onduty_yn": 0,\n  "restrict_manager_onduty_beyond_limit_yn": 0,\n  "restrict_hr_onduty_beyond_limit_yn": 0,\n  "attchmnt_for_od_yn": 0,\n  "whatsapp_od_rqst_yn": 0,\n  "teams_od_rqst_yn": 0,\n  "onduty_week_off_emp_restricted_yn": 0,\n  "onduty_holidays_emp_restricted_yn": 0,\n  "applicability_type": "",\n  "applicability_for": "",\n  "advnc_applicability_type": "",\n  "advnc_applicability_for": "",\n  "from_days": "",\n  "to_days": ""\n}' },
                 { method: "GET", path: "/checkin-policy/all/{corp_id}", desc: "Get all check-in policies" },
                 { method: "POST", path: "/checkin-policy-on-duty-type/add", desc: "Add on-duty type", body: '{\n  "puid": "",\n  "corp_id": "",\n  "onduty_type": "",\n  "onduty_applicability_type": "",\n  "onduty_limit": ""\n}' },
                 { method: "DELETE", path: "/checkin-policy-on-duty-type/delete/{puid}", desc: "Delete on-duty type" },
@@ -1678,8 +1678,8 @@
                 { method: "PUT", path: "/leave-type-basic-configuration/update/{puid}", desc: "Update basic config", body: '{\n  "puid": "",\n  "corpid": "",\n  "leaveCode": "",\n  "leaveName": "",\n  "leaveCycleStartMonth": "",\n  "leaveCycleEndMonth": "",\n  "leaveTypeTobeCredited": "",\n  "LimitDays": "",\n  "LeaveType": "",\n  "encahsmentAllowedYN": 0,\n  "isConfigurationCompletedYN": 0\n}' },
                 { method: "DELETE", path: "/leave-type-basic-configuration/delete/{puid}", desc: "Delete basic config" },
                 { method: "GET", path: "/leave-type-basic-configuration/all/{corpid}", desc: "Get all basic configs" },
-                { method: "POST", path: "/leave-type-full-configuration/add", desc: "Add full config", body: '{\n  "puid": "",\n  "corpid": ""\n}' },
-                { method: "PUT", path: "/leave-type-full-configuration/update/{puid}", desc: "Update full config", body: '{\n  "puid": "",\n  "corpid": ""\n}' },
+                { method: "POST", path: "/leave-type-full-configuration/add", desc: "Add full config", body: '{\n  "puid": "",\n  "corpid": "",\n  "applicabilityType": "",\n  "applicabledEmployeeStatus": "",\n  "applicabledGender": "",\n  "leaveCreditedType": "",\n  "allowAdditionalLeaveOnJoin": "",\n  "roundOffCreditedLeaves": "",\n  "lapseLeaveYn": 0,\n  "creditLeaveIfResignationPendingYn": 0,\n  "empHalfDayLeaveRqstYN": 0,\n  "empLeaveRqstYN": 0,\n  "empMaxRqstTenureType": "",\n  "empMaxNoRqstTenure": "",\n  "empMaxRqstYearType": "",\n  "empMaxNoRqstYear": "",\n  "empMaxRqstMonthType": "",\n  "empMaxNoRqstMonth": "",\n  "empMinLeaveRequiredToRqstType": "",\n  "empMinNoLeaveRequiredToRqst": "",\n  "maxNoContiniousLeaveAllowedType": "",\n  "maxNoContionousLeaveAllowedNo": "",\n  "maxNoLeavesYearlyType": "",\n  "maxNoLeavesYearly": "",\n  "maxNoLeavesMonthlyType": "",\n  "maxNoLeavesMonthly": "",\n  "empBackDtdLeaveYn": 0,\n  "empBackDtdLeaveNo": "",\n  "minDaysAdvncLeaveRqstType": "",\n  "minDaysAdvncLeaveRqstNo": "",\n  "empFutureDtdLeaveYn": 0,\n  "mngrFutureDtdLeaveYn": 0,\n  "hrFutureDtdLeaveYn": 0,\n  "mngrBackDtdLeaveYn": 0,\n  "mngrBackDtdLeaveNo": "",\n  "hrBackDtdLeaveYn": 0,\n  "hrBackDtdLeaveNo": "",\n  "leaveApplctnDocRequiredYn": 0,\n  "docRequiredForLeavesNoAbove": "",\n  "raiseLeaveRqstAftrAttdncProcessedYn": 0,\n  "restrictLeaveRqstOnPendingResignationYn": 0,\n  "restrictLeaveRqstAftrJoiningForSpecicPeriodType": "",\n  "restrictLeaveRqstAftrJoiningForSpecicPeriodDaysNo": "",\n  "excludeAbsentDaysYn": 0,\n  "specificEmpStatusLeaveApplicableYn": 0,\n  "empStatusProbationYn": 0,\n  "empStatusConfirmedYn": 0,\n  "empStatusResignedYn": 0,\n  "leaveRqstApplicableType": "",\n  "applicableToGenderYn": 0,\n  "applicabilityMaleYn": 0,\n  "applicabilityFemaleYn": 0,\n  "applicabilityOtherYn": 0,\n  "enableThisLeaveBirthdayYn": 0,\n  "birthdayLeaveAdvanceDays": "",\n  "birthdayLeavePostDays": "",\n  "weddingAnniversaryLeaveYn": 0,\n  "weedingAnniversaryLeaveAdvanceDays": "",\n  "weddingAnniversaryLeavePostDays": "",\n  "advanceLeaveBalanceYn": 0,\n  "advanceBalanceLimit": "",\n  "blockClubbingWithOtherLeavesYn": 0,\n  "leaveTypes": "",\n  "leaveDonationYn": 0,\n  "donateLeaveEmpYn": 0,\n  "donateLeaveManagerYn": 0,\n  "donateLeaveHrYn": 0,\n  "maxAnnualLeaveDonation": "",\n  "maxCarryForwardLeavesType": "",\n  "maxCarryForwardLeavesBalance": "",\n  "carryForwardMethod": "",\n  "carryForwardMethodDays": "",\n  "nextYearBalanceUsageOfCrntYearYn": 0,\n  "nextYearBalanceUsageOfCrntYearLimit": "",\n  "backdatedLeaveCancellationAfterCarryForwardYn": 0,\n  "allowBackdatedLeaveAfterCarryForward": "",\n  "sendCarryForwardAlertYn": 0,\n  "noOfDaysToSendAlertBeforeExpiry": "",\n  "alertMessage": "",\n  "includeWeeklyOffAsLeaveYn": 0,\n  "includePostLeaveWeeklyOffYn": 0,\n  "sandwichLeaveYn": 0,\n  "requireAdvanceSubmissionToExcludeWeeklyOffType": "",\n  "advanceSubmissionDaysBeforeToExcludeWeeklyOff": "",\n  "holidaysInLeaveCountYn": 0,\n  "includeWeekoffAndHolidayIfSpannedByLeaveYn": 0,\n  "requireAdvanceSubmissionToExcludeWeekoffAndHolidayType": "",\n  "advanceSubmissionDaysBeforeToExcludeWeekoffAndHoliday": ""\n}' },
+                { method: "PUT", path: "/leave-type-full-configuration/update/{puid}", desc: "Update full config", body: '{\n  "puid": "",\n  "corpid": "",\n  "applicabilityType": "",\n  "applicabledEmployeeStatus": "",\n  "applicabledGender": "",\n  "leaveCreditedType": "",\n  "allowAdditionalLeaveOnJoin": "",\n  "roundOffCreditedLeaves": "",\n  "lapseLeaveYn": 0,\n  "creditLeaveIfResignationPendingYn": 0,\n  "empHalfDayLeaveRqstYN": 0,\n  "empLeaveRqstYN": 0,\n  "empMaxRqstTenureType": "",\n  "empMaxNoRqstTenure": "",\n  "empMaxRqstYearType": "",\n  "empMaxNoRqstYear": "",\n  "empMaxRqstMonthType": "",\n  "empMaxNoRqstMonth": "",\n  "empMinLeaveRequiredToRqstType": "",\n  "empMinNoLeaveRequiredToRqst": "",\n  "maxNoContiniousLeaveAllowedType": "",\n  "maxNoContionousLeaveAllowedNo": "",\n  "maxNoLeavesYearlyType": "",\n  "maxNoLeavesYearly": "",\n  "maxNoLeavesMonthlyType": "",\n  "maxNoLeavesMonthly": "",\n  "empBackDtdLeaveYn": 0,\n  "empBackDtdLeaveNo": "",\n  "minDaysAdvncLeaveRqstType": "",\n  "minDaysAdvncLeaveRqstNo": "",\n  "empFutureDtdLeaveYn": 0,\n  "mngrFutureDtdLeaveYn": 0,\n  "hrFutureDtdLeaveYn": 0,\n  "mngrBackDtdLeaveYn": 0,\n  "mngrBackDtdLeaveNo": "",\n  "hrBackDtdLeaveYn": 0,\n  "hrBackDtdLeaveNo": "",\n  "leaveApplctnDocRequiredYn": 0,\n  "docRequiredForLeavesNoAbove": "",\n  "raiseLeaveRqstAftrAttdncProcessedYn": 0,\n  "restrictLeaveRqstOnPendingResignationYn": 0,\n  "restrictLeaveRqstAftrJoiningForSpecicPeriodType": "",\n  "restrictLeaveRqstAftrJoiningForSpecicPeriodDaysNo": "",\n  "excludeAbsentDaysYn": 0,\n  "specificEmpStatusLeaveApplicableYn": 0,\n  "empStatusProbationYn": 0,\n  "empStatusConfirmedYn": 0,\n  "empStatusResignedYn": 0,\n  "leaveRqstApplicableType": "",\n  "applicableToGenderYn": 0,\n  "applicabilityMaleYn": 0,\n  "applicabilityFemaleYn": 0,\n  "applicabilityOtherYn": 0,\n  "enableThisLeaveBirthdayYn": 0,\n  "birthdayLeaveAdvanceDays": "",\n  "birthdayLeavePostDays": "",\n  "weddingAnniversaryLeaveYn": 0,\n  "weedingAnniversaryLeaveAdvanceDays": "",\n  "weddingAnniversaryLeavePostDays": "",\n  "advanceLeaveBalanceYn": 0,\n  "advanceBalanceLimit": "",\n  "blockClubbingWithOtherLeavesYn": 0,\n  "leaveTypes": "",\n  "leaveDonationYn": 0,\n  "donateLeaveEmpYn": 0,\n  "donateLeaveManagerYn": 0,\n  "donateLeaveHrYn": 0,\n  "maxAnnualLeaveDonation": "",\n  "maxCarryForwardLeavesType": "",\n  "maxCarryForwardLeavesBalance": "",\n  "carryForwardMethod": "",\n  "carryForwardMethodDays": "",\n  "nextYearBalanceUsageOfCrntYearYn": 0,\n  "nextYearBalanceUsageOfCrntYearLimit": "",\n  "backdatedLeaveCancellationAfterCarryForwardYn": 0,\n  "allowBackdatedLeaveAfterCarryForward": "",\n  "sendCarryForwardAlertYn": 0,\n  "noOfDaysToSendAlertBeforeExpiry": "",\n  "alertMessage": "",\n  "includeWeeklyOffAsLeaveYn": 0,\n  "includePostLeaveWeeklyOffYn": 0,\n  "sandwichLeaveYn": 0,\n  "requireAdvanceSubmissionToExcludeWeeklyOffType": "",\n  "advanceSubmissionDaysBeforeToExcludeWeeklyOff": "",\n  "holidaysInLeaveCountYn": 0,\n  "includeWeekoffAndHolidayIfSpannedByLeaveYn": 0,\n  "requireAdvanceSubmissionToExcludeWeekoffAndHolidayType": "",\n  "advanceSubmissionDaysBeforeToExcludeWeekoffAndHoliday": ""\n}' },
                 { method: "DELETE", path: "/leave-type-full-configuration/delete/{puid}", desc: "Delete full config" },
                 { method: "GET", path: "/leave-type-full-configuration/all/{corpid}", desc: "Get all full configs" },
                 { method: "GET", path: "/leave-type-full-configuration/{puid}", desc: "Get full config by puid" }
@@ -1690,8 +1690,8 @@
             icon: "📋",
             color: "#aed581",
             endpoints: [
-                { method: "POST", path: "/leave-policy/add", desc: "Add leave policy", body: '{\n  "corpid": "",\n  "puid": "",\n  "policyName": "",\n  "leaveType": "",\n  "applicabilityType": "",\n  "applicabilityOn": "",\n  "advanceApplicabilityType": "",\n  "advanceApplicabilityOn": "",\n  "fromDays": "",\n  "toDays": ""\n}' },
-                { method: "PUT", path: "/leave-policy/update/{puid}", desc: "Update leave policy", body: '{\n  "corpid": "",\n  "puid": "",\n  "policyName": "",\n  "leaveType": "",\n  "applicabilityType": "",\n  "applicabilityOn": "",\n  "advanceApplicabilityType": "",\n  "advanceApplicabilityOn": "",\n  "fromDays": "",\n  "toDays": ""\n}' },
+                { method: "POST", path: "/leave-policy/add", desc: "Add leave policy", body: '{\n  "corpid": "",\n  "puid": "",\n  "policyName": "",\n  "description": "",\n  "leaveType": "",\n  "applicabilityType": "",\n  "applicabilityOn": "",\n  "advanceApplicabilityType": "",\n  "advanceApplicabilityOn": "",\n  "fromDays": "",\n  "toDays": ""\n}' },
+                { method: "PUT", path: "/leave-policy/update/{puid}", desc: "Update leave policy", body: '{\n  "corpid": "",\n  "puid": "",\n  "policyName": "",\n  "description": "",\n  "leaveType": "",\n  "applicabilityType": "",\n  "applicabilityOn": "",\n  "advanceApplicabilityType": "",\n  "advanceApplicabilityOn": "",\n  "fromDays": "",\n  "toDays": ""\n}' },
                 { method: "DELETE", path: "/leave-policy/delete/{puid}", desc: "Delete leave policy" },
                 { method: "GET", path: "/leave-policy/by-corpid/{corpid}", desc: "Get leave policies" }
             ]
@@ -1712,7 +1712,7 @@
             icon: "💵",
             color: "#66ffb4",
             endpoints: [
-                { method: "POST", path: "/paycomponent/add-or-update", desc: "Add or update pay component", body: '{\n  "corpId": "",\n  "puid": "",\n  "componentName": ""\n}' },
+                { method: "POST", path: "/paycomponent/add-or-update", desc: "Add or update pay component", body: '{\n  "corpId": "",\n  "puid": "",\n  "componentName": "",\n  "componentType": "",\n  "payType": "",\n  "paymentInterval": "",\n  "isPartOfCtcYn": 0,\n  "isPartOfGrossYn": 0,\n  "isIncludedInSalaryYn": 0,\n  "paymentNature": "",\n  "rqstVariableTypeEmpYn": 0,\n  "rqstVariableTypeManagerYn": 0,\n  "rqstVariableTypeHrYn": 0,\n  "isVariableAttachmentRequiredYn": 0,\n  "isProratedByPaidDaysYn": 0,\n  "arrearApplicableYn": 0,\n  "processInJoiningMonthYn": 0,\n  "processInSettlementMonthYn": 0,\n  "pfYn": 0,\n  "ptYn": 0,\n  "employeeStateInsuranceYn": 0,\n  "isIncludedForEsiCheck": 0,\n  "bonusYn": 0,\n  "isIncludedForBonusCheck": 0,\n  "labourWelfareFundYn": 0,\n  "gratuityYn": 0,\n  "leaveEncashmentYn": 0,\n  "roundOffConfiguration": "",\n  "isShownOnSalarySlip": "",\n  "isShownOnSalaryRegister": "",\n  "isShownRateOnSalarySlip": "",\n  "salaryRegisterSortOrder": "",\n  "taxConfigurationType": "",\n  "nonTaxableLimit": "",\n  "taxComputationMethodType": "",\n  "mapIncomeToSectionType": "",\n  "isIncludeInFBPBasket": ""\n}' },
                 { method: "GET", path: "/paycomponent/all/{corpId}", desc: "Get all pay components" },
                 { method: "GET", path: "/paycomponent/{puid}", desc: "Get pay component by puid" },
                 { method: "DELETE", path: "/paycomponent/delete/{puid}", desc: "Delete pay component" }
@@ -1733,7 +1733,7 @@
             icon: "⚙️",
             color: "#4fc3f7",
             endpoints: [
-                { method: "POST", path: "/paygroup-configuration/add-or-update", desc: "Add or update paygroup", body: '{\n  "corpId": "",\n  "puid": "",\n  "GroupName": ""\n}' },
+                { method: "POST", path: "/paygroup-configuration/add-or-update", desc: "Add or update paygroup", body: '{\n  "corpId": "",\n  "puid": "",\n  "GroupName": "",\n  "Description": "",\n  "Payslip": "",\n  "Reimbursement": "",\n  "TaxSlip": "",\n  "AppointmentLetter": "",\n  "SalaryRevisionLetter": "",\n  "ContractLetter": "",\n  "IncludedComponents": "",\n  "IsFBPEnabled": "",\n  "PfWageComponentsUnderThreshold": "",\n  "CtcYearlyYn": 0,\n  "MonthlyBasicYn": 0,\n  "LeaveEncashedOnGrosYn": 0,\n  "CostToCompanyYn": 0,\n  "PBYn": 0,\n  "CTCAllowances": "",\n  "ApplicabilityType": "",\n  "ApplicableOn": "",\n  "AdvanceApplicabilityType": "",\n  "AdvanceApplicableOn": "",\n  "FromDays": "",\n  "ToDays": "",\n  "ActiveYn": 1,\n  "FormulaConfiguredYn": 0\n}' },
                 { method: "GET", path: "/paygroup-configuration/by-corpid/{corpId}", desc: "Get paygroup by corp" },
                 { method: "GET", path: "/paygroup-configuration/{puid}", desc: "Get paygroup by puid" },
                 { method: "DELETE", path: "/paygroup-configuration/delete/{puid}", desc: "Delete paygroup" },
@@ -1762,7 +1762,7 @@
             icon: "💰",
             color: "#ffd740",
             endpoints: [
-                { method: "POST", path: "/employee-salary-structure/add-or-update", desc: "Add or update salary structure", body: '{\n  "corpId": "",\n  "puid": "",\n  "empCode": "",\n  "companyName": "",\n  "salaryRevisionMonth": "",\n  "arrearWithEffectFrom": "",\n  "payGroup": "",\n  "ctc": "",\n  "ctcYearly": "",\n  "monthlyBasic": "",\n  "leaveEnchashOnGross": "",\n  "grossList": "",\n  "year": "",\n  "increment": ""\n}' },
+                { method: "POST", path: "/employee-salary-structure/add-or-update", desc: "Add or update salary structure", body: '{\n  "corpId": "",\n  "puid": "",\n  "empCode": "",\n  "companyName": "",\n  "salaryRevisionMonth": "",\n  "arrearWithEffectFrom": "",\n  "payGroup": "",\n  "ctc": "",\n  "ctcYearly": "",\n  "monthlyBasic": "",\n  "leaveEnchashOnGross": "",\n  "performanceBonus": "",\n  "grossList": "",\n  "otherAlowances": "",\n  "otherBenifits": "",\n  "recurringDeductions": "",\n  "aplb": "",\n  "year": "",\n  "increment": ""\n}' },
                 { method: "GET", path: "/employee-salary-structure/{empCode}/{companyName}/{corpId}", desc: "Get salary structure" },
                 { method: "DELETE", path: "/employee-salary-structure/delete/{puid}", desc: "Delete salary structure" },
                 { method: "POST", path: "/employee-salary-structure/salary-revision", desc: "Process salary revision", body: '{\n  "corpId": "",\n  "companyName": "",\n  "empCode": "",\n  "year": "",\n  "salaryRevisionMonth": "",\n  "arrearWithEffectFrom": "",\n  "increment": 0\n}' }
@@ -1804,7 +1804,7 @@
             icon: "💳",
             color: "#66ffb4",
             endpoints: [
-                { method: "POST", path: "/employee-payroll-salary/add-or-update", desc: "Add or update payroll salary", body: '{\n  "corpId": "",\n  "empCode": "",\n  "companyName": "",\n  "year": "",\n  "month": "",\n  "grossList": "",\n  "status": "",\n  "isShownToEmployeeYn": 0\n}' },
+                { method: "POST", path: "/employee-payroll-salary/add-or-update", desc: "Add or update payroll salary", body: '{\n  "corpId": "",\n  "empCode": "",\n  "companyName": "",\n  "year": "",\n  "month": "",\n  "grossList": "",\n  "otherAllowances": "",\n  "otherBenefits": "",\n  "recurringDeduction": "",\n  "status": "",\n  "isShownToEmployeeYn": 0\n}' },
                 { method: "GET", path: "/employee-payroll-salary/all/{corpId}/{companyName?}", desc: "Get all payroll salary" },
                 { method: "GET", path: "/employee-payroll-salary/{corpId}/{empCode}/{year}/{month}/{companyName?}", desc: "Get specific payroll salary" },
                 { method: "POST", path: "/employee-payroll/bulk-process", desc: "Bulk process payroll", body: '{\n  "corpId": "",\n  "companyName": "",\n  "year": "",\n  "month": "",\n  "status": "",\n  "isShownToEmployeeYn": 0\n}' },
@@ -1856,9 +1856,9 @@
             icon: "✈️",
             color: "#ce93d8",
             endpoints: [
-                { method: "POST", path: "/leave-request", desc: "Submit leave request", body: '{\n  "corp_id": "",\n  "company_name": "",\n  "empcode": "",\n  "from_date": "",\n  "to_date": "",\n  "reason": "",\n  "leave_reason_description": ""\n}' },
+                { method: "POST", path: "/leave-request", desc: "Submit leave request", body: '{\n  "corp_id": "",\n  "company_name": "",\n  "empcode": "",\n  "full_name": "",\n  "emp_designation": "",\n  "from_date": "",\n  "to_date": "",\n  "reason": "",\n  "leave_reason_description": ""\n}' },
                 { method: "GET", path: "/leave-requests/{status}/{corp_id}/{empcode}", desc: "Get requests by status (Admin)" },
-                { method: "PATCH", path: "/leave-request/{id}", desc: "Update leave request status", body: '{\n  "corp_id": "",\n  "empcode": "",\n  "status": "",\n  "reject_reason": ""\n}' },
+                { method: "PATCH", path: "/leave-request/{id}", desc: "Update leave request status", body: '{\n  "corp_id": "",\n  "empcode": "",\n  "status": "",\n  "reject_reason": "",\n  "approved_reject_return_by": ""\n}' },
                 { method: "GET", path: "/leave-requests/employee/{corp_id}/{company_name}/{empcode}", desc: "Get employee leave requests" },
                 { method: "GET", path: "/employee/leave-requests/{status}/{corp_id}/{company_name}/{empcode}", desc: "Employee leaves by status" },
                 { method: "GET", path: "/people-on-leave-today/{corp_id}/{empcode}", desc: "People on leave today" },
@@ -1874,7 +1874,7 @@
                 { method: "POST", path: "/attendance-summary/bulk-insert-with-fallback", desc: "Bulk insert with fallback", body: '{\n  "corpId": "",\n  "companyName": "",\n  "month": "",\n  "year": ""\n}' },
                 { method: "GET", path: "/attendance-summary", desc: "Get all summaries" },
                 { method: "GET", path: "/attendance-summary/{id}", desc: "Get summary by ID" },
-                { method: "PUT", path: "/attendance-summary/{id}", desc: "Update summary", body: '{\n  "corpId": "",\n  "empCode": "",\n  "companyName": "",\n  "totalPresent": 0,\n  "workingDays": 0,\n  "holidays": 0,\n  "weekOff": 0,\n  "leave": 0,\n  "month": "",\n  "year": ""\n}' },
+                { method: "PUT", path: "/attendance-summary/{id}", desc: "Update summary", body: '{\n  "corpId": "",\n  "empCode": "",\n  "companyName": "",\n  "totalPresent": 0,\n  "workingDays": 0,\n  "holidays": 0,\n  "weekOff": 0,\n  "leave": 0,\n  "paidDays": 0,\n  "absent": 0,\n  "month": "",\n  "year": ""\n}' },
                 { method: "DELETE", path: "/attendance-summary/{id}", desc: "Delete summary" },
                 { method: "GET", path: "/check-attendance-summary/check-exists/{corpId}/{companyName}/{month}/{year}", desc: "Check summary exists" },
                 { method: "POST", path: "/attendance-summary/recalculate", desc: "Recalculate summaries", body: '{\n  "corpId": "",\n  "companyName": "",\n  "month": "",\n  "year": ""\n}' },
@@ -2002,8 +2002,8 @@
             endpoints: [
                 { method: "GET", path: "/recruitment/job-postings/{corp_id}", desc: "Get all job postings" },
                 { method: "GET", path: "/recruitment/job-postings/{corp_id}/{id}", desc: "Get job posting by ID" },
-                { method: "POST", path: "/recruitment/job-postings", desc: "Create job posting", body: '{\n  "corp_id": "",\n  "job_title": ""\n}' },
-                { method: "PUT", path: "/recruitment/job-postings/{corp_id}/{id}", desc: "Update job posting", body: '{\n  "corp_id": "",\n  "job_title": ""\n}' },
+                { method: "POST", path: "/recruitment/job-postings", desc: "Create job posting", body: '{\n  "corp_id": "",\n  "job_title": "",\n  "department": "",\n  "sub_department": "",\n  "designation": "",\n  "location": "",\n  "employment_type": "",\n  "no_of_openings": 0,\n  "job_description": "",\n  "requirements": "",\n  "min_salary": 0,\n  "max_salary": 0,\n  "currency": "",\n  "application_deadline": "",\n  "status": "Open",\n  "created_by": ""\n}' },
+                { method: "PUT", path: "/recruitment/job-postings/{corp_id}/{id}", desc: "Update job posting", body: '{\n  "corp_id": "",\n  "job_title": "",\n  "department": "",\n  "sub_department": "",\n  "designation": "",\n  "location": "",\n  "employment_type": "",\n  "no_of_openings": 0,\n  "job_description": "",\n  "requirements": "",\n  "min_salary": 0,\n  "max_salary": 0,\n  "currency": "",\n  "application_deadline": "",\n  "status": "Open",\n  "created_by": ""\n}' },
                 { method: "DELETE", path: "/recruitment/job-postings/{corp_id}/{id}", desc: "Delete job posting" },
                 { method: "PATCH", path: "/recruitment/job-postings/{corp_id}/{id}/status", desc: "Change posting status", body: '{\n  "status": "Open"\n}' }
             ]
@@ -2015,7 +2015,7 @@
             endpoints: [
                 { method: "GET", path: "/recruitment/candidates/{corp_id}", desc: "Get all candidates" },
                 { method: "GET", path: "/recruitment/candidates/{corp_id}/{id}", desc: "Get candidate by ID" },
-                { method: "POST", path: "/recruitment/candidates", desc: "Create candidate", body: '{\n  "corp_id": "",\n  "first_name": "",\n  "email": ""\n}' },
+                { method: "POST", path: "/recruitment/candidates", desc: "Create candidate", body: '{\n  "corp_id": "",\n  "first_name": "",\n  "last_name": "",\n  "email": "",\n  "phone": "",\n  "dob": "",\n  "gender": "",\n  "current_location": "",\n  "highest_qualification": "",\n  "total_experience_years": 0,\n  "current_ctc": 0,\n  "expected_ctc": 0,\n  "notice_period": "",\n  "linkedin_url": "",\n  "source": "",\n  "referred_by": "",\n  "skills": "",\n  "status": "Active"\n}' },
                 { method: "POST", path: "/recruitment/candidates/{corp_id}/{id}", desc: "Update candidate", body: '(multipart form data)' },
                 { method: "DELETE", path: "/recruitment/candidates/{corp_id}/{id}", desc: "Delete candidate" },
                 { method: "GET", path: "/recruitment/candidates/{corp_id}/{id}/resume", desc: "Download resume" }
@@ -2028,8 +2028,8 @@
             endpoints: [
                 { method: "GET", path: "/recruitment/stages/{corp_id}", desc: "Get all stages" },
                 { method: "GET", path: "/recruitment/stages/{corp_id}/{id}", desc: "Get stage by ID" },
-                { method: "POST", path: "/recruitment/stages", desc: "Create stage", body: '{\n  "corp_id": "",\n  "stage_name": ""\n}' },
-                { method: "PUT", path: "/recruitment/stages/{corp_id}/{id}", desc: "Update stage", body: '{\n  "corp_id": "",\n  "stage_name": ""\n}' },
+                { method: "POST", path: "/recruitment/stages", desc: "Create stage", body: '{\n  "corp_id": "",\n  "stage_name": "",\n  "stage_order": 0,\n  "stage_type": "",\n  "description": "",\n  "is_active": 1\n}' },
+                { method: "PUT", path: "/recruitment/stages/{corp_id}/{id}", desc: "Update stage", body: '{\n  "corp_id": "",\n  "stage_name": "",\n  "stage_order": 0,\n  "stage_type": "",\n  "description": "",\n  "is_active": 1\n}' },
                 { method: "DELETE", path: "/recruitment/stages/{corp_id}/{id}", desc: "Delete stage" }
             ]
         },
@@ -2040,8 +2040,8 @@
             endpoints: [
                 { method: "GET", path: "/recruitment/applications/{corp_id}", desc: "Get all applications" },
                 { method: "GET", path: "/recruitment/applications/{corp_id}/{id}", desc: "Get application by ID" },
-                { method: "POST", path: "/recruitment/applications", desc: "Create application", body: '{\n  "corp_id": "",\n  "job_posting_id": "",\n  "candidate_id": ""\n}' },
-                { method: "PUT", path: "/recruitment/applications/{corp_id}/{id}", desc: "Update application", body: '{\n  "job_posting_id": "",\n  "candidate_id": ""\n}' },
+                { method: "POST", path: "/recruitment/applications", desc: "Create application", body: '{\n  "corp_id": "",\n  "job_posting_id": "",\n  "candidate_id": "",\n  "applied_date": "",\n  "current_stage": "",\n  "status": "",\n  "overall_remarks": ""\n}' },
+                { method: "PUT", path: "/recruitment/applications/{corp_id}/{id}", desc: "Update application", body: '{\n  "job_posting_id": "",\n  "candidate_id": "",\n  "current_stage": "",\n  "status": "",\n  "overall_remarks": ""\n}' },
                 { method: "DELETE", path: "/recruitment/applications/{corp_id}/{id}", desc: "Delete application" },
                 { method: "PATCH", path: "/recruitment/applications/{corp_id}/{id}/decide", desc: "Decide candidate", body: '{\n  "final_decision": "Selected",\n  "decided_by": "",\n  "overall_remarks": ""\n}' },
                 { method: "GET", path: "/recruitment/applications/{corp_id}/{application_id}/stage-results", desc: "Get stage results" },
@@ -2057,7 +2057,7 @@
             endpoints: [
                 { method: "GET", path: "/offer-letter-templates/{corp_id}", desc: "Get all templates" },
                 { method: "GET", path: "/offer-letter-templates/{corp_id}/{id}", desc: "Get template by ID" },
-                { method: "POST", path: "/offer-letter-templates", desc: "Create template", body: '{\n  "corp_id": "",\n  "template_name": "",\n  "salary_components": ""\n}' },
+                { method: "POST", path: "/offer-letter-templates", desc: "Create template", body: '{\n  "corp_id": "",\n  "template_name": "",\n  "header_content": "",\n  "body_content": "",\n  "footer_content": "",\n  "signatory_name": "",\n  "signatory_designation": "",\n  "salary_currency": "",\n  "salary_components": "",\n  "salary_notes": "",\n  "is_active": 1,\n  "created_by": ""\n}' },
                 { method: "POST", path: "/offer-letter-templates/{corp_id}/{id}", desc: "Update template", body: '(multipart form data)' },
                 { method: "DELETE", path: "/offer-letter-templates/{corp_id}/{id}", desc: "Delete template" },
                 { method: "POST", path: "/offer-letter-templates/{corp_id}/{id}/upload-logo", desc: "Upload logo", body: '(multipart form data)' },
@@ -2071,7 +2071,7 @@
             endpoints: [
                 { method: "GET", path: "/offer-letters/{corp_id}", desc: "Get all offer letters" },
                 { method: "GET", path: "/offer-letters/{corp_id}/{id}", desc: "Get offer letter by ID" },
-                { method: "POST", path: "/offer-letters/generate", desc: "Generate offer letter", body: '{\n  "corp_id": "",\n  "application_id": "",\n  "template_id": "",\n  "date_of_joining": "",\n  "ctc_annual": 0,\n  "generated_by": ""\n}' },
+                { method: "POST", path: "/offer-letters/generate", desc: "Generate offer letter", body: '{\n  "corp_id": "",\n  "application_id": "",\n  "template_id": "",\n  "candidate_name": "",\n  "designation": "",\n  "department": "",\n  "location": "",\n  "date_of_joining": "",\n  "ctc_annual": 0,\n  "salary_breakdown": "",\n  "generated_by": ""\n}' },
                 { method: "GET", path: "/offer-letters/{corp_id}/{id}/download-pdf", desc: "Download offer PDF" },
                 { method: "GET", path: "/offer-letters/{corp_id}/{id}/preview", desc: "Preview offer letter" },
                 { method: "PATCH", path: "/offer-letters/{corp_id}/{id}/status", desc: "Update offer status", body: '{\n  "status": "Draft"\n}' },
