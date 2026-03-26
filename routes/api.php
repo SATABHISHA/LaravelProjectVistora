@@ -69,6 +69,7 @@ use App\Http\Controllers\LeaveTypeFullConfigurationApiController;
 use App\Http\Controllers\LeavePolicyApiController;
 use App\Http\Controllers\EmployeeProfilePhotoApiController;
 use App\Http\Controllers\PayComponentApiController;
+use App\Http\Controllers\PayComponentV1ApiController;
 use App\Http\Controllers\ComponentTypeApiController;
 use App\Http\Controllers\PaygroupConfigurationApiController;
 use App\Http\Controllers\FormulaBuilderApiController;
@@ -518,6 +519,11 @@ Route::post('/paycomponent/add-or-update', [PayComponentApiController::class, 's
 Route::get('/paycomponent/all/{corpId}', [PayComponentApiController::class, 'getByCorpId']);
 Route::get('/paycomponent/{puid}', [PayComponentApiController::class, 'getByPuid']);
 Route::delete('/paycomponent/delete/{puid}', [PayComponentApiController::class, 'destroy']);
+
+// Pay Component V1 Routes
+Route::post('/paycomponentv1/add-or-update', [PayComponentV1ApiController::class, 'storeOrUpdate']);
+Route::get('/paycomponentv1/all/{corpId}', [PayComponentV1ApiController::class, 'getByCorpId']);
+Route::delete('/paycomponentv1/delete/{puid}', [PayComponentV1ApiController::class, 'destroy']);
 
 // Component Type Routes
 Route::post('/component-type/add-or-update', [ComponentTypeApiController::class, 'storeOrUpdate']);

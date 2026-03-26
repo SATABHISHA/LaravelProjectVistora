@@ -1719,6 +1719,16 @@
             ]
         },
         {
+            category: "Pay Component V1",
+            icon: "💰",
+            color: "#81c784",
+            endpoints: [
+                { method: "POST", path: "/paycomponentv1/add-or-update", desc: "Add or update pay component v1 (puid auto-generated on create; pass puid to update)", body: '{\n  "corpId": "",\n  "puid": "",\n  "componentName": "",\n  "companyName": "",\n  "payType": ""\n}' },
+                { method: "GET", path: "/paycomponentv1/all/{corpId}", desc: "Get all pay components v1 by corpId" },
+                { method: "DELETE", path: "/paycomponentv1/delete/{puid}", desc: "Delete pay component v1 by puid" }
+            ]
+        },
+        {
             category: "Component Type",
             icon: "🧩",
             color: "#ffa726",
