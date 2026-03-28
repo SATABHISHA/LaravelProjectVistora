@@ -72,6 +72,7 @@ use App\Http\Controllers\PayComponentApiController;
 use App\Http\Controllers\PayComponentV1ApiController;
 use App\Http\Controllers\ComponentTypeApiController;
 use App\Http\Controllers\PaygroupConfigurationApiController;
+use App\Http\Controllers\PaygroupConfigurationV1ApiController;
 use App\Http\Controllers\FormulaBuilderApiController;
 use App\Http\Controllers\EmployeeSalaryStructureApiController;
 use App\Http\Controllers\AttendanceApiController;
@@ -533,6 +534,12 @@ Route::delete('/component-type/delete/{corpId}/{id}', [ComponentTypeApiControlle
 // Paygroup Configuration Routes
 Route::post('/paygroup-configuration/add-or-update', [PaygroupConfigurationApiController::class, 'storeOrUpdate']);
 Route::get('/paygroup-configuration/by-corpid/{corpId}', [PaygroupConfigurationApiController::class, 'fetchByCorpId']);
+
+// Paygroup Configuration V1 Routes
+Route::post('/paygroupconfigurationv1/add-or-update', [PaygroupConfigurationV1ApiController::class, 'storeOrUpdate']);
+Route::get('/paygroupconfigurationv1/all/{corpId}', [PaygroupConfigurationV1ApiController::class, 'getByCorpId']);
+Route::delete('/paygroupconfigurationv1/delete/{puid}', [PaygroupConfigurationV1ApiController::class, 'destroy']);
+
 Route::get('/paygroup-configuration/{puid}', [PaygroupConfigurationApiController::class, 'fetchByPuid']);
 Route::delete('/paygroup-configuration/delete/{puid}', [PaygroupConfigurationApiController::class, 'destroy']);
 Route::get('/paygroup/included-components/{puid}', [PaygroupConfigurationApiController::class, 'fetchIncludedComponents']);

@@ -1758,6 +1758,16 @@
             ]
         },
         {
+            category: "Paygroup Configuration V1",
+            icon: "⚙️",
+            color: "#26c6da",
+            endpoints: [
+                { method: "POST", path: "/paygroupconfigurationv1/add-or-update", desc: "Add or update paygroup config v1 (puid auto-generated on create; pass puid to update)", body: '{\n  "corpId": "",\n  "puid": "",\n  "GroupName": "",\n  "IncludedComponents": ""\n}' },
+                { method: "GET", path: "/paygroupconfigurationv1/all/{corpId}", desc: "Get all paygroup config v1 by corpId" },
+                { method: "DELETE", path: "/paygroupconfigurationv1/delete/{puid}", desc: "Delete paygroup config v1 by puid" }
+            ]
+        },
+        {
             category: "Formula Builder",
             icon: "🔢",
             color: "#ff6b9d",
