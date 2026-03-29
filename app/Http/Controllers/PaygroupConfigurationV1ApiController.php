@@ -178,8 +178,9 @@ class PaygroupConfigurationV1ApiController extends Controller
             // Get all formula_builders for this paygroup puid
             $formulaBuilders = FormulaBuilder::where('paygroupPuid', $paygroupPuid)->get()->keyBy('componentName');
 
-            // First pass: calculate Basic from CTC (or use formula_builder definition)
-            $basicSalary = $this->calculateBasicFromCtc($formulaBuilders, $ctc);
+            // Resolve all component values using dependency-aware calculation
+            $resolvedValues = $this->resolveAllComponentValues($includedComponents, $formulaBuilders, $ctc);
+            $basicSalary = $resolvedValues['Basic'] ?? 0;
 
             // Categorize components
             $grossComponents = [];
@@ -187,27 +188,21 @@ class PaygroupConfigurationV1ApiController extends Controller
             $benefitComponents = [];
 
             foreach ($includedComponents as $componentName) {
+                // Skip CTC as a display component — it's the input, not a salary component
+                if (strtolower(trim($componentName)) === 'ctc') {
+                    continue;
+                }
+
                 $payComponent = DB::table('pay_components')
                     ->where('componentName', $componentName)
-                    ->where('isPartOfCtcYn', 1)
                     ->first();
 
                 if (!$payComponent) {
                     continue;
                 }
 
-                $calculatedValue = 0.0;
-                $formula = 'N/A';
-
-                if (strtolower(trim($componentName)) === 'basic') {
-                    $calculatedValue = round($basicSalary, 0);
-                    $formula = 'Basic';
-                } else {
-                    $result = $this->calculateComponentValueV1($componentName, $basicSalary, $formulaBuilders);
-                    $calculatedValue = round($result['calculatedValue'], 0);
-                    $formula = $result['formula'];
-                }
-
+                $calculatedValue = round($resolvedValues[$componentName] ?? 0, 0);
+                $formula = $this->getFormulaDescription($componentName, $formulaBuilders);
                 $annualCalculatedValue = round($calculatedValue * 12, 0);
 
                 $componentResult = [
@@ -220,29 +215,15 @@ class PaygroupConfigurationV1ApiController extends Controller
                 ];
 
                 $payType = $payComponent->payType;
-                if ($payType === 'Addition' || $payType === 'Addition & Deduction') {
+
+                // "Addition & Deduction" goes ONLY to deductions (not gross)
+                if ($payType === 'Addition') {
                     $grossComponents[] = $componentResult;
-                }
-                if ($payType === 'Deduction' || $payType === 'Addition & Deduction') {
+                } elseif ($payType === 'Deduction' || $payType === 'Addition & Deduction') {
                     $deductionComponents[] = $componentResult;
-                }
-                if ($payType === 'Benefits') {
+                } elseif ($payType === 'Benefits') {
                     $benefitComponents[] = $componentResult;
                 }
-            }
-
-            // Round all values
-            foreach ($grossComponents as &$c) {
-                $c['calculatedValue'] = round($c['calculatedValue'], 0);
-                $c['annualCalculatedValue'] = round($c['annualCalculatedValue'], 0);
-            }
-            foreach ($deductionComponents as &$c) {
-                $c['calculatedValue'] = round($c['calculatedValue'], 0);
-                $c['annualCalculatedValue'] = round($c['annualCalculatedValue'], 0);
-            }
-            foreach ($benefitComponents as &$c) {
-                $c['calculatedValue'] = round($c['calculatedValue'], 0);
-                $c['annualCalculatedValue'] = round($c['annualCalculatedValue'], 0);
             }
 
             // Calculate totals
@@ -318,63 +299,145 @@ class PaygroupConfigurationV1ApiController extends Controller
         }
     }
 
-    // Calculate Basic salary from CTC using formula_builders
-    private function calculateBasicFromCtc($formulaBuilders, $ctc)
+    /**
+     * Resolve all component values by building a dependency graph.
+     * Handles formulas like: CTC = 70% of Basic (reverse: Basic = CTC / 0.70)
+     * And forward: HRA = 50% of Basic, NPS = 5% of Basic, etc.
+     */
+    private function resolveAllComponentValues($includedComponents, $formulaBuilders, $ctc)
     {
-        $basicFormula = $formulaBuilders->get('Basic');
+        $resolved = [];
+        $resolved['CTC'] = $ctc;
 
-        if ($basicFormula) {
-            $formulaType = strtolower($basicFormula->formula ?? '');
-            $referenceValue = (float) ($basicFormula->referenceValue ?? 0);
+        // Step 1: Determine Basic salary from CTC
+        $resolved['Basic'] = $this->deriveBasicFromCtc($formulaBuilders, $ctc);
 
-            if ($formulaType === 'percent' && $referenceValue > 0) {
+        // Step 2: Resolve all other components (may reference Basic, CTC, or other components)
+        // Multiple passes to handle dependencies between components
+        $maxPasses = 5;
+        for ($pass = 0; $pass < $maxPasses; $pass++) {
+            $allResolved = true;
+
+            foreach ($includedComponents as $componentName) {
+                $name = trim($componentName);
+                if (isset($resolved[$name])) {
+                    continue; // Already resolved
+                }
+
+                $fb = $formulaBuilders->get($name);
+                if (!$fb) {
+                    $resolved[$name] = 0;
+                    continue;
+                }
+
+                $formulaType = strtolower($fb->formula ?? '');
+                $refersTo = trim($fb->componentNameRefersTo ?? '');
+                $referenceValue = (float) ($fb->referenceValue ?? 0);
+
+                if ($formulaType === 'fixed') {
+                    $resolved[$name] = round($referenceValue, 0);
+                } elseif ($formulaType === 'variable') {
+                    $resolved[$name] = 0;
+                } elseif ($formulaType === 'percent' && $referenceValue > 0) {
+                    // Check if the referenced component is already resolved
+                    if (isset($resolved[$refersTo])) {
+                        $resolved[$name] = round(($referenceValue / 100) * $resolved[$refersTo], 0);
+                    } else {
+                        // Try case-insensitive match
+                        $found = false;
+                        foreach ($resolved as $key => $val) {
+                            if (strtolower($key) === strtolower($refersTo)) {
+                                $resolved[$name] = round(($referenceValue / 100) * $val, 0);
+                                $found = true;
+                                break;
+                            }
+                        }
+                        if (!$found) {
+                            $allResolved = false; // Will try again next pass
+                        }
+                    }
+                } else {
+                    $resolved[$name] = 0;
+                }
+            }
+
+            if ($allResolved) {
+                break;
+            }
+        }
+
+        return $resolved;
+    }
+
+    /**
+     * Derive Basic salary from CTC using formula_builders.
+     * Handles both directions:
+     *   - Basic's formula says "X% of CTC" → Basic = X% of CTC
+     *   - CTC's formula says "X% of Basic" → Basic = CTC / (X/100)
+     *   - Basic's formula is "fixed" → use the fixed value
+     *   - Default fallback: Basic = 40% of CTC
+     */
+    private function deriveBasicFromCtc($formulaBuilders, $ctc)
+    {
+        $basicFb = $formulaBuilders->get('Basic');
+        $ctcFb = $formulaBuilders->get('CTC');
+
+        // Case 1: Basic formula defines relationship to CTC directly
+        if ($basicFb) {
+            $formulaType = strtolower($basicFb->formula ?? '');
+            $refersTo = strtolower(trim($basicFb->componentNameRefersTo ?? ''));
+            $referenceValue = (float) ($basicFb->referenceValue ?? 0);
+
+            if ($formulaType === 'percent' && $refersTo === 'ctc' && $referenceValue > 0) {
                 return round(($referenceValue / 100) * $ctc, 0);
-            } elseif ($formulaType === 'fixed' && $referenceValue > 0) {
+            }
+            if ($formulaType === 'fixed' && $referenceValue > 0) {
                 return round($referenceValue, 0);
             }
         }
 
-        // Default: Basic = 40% of CTC if no formula defined
+        // Case 2: CTC formula defines relationship to Basic (reverse calculation)
+        // e.g., CTC = 70% of Basic → Basic = CTC / 0.70
+        if ($ctcFb) {
+            $formulaType = strtolower($ctcFb->formula ?? '');
+            $refersTo = strtolower(trim($ctcFb->componentNameRefersTo ?? ''));
+            $referenceValue = (float) ($ctcFb->referenceValue ?? 0);
+
+            if ($formulaType === 'percent' && $refersTo === 'basic' && $referenceValue > 0) {
+                return round($ctc / ($referenceValue / 100), 0);
+            }
+        }
+
+        // Default: Basic = 40% of CTC
         return round(0.4 * $ctc, 0);
     }
 
-    // Calculate component value using formula_builders scoped to paygroupPuid
-    private function calculateComponentValueV1($componentName, $basicSalary, $formulaBuilders)
+    /**
+     * Get human-readable formula description for a component.
+     */
+    private function getFormulaDescription($componentName, $formulaBuilders)
     {
-        $fb = $formulaBuilders->get($componentName);
+        if (strtolower(trim($componentName)) === 'basic') {
+            return 'Basic';
+        }
 
+        $fb = $formulaBuilders->get($componentName);
         if (!$fb) {
-            return ['calculatedValue' => 0.0, 'formula' => 'N/A'];
+            return 'N/A';
         }
 
         $formulaType = strtolower($fb->formula ?? '');
-        $refersTo = $fb->componentNameRefersTo ?? null;
+        $refersTo = $fb->componentNameRefersTo ?? 'Unknown';
         $referenceValue = (float) ($fb->referenceValue ?? 0);
-        $calculatedValue = 0.0;
-        $formula = $fb->formula;
 
-        if ($formulaType === 'percent') {
-            if (strtolower($refersTo ?? '') === 'basic' && $referenceValue > 0) {
-                $calculatedValue = ($referenceValue / 100) * $basicSalary;
-                $formula = $referenceValue . '% of Basic';
-            } else {
-                $calculatedValue = 0.0;
-                $formula = $referenceValue . '% of ' . ($refersTo ?? 'Unknown');
-            }
+        if ($formulaType === 'percent' && $referenceValue > 0) {
+            return $referenceValue . '% of ' . $refersTo;
         } elseif ($formulaType === 'fixed') {
-            $calculatedValue = $referenceValue;
-            $formula = 'Fixed: ₹' . number_format($referenceValue, 2);
+            return 'Fixed: ₹' . number_format($referenceValue, 2);
         } elseif ($formulaType === 'variable') {
-            $calculatedValue = 0.0;
-            $formula = 'Variable';
-        } else {
-            $calculatedValue = 0.0;
-            $formula = 'Unknown Formula Type: ' . $fb->formula;
+            return 'Variable';
         }
 
-        return [
-            'calculatedValue' => round($calculatedValue, 0),
-            'formula' => $formula
-        ];
+        return $fb->formula ?? 'N/A';
     }
 }
