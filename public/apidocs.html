@@ -1764,7 +1764,9 @@
             endpoints: [
                 { method: "POST", path: "/paygroupconfigurationv1/add-or-update", desc: "Add or update paygroup config v1 (puid auto-generated on create; pass puid to update)", body: '{\n  "corpId": "",\n  "puid": "",\n  "GroupName": "",\n  "IncludedComponents": ""\n}' },
                 { method: "GET", path: "/paygroupconfigurationv1/all/{corpId}", desc: "Get all paygroup config v1 by corpId" },
-                { method: "DELETE", path: "/paygroupconfigurationv1/delete/{puid}", desc: "Delete paygroup config v1 by puid" }
+                { method: "DELETE", path: "/paygroupconfigurationv1/delete/{puid}", desc: "Delete paygroup config v1 by puid (also deletes related formula_builders)" },
+                { method: "GET", path: "/paygroupv1/groupnames/{corpId}", desc: "Get all group names with details by corpId from paygroup_configuration_v1s" },
+                { method: "GET", path: "/paygroupv1/complete-improved/{groupName}/{corpId}/{ctc}", desc: "Complete payroll breakdown (V1) — calculates Basic from CTC using formula_builders scoped by paygroupPuid" }
             ]
         },
         {

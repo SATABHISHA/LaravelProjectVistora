@@ -539,6 +539,8 @@ Route::get('/paygroup-configuration/by-corpid/{corpId}', [PaygroupConfigurationA
 Route::post('/paygroupconfigurationv1/add-or-update', [PaygroupConfigurationV1ApiController::class, 'storeOrUpdate']);
 Route::get('/paygroupconfigurationv1/all/{corpId}', [PaygroupConfigurationV1ApiController::class, 'getByCorpId']);
 Route::delete('/paygroupconfigurationv1/delete/{puid}', [PaygroupConfigurationV1ApiController::class, 'destroy']);
+Route::get('/paygroupv1/groupnames/{corpId}', [PaygroupConfigurationV1ApiController::class, 'getGroupNamesByCorpId']);
+Route::get('/paygroupv1/complete-improved/{groupName}/{corpId}/{ctc}', [PaygroupConfigurationV1ApiController::class, 'fetchCompletePayrollBreakdownImproved']);
 
 Route::get('/paygroup-configuration/{puid}', [PaygroupConfigurationApiController::class, 'fetchByPuid']);
 Route::delete('/paygroup-configuration/delete/{puid}', [PaygroupConfigurationApiController::class, 'destroy']);
