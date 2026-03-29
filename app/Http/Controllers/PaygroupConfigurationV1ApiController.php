@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use Illuminate\Http\Request;
 use App\Models\PaygroupConfigurationV1;
+use App\Models\FormulaBuilder;
 
 class PaygroupConfigurationV1ApiController extends Controller
 {
@@ -96,7 +97,7 @@ class PaygroupConfigurationV1ApiController extends Controller
         ]);
     }
 
-    // Delete PaygroupConfigurationV1 by puid
+    // Delete PaygroupConfigurationV1 by puid (also deletes related formula_builders)
     public function destroy($puid)
     {
         $paygroup = PaygroupConfigurationV1::where('puid', $puid)->first();
@@ -108,11 +109,15 @@ class PaygroupConfigurationV1ApiController extends Controller
             ], 404);
         }
 
+        // Delete related formula_builders where paygroupPuid matches this puid
+        $deletedFormulaBuilders = FormulaBuilder::where('paygroupPuid', $puid)->delete();
+
         $paygroup->delete();
 
         return response()->json([
             'status' => true,
-            'message' => 'PaygroupConfigurationV1 deleted successfully'
+            'message' => 'PaygroupConfigurationV1 and related formula builders deleted successfully',
+            'deletedFormulaBuilders' => $deletedFormulaBuilders
         ]);
     }
 }
