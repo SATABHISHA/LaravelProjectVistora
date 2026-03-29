@@ -193,8 +193,9 @@ class PaygroupConfigurationV1ApiController extends Controller
                     continue;
                 }
 
-                $payComponent = DB::table('pay_components')
+                $payComponent = DB::table('pay_component_v1s')
                     ->where('componentName', $componentName)
+                    ->where('corpId', $corpId)
                     ->first();
 
                 if (!$payComponent) {
@@ -208,7 +209,6 @@ class PaygroupConfigurationV1ApiController extends Controller
                 $componentResult = [
                     'componentName' => $componentName,
                     'payType' => $payComponent->payType,
-                    'paymentNature' => $payComponent->paymentNature,
                     'formula' => $formula,
                     'calculatedValue' => round($calculatedValue, 0),
                     'annualCalculatedValue' => round($annualCalculatedValue, 0)
@@ -216,12 +216,13 @@ class PaygroupConfigurationV1ApiController extends Controller
 
                 $payType = $payComponent->payType;
 
-                // "Addition & Deduction" goes ONLY to deductions (not gross)
-                if ($payType === 'Addition') {
+                $payTypeLower = strtolower($payType);
+
+                if ($payTypeLower === 'addition' || $payTypeLower === 'earning' || $payTypeLower === 'earnings') {
                     $grossComponents[] = $componentResult;
-                } elseif ($payType === 'Deduction' || $payType === 'Addition & Deduction') {
+                } elseif ($payTypeLower === 'deduction' || $payTypeLower === 'addition & deduction' || $payTypeLower === 'earning and deduction') {
                     $deductionComponents[] = $componentResult;
-                } elseif ($payType === 'Benefits') {
+                } elseif ($payTypeLower === 'benefits' || $payTypeLower === 'benefit') {
                     $benefitComponents[] = $componentResult;
                 }
             }
