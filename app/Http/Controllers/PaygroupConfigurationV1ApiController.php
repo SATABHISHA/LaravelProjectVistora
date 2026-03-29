@@ -138,6 +138,7 @@ class PaygroupConfigurationV1ApiController extends Controller
     }
 
     // Complete improved payroll breakdown using paygroup_configuration_v1s and formula_builders
+    // CTC input is treated as ANNUAL for corpId != 'maco'
     public function fetchCompletePayrollBreakdownImproved($groupName, $corpId, $ctc)
     {
         if (!is_numeric($ctc) || $ctc < 0) {
@@ -149,6 +150,8 @@ class PaygroupConfigurationV1ApiController extends Controller
         }
 
         $ctc = (float) $ctc;
+        // For corpId != 'maco', CTC is annual; for maco, CTC is monthly
+        $isMaco = strtolower($corpId) === 'maco';
 
         try {
             // Get paygroup config from paygroup_configuration_v1s
@@ -178,9 +181,14 @@ class PaygroupConfigurationV1ApiController extends Controller
             // Get all formula_builders for this paygroup puid
             $formulaBuilders = FormulaBuilder::where('paygroupPuid', $paygroupPuid)->get()->keyBy('componentName');
 
-            // Resolve all component values using dependency-aware calculation
-            $resolvedValues = $this->resolveAllComponentValues($includedComponents, $formulaBuilders, $ctc);
-            $basicSalary = $resolvedValues['Basic'] ?? 0;
+            // For non-maco: CTC is annual, so all resolved values are annual
+            // For maco: CTC is monthly, so all resolved values are monthly
+            $annualCtc = $isMaco ? ($ctc * 12) : $ctc;
+
+            // Resolve all component values using dependency-aware calculation (annual basis)
+            $resolvedValues = $this->resolveAllComponentValues($includedComponents, $formulaBuilders, $annualCtc);
+            $basicSalaryAnnual = $resolvedValues['Basic'] ?? 0;
+            $basicSalaryMonthly = round($basicSalaryAnnual / 12, 0);
 
             // Categorize components
             $grossComponents = [];
@@ -202,16 +210,16 @@ class PaygroupConfigurationV1ApiController extends Controller
                     continue;
                 }
 
-                $calculatedValue = round($resolvedValues[$componentName] ?? 0, 0);
+                $annualValue = round($resolvedValues[$componentName] ?? 0, 0);
+                $monthlyValue = round($annualValue / 12, 0);
                 $formula = $this->getFormulaDescription($componentName, $formulaBuilders);
-                $annualCalculatedValue = round($calculatedValue * 12, 0);
 
                 $componentResult = [
                     'componentName' => $componentName,
                     'payType' => $payComponent->payType,
                     'formula' => $formula,
-                    'calculatedValue' => round($calculatedValue, 0),
-                    'annualCalculatedValue' => round($annualCalculatedValue, 0)
+                    'calculatedValue' => $monthlyValue,
+                    'annualCalculatedValue' => $annualValue
                 ];
 
                 $payType = $payComponent->payType;
@@ -250,7 +258,9 @@ class PaygroupConfigurationV1ApiController extends Controller
                     'corpId' => $corpId,
                     'paygroupPuid' => $paygroupPuid,
                     'ctc' => round($ctc, 0),
-                    'basicSalary' => round($basicSalary, 0),
+                    'annualCTC' => round($annualCtc, 0),
+                    'basicSalary' => $basicSalaryMonthly,
+                    'annualBasicSalary' => $basicSalaryAnnual,
                     'gross' => $grossComponents,
                     'deductions' => $deductionComponents,
                     'otherBenefitsAllowances' => $benefitComponents,
@@ -470,10 +480,6 @@ class PaygroupConfigurationV1ApiController extends Controller
      */
     private function getFormulaDescription($componentName, $formulaBuilders)
     {
-        if (strtolower(trim($componentName)) === 'basic') {
-            return 'Basic';
-        }
-
         // Direct lookup: componentName has its own formula_builder entry
         $fb = $formulaBuilders->get($componentName);
         if ($fb) {
