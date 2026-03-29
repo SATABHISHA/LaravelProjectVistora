@@ -302,8 +302,13 @@ class PaygroupConfigurationV1ApiController extends Controller
 
     /**
      * Resolve all component values by building a dependency graph.
-     * Handles formulas like: CTC = 70% of Basic (reverse: Basic = CTC / 0.70)
-     * And forward: HRA = 50% of Basic, NPS = 5% of Basic, etc.
+     * Supports two lookup modes:
+     *   1. Forward: componentName has its own formula_builder entry
+     *      → componentName = referenceValue% of componentNameRefersTo
+     *   2. Reverse: component appears as componentNameRefersTo in another entry
+     *      → component = referenceValue% of that entry's componentName
+     *      e.g., formula_builder: componentName=Basic, refersTo=NPS, value=5
+     *      means NPS = 5% of Basic
      */
     private function resolveAllComponentValues($includedComponents, $formulaBuilders, $ctc)
     {
@@ -313,7 +318,18 @@ class PaygroupConfigurationV1ApiController extends Controller
         // Step 1: Determine Basic salary from CTC
         $resolved['Basic'] = $this->deriveBasicFromCtc($formulaBuilders, $ctc);
 
-        // Step 2: Resolve all other components (may reference Basic, CTC, or other components)
+        // Build reverse index: componentNameRefersTo → formula_builder entry
+        // This allows lookup for components that don't have their own formula_builder entry
+        // but are referenced by another component's formula
+        $reverseIndex = [];
+        foreach ($formulaBuilders as $fb) {
+            $refersTo = trim($fb->componentNameRefersTo ?? '');
+            if (!empty($refersTo)) {
+                $reverseIndex[$refersTo] = $fb;
+            }
+        }
+
+        // Step 2: Resolve all other components
         // Multiple passes to handle dependencies between components
         $maxPasses = 5;
         for ($pass = 0; $pass < $maxPasses; $pass++) {
@@ -325,39 +341,75 @@ class PaygroupConfigurationV1ApiController extends Controller
                     continue; // Already resolved
                 }
 
+                // Try direct lookup first (componentName has its own formula)
                 $fb = $formulaBuilders->get($name);
-                if (!$fb) {
-                    $resolved[$name] = 0;
-                    continue;
-                }
 
-                $formulaType = strtolower($fb->formula ?? '');
-                $refersTo = trim($fb->componentNameRefersTo ?? '');
-                $referenceValue = (float) ($fb->referenceValue ?? 0);
+                if ($fb) {
+                    // Forward calculation: name = referenceValue% of refersTo
+                    $formulaType = strtolower($fb->formula ?? '');
+                    $refersTo = trim($fb->componentNameRefersTo ?? '');
+                    $referenceValue = (float) ($fb->referenceValue ?? 0);
 
-                if ($formulaType === 'fixed') {
-                    $resolved[$name] = round($referenceValue, 0);
-                } elseif ($formulaType === 'variable') {
-                    $resolved[$name] = 0;
-                } elseif ($formulaType === 'percent' && $referenceValue > 0) {
-                    // Check if the referenced component is already resolved
-                    if (isset($resolved[$refersTo])) {
-                        $resolved[$name] = round(($referenceValue / 100) * $resolved[$refersTo], 0);
-                    } else {
-                        // Try case-insensitive match
-                        $found = false;
-                        foreach ($resolved as $key => $val) {
-                            if (strtolower($key) === strtolower($refersTo)) {
-                                $resolved[$name] = round(($referenceValue / 100) * $val, 0);
-                                $found = true;
-                                break;
+                    if ($formulaType === 'fixed') {
+                        $resolved[$name] = round($referenceValue, 0);
+                    } elseif ($formulaType === 'variable') {
+                        $resolved[$name] = 0;
+                    } elseif ($formulaType === 'percent' && $referenceValue > 0) {
+                        if (isset($resolved[$refersTo])) {
+                            $resolved[$name] = round(($referenceValue / 100) * $resolved[$refersTo], 0);
+                        } else {
+                            // Try case-insensitive match
+                            $found = false;
+                            foreach ($resolved as $key => $val) {
+                                if (strtolower($key) === strtolower($refersTo)) {
+                                    $resolved[$name] = round(($referenceValue / 100) * $val, 0);
+                                    $found = true;
+                                    break;
+                                }
+                            }
+                            if (!$found) {
+                                $allResolved = false; // Will try again next pass
                             }
                         }
-                        if (!$found) {
-                            $allResolved = false; // Will try again next pass
+                    } else {
+                        $resolved[$name] = 0;
+                    }
+                } elseif (isset($reverseIndex[$name])) {
+                    // Reverse lookup: this component is referenced by another formula_builder
+                    // e.g., Basic's entry has componentNameRefersTo=NPS
+                    // means NPS = referenceValue% of Basic
+                    $reverseFb = $reverseIndex[$name];
+                    $formulaType = strtolower($reverseFb->formula ?? '');
+                    $sourceComponent = trim($reverseFb->componentName ?? '');
+                    $referenceValue = (float) ($reverseFb->referenceValue ?? 0);
+
+                    if ($formulaType === 'fixed') {
+                        $resolved[$name] = round($referenceValue, 0);
+                    } elseif ($formulaType === 'variable') {
+                        $resolved[$name] = 0;
+                    } elseif ($formulaType === 'percent' && $referenceValue > 0) {
+                        if (isset($resolved[$sourceComponent])) {
+                            // component = referenceValue% of sourceComponent
+                            $resolved[$name] = round(($referenceValue / 100) * $resolved[$sourceComponent], 0);
+                        } else {
+                            // Try case-insensitive match
+                            $found = false;
+                            foreach ($resolved as $key => $val) {
+                                if (strtolower($key) === strtolower($sourceComponent)) {
+                                    $resolved[$name] = round(($referenceValue / 100) * $val, 0);
+                                    $found = true;
+                                    break;
+                                }
+                            }
+                            if (!$found) {
+                                $allResolved = false; // Will try again next pass
+                            }
                         }
+                    } else {
+                        $resolved[$name] = 0;
                     }
                 } else {
+                    // No formula found at all
                     $resolved[$name] = 0;
                 }
             }
@@ -422,23 +474,44 @@ class PaygroupConfigurationV1ApiController extends Controller
             return 'Basic';
         }
 
+        // Direct lookup: componentName has its own formula_builder entry
         $fb = $formulaBuilders->get($componentName);
-        if (!$fb) {
-            return 'N/A';
+        if ($fb) {
+            $formulaType = strtolower($fb->formula ?? '');
+            $refersTo = $fb->componentNameRefersTo ?? 'Unknown';
+            $referenceValue = (float) ($fb->referenceValue ?? 0);
+
+            if ($formulaType === 'percent' && $referenceValue > 0) {
+                return $referenceValue . '% of ' . $refersTo;
+            } elseif ($formulaType === 'fixed') {
+                return 'Fixed: ₹' . number_format($referenceValue, 2);
+            } elseif ($formulaType === 'variable') {
+                return 'Variable';
+            }
+
+            return $fb->formula ?? 'N/A';
         }
 
-        $formulaType = strtolower($fb->formula ?? '');
-        $refersTo = $fb->componentNameRefersTo ?? 'Unknown';
-        $referenceValue = (float) ($fb->referenceValue ?? 0);
+        // Reverse lookup: check if this component appears as componentNameRefersTo
+        // in another formula_builder entry (e.g., Basic's entry has refersTo=NPS → NPS = 5% of Basic)
+        foreach ($formulaBuilders as $entry) {
+            if (trim($entry->componentNameRefersTo ?? '') === $componentName) {
+                $formulaType = strtolower($entry->formula ?? '');
+                $referenceValue = (float) ($entry->referenceValue ?? 0);
+                $sourceComponent = $entry->componentName;
 
-        if ($formulaType === 'percent' && $referenceValue > 0) {
-            return $referenceValue . '% of ' . $refersTo;
-        } elseif ($formulaType === 'fixed') {
-            return 'Fixed: ₹' . number_format($referenceValue, 2);
-        } elseif ($formulaType === 'variable') {
-            return 'Variable';
+                if ($formulaType === 'percent' && $referenceValue > 0) {
+                    return $referenceValue . '% of ' . $sourceComponent;
+                } elseif ($formulaType === 'fixed') {
+                    return 'Fixed: ₹' . number_format($referenceValue, 2);
+                } elseif ($formulaType === 'variable') {
+                    return 'Variable';
+                }
+
+                return $entry->formula ?? 'N/A';
+            }
         }
 
-        return $fb->formula ?? 'N/A';
+        return 'N/A';
     }
 }
