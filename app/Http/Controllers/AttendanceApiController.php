@@ -113,12 +113,22 @@ class AttendanceApiController extends Controller
     private function calculateWorkingHours($checkInTime, $checkOutTime)
     {
         try {
-            // Parse AM/PM time format
-            $checkIn = Carbon::createFromFormat('g:i A', $checkInTime);
-            $checkOut = Carbon::createFromFormat('g:i A', $checkOutTime);
+            // Skip invalid/missing time values
+            if (!$checkInTime || !$checkOutTime || 
+                strtoupper(trim($checkInTime)) === 'N/A' || 
+                strtoupper(trim($checkOutTime)) === 'N/A' ||
+                trim($checkInTime) === '' || trim($checkOutTime) === '') {
+                return '00:00';
+            }
+
+            $checkIn = $this->parseTimeString($checkInTime);
+            $checkOut = $this->parseTimeString($checkOutTime);
+
+            if (!$checkIn || !$checkOut) {
+                return '00:00';
+            }
             
             // Handle case where checkout is next day (e.g., night shift)
-            // If checkout time is earlier than checkin time, assume it's next day
             if ($checkOut->lt($checkIn)) {
                 $checkOut->addDay();
             }
@@ -133,9 +143,46 @@ class AttendanceApiController extends Controller
             return sprintf('%02d:%02d', $hours, $minutes);
             
         } catch (\Exception $e) {
-            // If parsing fails, return 00:00
             return '00:00';
         }
+    }
+
+    /**
+     * Parse a time string in various formats and return a Carbon instance
+     */
+    private function parseTimeString($timeStr)
+    {
+        $timeStr = trim($timeStr);
+        
+        // Try multiple time formats
+        $formats = [
+            'g:i A',    // 9:00 AM
+            'g:i a',    // 9:00 am
+            'h:i A',    // 09:00 AM
+            'h:i a',    // 09:00 am
+            'G:i',      // 9:00 (24-hour)
+            'H:i',      // 09:00 (24-hour with leading zero)
+            'H:i:s',    // 09:00:00 (24-hour with seconds)
+            'g:iA',     // 9:00AM (no space)
+            'g:ia',     // 9:00am (no space)
+        ];
+        
+        foreach ($formats as $format) {
+            try {
+                $parsed = Carbon::createFromFormat($format, $timeStr);
+                if ($parsed && $parsed->format($format) === $timeStr) {
+                    return $parsed;
+                }
+                // If strict match fails, still return if parsing succeeded
+                if ($parsed !== false) {
+                    return $parsed;
+                }
+            } catch (\Exception $e) {
+                continue;
+            }
+        }
+        
+        return null;
     }
 
     /**
@@ -598,19 +645,19 @@ class AttendanceApiController extends Controller
                     if (preg_match('/^(\d{2})\/(\d{2})\/(\d{4})$/', $fromDateStr, $matches)) {
                         $fromDateStr = $matches[3] . '-' . $matches[2] . '-' . $matches[1];
                     }
-                    $fromDate = Carbon::parse($fromDateStr);
+                    $leaveFromDate = Carbon::parse($fromDateStr);
                     
                     // Parse to_date - handle multiple formats
                     $toDateStr = $leave->to_date;
                     if (preg_match('/^(\d{2})\/(\d{2})\/(\d{4})$/', $toDateStr, $matches)) {
                         $toDateStr = $matches[3] . '-' . $matches[2] . '-' . $matches[1];
                     }
-                    $toDate = Carbon::parse($toDateStr);
+                    $leaveToDate = Carbon::parse($toDateStr);
                     
                     // Iterate through each date in the leave period
-                    for ($date = $fromDate->copy(); $date->lte($toDate); $date->addDay()) {
-                        $dateKey = $date->format('Y-m-d');
-                        if ($date->gte(Carbon::parse($startDate)) && $date->lte(Carbon::parse($endDate))) {
+                    for ($leaveDay = $leaveFromDate->copy(); $leaveDay->lte($leaveToDate); $leaveDay->addDay()) {
+                        $dateKey = $leaveDay->format('Y-m-d');
+                        if ($leaveDay->gte(Carbon::parse($startDate)) && $leaveDay->lte(Carbon::parse($endDate))) {
                             $leavesByEmpCodeAndDate[$leave->empcode][$dateKey] = $leave->status;
                         }
                     }
@@ -642,6 +689,15 @@ class AttendanceApiController extends Controller
                     }
                 }
                 
+                // Recalculate totalHrsForTheDay if missing but check-in/out are valid
+                $totalHrs = $record->totalHrsForTheDay;
+                $hasValidIn = $record->checkIn && strtoupper(trim($record->checkIn)) !== 'N/A' && trim($record->checkIn) !== '';
+                $hasValidOut = $record->checkOut && strtoupper(trim($record->checkOut)) !== 'N/A' && trim($record->checkOut) !== '';
+                
+                if ($hasValidIn && $hasValidOut && (empty($totalHrs) || $totalHrs === '00:00' || $totalHrs === '0')) {
+                    $totalHrs = $this->calculateWorkingHours($record->checkIn, $record->checkOut);
+                }
+
                 $attendanceByDate[$dateKey] = [
                     'id' => $record->id,
                     'puid' => $record->puid,
@@ -650,7 +706,7 @@ class AttendanceApiController extends Controller
                     'status' => $record->status,
                     'attendanceStatus' => $attendanceStatus,
                     'leaveStatus' => $leaveStatus, // Include leave status for reference
-                    'totalHrsForTheDay' => $record->totalHrsForTheDay,
+                    'totalHrsForTheDay' => $totalHrs,
                     'dayName' => $recordDate->format('D'), // Short day name (Mon, Tue, etc.)
                     'dateOnly' => $recordDate->format('d'), // Day number only (01-31)
                     'fullDate' => $recordDate->format('Y-m-d'),
@@ -813,12 +869,15 @@ class AttendanceApiController extends Controller
             $responseData['userName'] = $attendance->userName;
             
             // Calculate hours based on different scenarios
-            if ($attendance->checkIn && $attendance->checkOut) {
+            $hasValidCheckIn = $attendance->checkIn && strtoupper(trim($attendance->checkIn)) !== 'N/A' && trim($attendance->checkIn) !== '';
+            $hasValidCheckOut = $attendance->checkOut && strtoupper(trim($attendance->checkOut)) !== 'N/A' && trim($attendance->checkOut) !== '';
+            
+            if ($hasValidCheckIn && $hasValidCheckOut) {
                 // Scenario 1: Both check-in and check-out done
                 $responseData['totalHours'] = $this->calculateWorkingHours($attendance->checkIn, $attendance->checkOut);
                 $responseData['hoursType'] = 'Completed Shift';
                 
-            } elseif ($attendance->checkIn && !$attendance->checkOut) {
+            } elseif ($hasValidCheckIn && !$hasValidCheckOut) {
                 // Scenario 2: Only check-in done, calculate hours till current time
                 $responseData['totalHours'] = $this->calculateWorkingHours($attendance->checkIn, $currentTime->format('g:i A'));
                 $responseData['hoursType'] = 'Ongoing Shift';
