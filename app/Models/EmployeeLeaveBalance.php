@@ -15,6 +15,7 @@ class EmployeeLeaveBalance extends Model
         'corp_id',
         'emp_code',
         'emp_full_name',
+        'company_name',
         'leave_type_puid',
         'leave_code',
         'leave_name',

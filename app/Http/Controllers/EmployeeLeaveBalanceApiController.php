@@ -8,6 +8,7 @@ use App\Models\EmployeeLeaveBalance;
 use App\Models\LeaveTypeBasicConfiguration;
 use App\Models\LeaveTypeFullConfiguration;
 use App\Models\EmployeeDetail;
+use App\Models\EmploymentDetail;
 use App\Models\UserLogin;
 use Carbon\Carbon;
 
@@ -91,12 +92,14 @@ class EmployeeLeaveBalanceApiController extends Controller
         $request->validate([
             'corp_id' => 'required|string',
             'emp_code' => 'required|string', // Admin's emp_code
-            'year' => 'required|integer|min:2020|max:2100'
+            'year' => 'required|integer|min:2020|max:2100',
+            'company_name' => 'required|string'
         ]);
 
         $corpId = $request->corp_id;
         $adminEmpCode = $request->emp_code;
         $year = $request->year;
+        $companyName = $request->company_name;
         $currentDate = Carbon::now();
         $currentMonth = $currentDate->month;
 
@@ -108,13 +111,27 @@ class EmployeeLeaveBalanceApiController extends Controller
             ], 403);
         }
 
-        // Get all employees for the corp_id
-        $employees = EmployeeDetail::where('corp_id', $corpId)->get();
-        
+        // Get employees filtered by corp_id + company_name via EmploymentDetail
+        $empCodes = EmploymentDetail::where('corp_id', $corpId)
+            ->where('company_name', $companyName)
+            ->pluck('EmpCode')
+            ->toArray();
+
+        if (empty($empCodes)) {
+            return response()->json([
+                'status' => false,
+                'message' => 'No employees found for this corp_id and company_name.'
+            ], 404);
+        }
+
+        $employees = EmployeeDetail::where('corp_id', $corpId)
+            ->whereIn('EmpCode', $empCodes)
+            ->get();
+
         if ($employees->isEmpty()) {
             return response()->json([
                 'status' => false,
-                'message' => 'No employees found for this corp_id.'
+                'message' => 'No employees found for this corp_id and company_name.'
             ], 404);
         }
 
@@ -150,11 +167,12 @@ class EmployeeLeaveBalanceApiController extends Controller
                     $basic = $config['basic'];
                     $full = $config['full'];
                     
-                    // Check if leave already exists for this employee, leave type, and year
+                    // Check if leave already exists for this employee, leave type, year, and company
                     $existingLeave = EmployeeLeaveBalance::where('corp_id', $corpId)
                         ->where('emp_code', $empCode)
                         ->where('leave_type_puid', $basic->puid)
                         ->where('year', $year)
+                        ->where('company_name', $companyName)
                         ->first();
 
                     if ($existingLeave) {
@@ -221,6 +239,7 @@ class EmployeeLeaveBalanceApiController extends Controller
                         'corp_id' => $corpId,
                         'emp_code' => $empCode,
                         'emp_full_name' => $empFullName,
+                        'company_name' => $companyName,
                         'leave_type_puid' => $basic->puid,
                         'leave_code' => $basic->leaveCode,
                         'leave_name' => $basic->leaveName,
@@ -253,6 +272,7 @@ class EmployeeLeaveBalanceApiController extends Controller
                     'carry_forward_applied' => $carryForwardCount,
                     'employees_allotted' => count($allottedEmployees),
                     'employees_skipped' => count($skippedEmployees),
+                    'company_name' => $companyName,
                     'year' => $year
                 ]
             ], 201);
@@ -276,13 +296,15 @@ class EmployeeLeaveBalanceApiController extends Controller
             'corp_id' => 'required|string',
             'emp_code' => 'required|string', // Admin's emp_code
             'year' => 'required|integer',
-            'month' => 'required|integer|min:1|max:12'
+            'month' => 'required|integer|min:1|max:12',
+            'company_name' => 'required|string'
         ]);
 
         $corpId = $request->corp_id;
         $adminEmpCode = $request->emp_code;
         $year = $request->year;
         $month = $request->month;
+        $companyName = $request->company_name;
 
         // Check if user is admin
         if (!$this->isAdmin($corpId, $adminEmpCode)) {
@@ -298,10 +320,11 @@ class EmployeeLeaveBalanceApiController extends Controller
         DB::beginTransaction();
 
         try {
-            // Get all leave balances with monthly credit type for the given year
+            // Get all leave balances with monthly credit type for the given year and company
             $leaveBalances = EmployeeLeaveBalance::where('corp_id', $corpId)
                 ->where('year', $year)
                 ->where('credit_type', 'monthly')
+                ->where('company_name', $companyName)
                 ->get();
 
             foreach ($leaveBalances as $balance) {
@@ -343,6 +366,7 @@ class EmployeeLeaveBalanceApiController extends Controller
                 'data' => [
                     'records_updated' => $updatedCount,
                     'records_skipped' => $skippedCount,
+                    'company_name' => $companyName,
                     'year' => $year,
                     'month' => $month
                 ]
@@ -363,6 +387,7 @@ class EmployeeLeaveBalanceApiController extends Controller
     public function getEmployeeLeaveList(Request $request, $corpId, $empCode = null)
     {
         $year = $request->query('year', Carbon::now()->year);
+        $companyName = $request->query('company_name');
 
         // Build query for leave balances
         $query = EmployeeLeaveBalance::where('corp_id', $corpId)
@@ -371,6 +396,11 @@ class EmployeeLeaveBalanceApiController extends Controller
         // If emp_code is provided and not 'ALL', filter by emp_code
         if ($empCode && strtoupper($empCode) !== 'ALL') {
             $query->where('emp_code', $empCode);
+        }
+
+        // Optional company_name filter
+        if ($companyName) {
+            $query->where('company_name', $companyName);
         }
         
         $leaveBalances = $query->orderBy('emp_code')
@@ -395,6 +425,7 @@ class EmployeeLeaveBalanceApiController extends Controller
                 $employeeLeaves[$empCode] = [
                     'emp_code' => $empCode,
                     'emp_full_name' => $balance->emp_full_name,
+                    'company_name' => $balance->company_name,
                     'year' => $year,
                     'leave_types' => []
                 ];
@@ -419,6 +450,7 @@ class EmployeeLeaveBalanceApiController extends Controller
             'message' => 'Employee leave list retrieved successfully.',
             'total_employees' => count($employeeLeaves),
             'year' => $year,
+            'company_name' => $companyName,
             'data' => array_values($employeeLeaves)
         ]);
     }
@@ -604,11 +636,17 @@ class EmployeeLeaveBalanceApiController extends Controller
     public function getLeaveSummary(Request $request, $corpId)
     {
         $year = $request->query('year', Carbon::now()->year);
+        $companyName = $request->query('company_name');
 
-        $summary = DB::table('employee_leave_balances')
+        $query = DB::table('employee_leave_balances')
             ->where('corp_id', $corpId)
-            ->where('year', $year)
-            ->select(
+            ->where('year', $year);
+
+        if ($companyName) {
+            $query->where('company_name', $companyName);
+        }
+
+        $summary = $query->select(
                 'leave_code',
                 'leave_name',
                 DB::raw('COUNT(DISTINCT emp_code) as total_employees'),
@@ -632,6 +670,7 @@ class EmployeeLeaveBalanceApiController extends Controller
             'status' => true,
             'message' => 'Leave summary retrieved successfully.',
             'year' => $year,
+            'company_name' => $companyName,
             'data' => $summary
         ]);
     }
@@ -643,6 +682,7 @@ class EmployeeLeaveBalanceApiController extends Controller
     public function getLeaveNames(Request $request, $corpId, $empCode = null)
     {
         $year = $request->query('year', Carbon::now()->year);
+        $companyName = $request->query('company_name');
         
         // Build query
         $query = EmployeeLeaveBalance::where('corp_id', $corpId)
@@ -652,8 +692,13 @@ class EmployeeLeaveBalanceApiController extends Controller
         if ($empCode && strtoupper($empCode) !== 'ALL') {
             $query->where('emp_code', $empCode);
         }
+
+        // Optional company_name filter
+        if ($companyName) {
+            $query->where('company_name', $companyName);
+        }
         
-        $leaveBalances = $query->select('emp_code', 'emp_full_name', 'leave_code', 'leave_name', 'leave_type_puid')
+        $leaveBalances = $query->select('emp_code', 'emp_full_name', 'company_name', 'leave_code', 'leave_name', 'leave_type_puid')
             ->orderBy('emp_code')
             ->orderBy('leave_name')
             ->get();
@@ -675,6 +720,7 @@ class EmployeeLeaveBalanceApiController extends Controller
                 $result[$empKey] = [
                     'emp_code' => $balance->emp_code,
                     'emp_full_name' => $balance->emp_full_name,
+                    'company_name' => $balance->company_name,
                     'leave_types' => []
                 ];
             }
@@ -690,6 +736,7 @@ class EmployeeLeaveBalanceApiController extends Controller
             'status' => true,
             'message' => 'Leave names retrieved successfully.',
             'year' => $year,
+            'company_name' => $companyName,
             'total_employees' => count($result),
             'data' => array_values($result)
         ]);

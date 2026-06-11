@@ -8,6 +8,7 @@ use App\Http\Controllers\LocationApiController;
 use App\Http\Controllers\IndustryApiController;
 use App\Http\Controllers\CurrencyApiController;
 use App\Http\Controllers\SubDepartmentApiController;
+use App\Http\Controllers\LeaveSettingsApiController;
 use App\Http\Controllers\DesignationApiController;
 use App\Http\Controllers\GradeApiController;
 use App\Http\Controllers\DocumentTypeApiController;
@@ -846,6 +847,10 @@ Route::get('/employee-leave-balance/list/{corpId}/{empCode?}', [EmployeeLeaveBal
 Route::get('/employee-leave-balance/summary/{corpId}', [EmployeeLeaveBalanceApiController::class, 'getLeaveSummary']); // Get leave summary for admin dashboard
 Route::get('/employee-leave-balance/leave-names/{corpId}/{empCode?}', [EmployeeLeaveBalanceApiController::class, 'getLeaveNames']); // Get leave names by corp_id and optional emp_code
 Route::get('/employee-leave-balance/{corpId}/{empCode}', [EmployeeLeaveBalanceApiController::class, 'getEmployeeLeaveBalance']); // Get individual employee leave balance
+
+// Leave Settings Routes (company-scoped)
+Route::get('/leave-settings/{corpId}/{year}', [LeaveSettingsApiController::class, 'getByCorpYear']); // Get leave settings for corp+company+year
+Route::post('/leave-settings/upsert', [LeaveSettingsApiController::class, 'upsert']); // Create/update leave settings
 
 // ============================================================
 // ONBOARDING - RECRUITMENT JOB POSTINGS
