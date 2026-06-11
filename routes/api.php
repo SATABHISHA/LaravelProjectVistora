@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\UserLoginApiController;
+use App\Http\Controllers\CorpCompanyTagApiController;
 use App\Http\Controllers\CompanyDetailsApiController;
 use App\Http\Controllers\BusinessUnitApiController;
 use App\Http\Controllers\DepartmentApiController;
@@ -851,6 +852,11 @@ Route::get('/employee-leave-balance/{corpId}/{empCode}', [EmployeeLeaveBalanceAp
 // Leave Settings Routes (company-scoped)
 Route::get('/leave-settings/{corpId}/{year}', [LeaveSettingsApiController::class, 'getByCorpYear']); // Get leave settings for corp+company+year
 Route::post('/leave-settings/upsert', [LeaveSettingsApiController::class, 'upsert']); // Create/update leave settings
+
+// Corp Company Tag Routes
+Route::get('/corp-company-tags/{corpId}', [CorpCompanyTagApiController::class, 'index']);
+Route::post('/corp-company-tags/upsert', [CorpCompanyTagApiController::class, 'upsert']);
+Route::delete('/corp-company-tags/{corpId}/{companyTag}', [CorpCompanyTagApiController::class, 'destroy']);
 
 // ============================================================
 // ONBOARDING - RECRUITMENT JOB POSTINGS
