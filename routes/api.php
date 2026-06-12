@@ -840,6 +840,7 @@ Route::get('/fms/category-summary', [FmsCategoryController::class, 'summary']);
 
 // Employee Leave Balance Routes
 Route::post('/employee-leave-balance/allot', [EmployeeLeaveBalanceApiController::class, 'allotLeaves']); // Admin only - allot leaves to all employees
+Route::post('/employee-leave-balance/update', [EmployeeLeaveBalanceApiController::class, 'updateAllotment']); // Update existing leave allotment
 Route::post('/employee-leave-balance/process-monthly', [EmployeeLeaveBalanceApiController::class, 'processMonthlyCredits']); // Admin only - process monthly credits
 Route::post('/employee-leave-balance/update-used', [EmployeeLeaveBalanceApiController::class, 'updateLeaveUsed']); // Update leave when used
 Route::post('/employee-leave-balance/revert-used', [EmployeeLeaveBalanceApiController::class, 'revertLeaveUsed']); // Revert leave when cancelled

@@ -13,19 +13,20 @@ The Employee Leave Balance API provides functionality to manage employee leave a
 ## Table of Contents
 
 1. [Allot Leaves to Employees](#1-allot-leaves-to-employees)
-2. [Process Monthly Credits](#2-process-monthly-credits)
-3. [Get All Employees Leave List](#3-get-all-employees-leave-list)
-4. [Get Individual Employee Leave Balance](#4-get-individual-employee-leave-balance)
-5. [Update Leave Used](#5-update-leave-used)
-6. [Revert Leave Used](#6-revert-leave-used)
-7. [Get Leave Summary](#7-get-leave-summary)
-8. [Get Leave Names](#8-get-leave-names)
-9. [Deduct Leave by Request](#9-deduct-leave-by-request)
-10. [Get Leave Settings by Corp and Year](#10-get-leave-settings-by-corp-and-year)
-11. [Upsert Leave Settings](#11-upsert-leave-settings)
-12. [Get Corp Company Tags](#12-get-corp-company-tags)
-13. [Upsert Corp Company Tag](#13-upsert-corp-company-tag)
-14. [Delete Corp Company Tag](#14-delete-corp-company-tag)
+2. [Update Leave Allotment](#2-update-leave-allotment)
+3. [Process Monthly Credits](#3-process-monthly-credits)
+4. [Get All Employees Leave List](#4-get-all-employees-leave-list)
+5. [Get Individual Employee Leave Balance](#5-get-individual-employee-leave-balance)
+6. [Update Leave Used](#6-update-leave-used)
+7. [Revert Leave Used](#7-revert-leave-used)
+8. [Get Leave Summary](#8-get-leave-summary)
+9. [Get Leave Names](#9-get-leave-names)
+10. [Deduct Leave by Request](#10-deduct-leave-by-request)
+11. [Get Leave Settings by Corp and Year](#11-get-leave-settings-by-corp-and-year)
+12. [Upsert Leave Settings](#12-upsert-leave-settings)
+13. [Get Corp Company Tags](#13-get-corp-company-tags)
+14. [Upsert Corp Company Tag](#14-upsert-corp-company-tag)
+15. [Delete Corp Company Tag](#15-delete-corp-company-tag)
 
 ---
 
@@ -170,7 +171,75 @@ curl -X POST "http://localhost:8000/api/employee-leave-balance/allot" \
 
 ---
 
-## 2. Process Monthly Credits
+## 2. Update Leave Allotment
+
+Update an existing company-scoped leave allotment record.
+
+### Endpoint
+
+```
+POST /api/employee-leave-balance/update
+```
+
+### Request Body Parameters
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| corp_id | string | Yes | Corporate ID |
+| emp_code | string | Yes | Admin/supervisor employee code |
+| company_name | string | Yes | Company scope |
+| leave_type_puid | string | Yes | Leave type PUID |
+| leave_code | string | Yes | Leave code |
+| year | integer | Yes | Leave year |
+| total_allotted | numeric | Yes | Updated total allotted |
+| used | numeric | Yes | Updated used days |
+| balance | numeric | Yes | Updated balance |
+| carry_forward | numeric | No | Updated carry forward |
+| credit_type | string | No | yearly or monthly |
+| month | integer | No | Last credited month |
+
+### Success Response (200 OK)
+
+```json
+{
+    "status": true,
+    "message": "Leave allotment updated successfully.",
+    "data": {
+        "id": 1,
+        "corp_id": "test",
+        "emp_code": "EMP001",
+        "company_name": "Hyderabad Office",
+        "leave_type_puid": "puid-1",
+        "leave_code": "SL",
+        "leave_name": "Sick Leave",
+        "total_allotted": 15,
+        "used": 3,
+        "balance": 12,
+        "carry_forward": 2,
+        "credit_type": "monthly",
+        "month": 5,
+        "year": 2026
+    }
+}
+```
+
+### Not Found Response (404)
+
+```json
+{
+    "status": false,
+    "message": "Leave allotment record not found for provided company/year/leave."
+}
+```
+
+### Validation Rules
+
+- `used` must not be greater than `total_allotted`
+- `balance` must equal `total_allotted - used` within a 0.01 tolerance
+
+---
+
+## 3. Process Monthly Credits
 
 Process monthly leave credits for employees with monthly credit type leaves. Admin only.
 
@@ -251,7 +320,7 @@ curl -X POST "http://localhost:8000/api/employee-leave-balance/process-monthly" 
 
 ---
 
-## 3. Get Employees Leave List
+## 4. Get Employees Leave List
 
 Retrieve leave balances for all employees or a specific employee in a corporation.
 
@@ -428,7 +497,7 @@ curl -X GET "http://localhost:8000/api/employee-leave-balance/list/test/EMP001?y
 
 ---
 
-## 4. Get Individual Employee Leave Balance
+## 5. Get Individual Employee Leave Balance
 
 Retrieve leave balances for a specific employee.
 
@@ -524,7 +593,7 @@ curl -X GET "http://localhost:8000/api/employee-leave-balance/test/EMP001?year=2
 
 ---
 
-## 5. Update Leave Used
+## 6. Update Leave Used
 
 Deduct leave balance when an employee uses leave (typically called after leave request approval).
 
@@ -614,7 +683,7 @@ curl -X POST "http://localhost:8000/api/employee-leave-balance/update-used" \
 
 ---
 
-## 6. Revert Leave Used
+## 7. Revert Leave Used
 
 Revert leave deduction when a leave request is cancelled.
 
@@ -695,7 +764,7 @@ curl -X POST "http://localhost:8000/api/employee-leave-balance/revert-used" \
 
 ---
 
-## 7. Get Leave Summary
+## 8. Get Leave Summary
 
 Get aggregated leave summary for admin dashboard.
 
@@ -768,7 +837,7 @@ curl -X GET "http://localhost:8000/api/employee-leave-balance/summary/test?year=
 
 ---
 
-## 8. Get Leave Names
+## 9. Get Leave Names
 
 Get leave names (leave types) for employees by corp_id. Can fetch for all employees or a specific employee.
 
@@ -900,7 +969,7 @@ curl -X GET "http://localhost:8000/api/employee-leave-balance/leave-names/test/E
 
 ---
 
-## 9. Deduct Leave by Request
+## 10. Deduct Leave by Request
 
 Deduct leave from employee balance based on a leave request. The number of days to deduct is automatically calculated from the `from_date` and `to_date` columns in the `leave_request` table.
 
@@ -1042,7 +1111,7 @@ curl -X POST "http://localhost:8000/api/employee-leave-balance/deduct-by-request
 
 ---
 
-## 10. Get Leave Settings by Corp and Year
+## 11. Get Leave Settings by Corp and Year
 
 Get leave settings for a specific corp, company, and year.
 
@@ -1104,7 +1173,7 @@ curl -X GET "http://localhost:8000/api/leave-settings/test/2026?company_name=Hyd
 
 ---
 
-## 11. Upsert Leave Settings
+## 12. Upsert Leave Settings
 
 Create or update company-scoped leave settings.
 
@@ -1169,7 +1238,7 @@ POST /api/leave-settings/upsert
 
 ---
 
-## 12. Get Corp Company Tags
+## 13. Get Corp Company Tags
 
 List active company tags for a corp.
 
@@ -1197,7 +1266,7 @@ GET /api/corp-company-tags/{corpId}
 
 ---
 
-## 13. Upsert Corp Company Tag
+## 14. Upsert Corp Company Tag
 
 Create a new company tag or rename an existing one.
 
@@ -1245,7 +1314,7 @@ POST /api/corp-company-tags/upsert
 
 ---
 
-## 14. Delete Corp Company Tag
+## 15. Delete Corp Company Tag
 
 Deactivate an existing company tag (soft delete via `active_yn = 0`).
 

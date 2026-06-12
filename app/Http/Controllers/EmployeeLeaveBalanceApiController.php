@@ -847,4 +847,120 @@ class EmployeeLeaveBalanceApiController extends Controller
             ]
         ]);
     }
+
+    /**
+     * Update an existing leave allotment for a specific company/year/leave.
+     */
+    public function updateAllotment(Request $request)
+    {
+        $validated = $request->validate([
+            'corp_id' => 'required|string',
+            'emp_code' => 'required|string',
+            'company_name' => 'required|string',
+            'leave_type_puid' => 'required|string',
+            'leave_code' => 'required|string',
+            'year' => 'required|integer|min:2020|max:2100',
+            'total_allotted' => 'required|numeric|min:0',
+            'used' => 'required|numeric|min:0',
+            'balance' => 'required|numeric|min:0',
+            'carry_forward' => 'nullable|numeric|min:0',
+            'credit_type' => 'nullable|string|in:yearly,monthly',
+            'month' => 'nullable|integer|min:1|max:12',
+        ]);
+
+        if ((float) $validated['used'] > (float) $validated['total_allotted']) {
+            return response()->json([
+                'status' => false,
+                'message' => 'The used value cannot be greater than total allotted.',
+                'errors' => [
+                    'used' => ['The used value cannot be greater than total allotted.'],
+                ],
+            ], 422);
+        }
+
+        $expectedBalance = (float) $validated['total_allotted'] - (float) $validated['used'];
+        if (abs((float) $validated['balance'] - $expectedBalance) > 0.01) {
+            return response()->json([
+                'status' => false,
+                'message' => 'The balance must equal total_allotted minus used.',
+                'errors' => [
+                    'balance' => ['The balance must equal total_allotted minus used.'],
+                ],
+            ], 422);
+        }
+
+        DB::beginTransaction();
+
+        try {
+            $leaveBalance = EmployeeLeaveBalance::where('corp_id', $validated['corp_id'])
+                ->where('emp_code', $validated['emp_code'])
+                ->where('company_name', $validated['company_name'])
+                ->where('leave_type_puid', $validated['leave_type_puid'])
+                ->where('leave_code', $validated['leave_code'])
+                ->where('year', $validated['year'])
+                ->lockForUpdate()
+                ->first();
+
+            if (!$leaveBalance) {
+                DB::rollBack();
+                return response()->json([
+                    'status' => false,
+                    'message' => 'Leave allotment record not found for provided company/year/leave.',
+                ], 404);
+            }
+
+            $leaveBalance->total_allotted = $validated['total_allotted'];
+            $leaveBalance->used = $validated['used'];
+            $leaveBalance->balance = $validated['balance'];
+            $leaveBalance->carry_forward = $validated['carry_forward'] ?? 0;
+
+            $shouldTouchCreditedAt = $request->has('credit_type') || $request->has('month');
+
+            if ($request->filled('credit_type')) {
+                $leaveBalance->credit_type = $validated['credit_type'];
+            }
+
+            if ($request->filled('month')) {
+                $leaveBalance->month = $validated['month'];
+            }
+
+            if ($shouldTouchCreditedAt) {
+                $leaveBalance->last_credited_at = Carbon::now();
+            }
+
+            $leaveBalance->save();
+
+            DB::commit();
+
+            return response()->json([
+                'status' => true,
+                'message' => 'Leave allotment updated successfully.',
+                'data' => [
+                    'id' => $leaveBalance->id,
+                    'corp_id' => $leaveBalance->corp_id,
+                    'emp_code' => $leaveBalance->emp_code,
+                    'company_name' => $leaveBalance->company_name,
+                    'leave_type_puid' => $leaveBalance->leave_type_puid,
+                    'leave_code' => $leaveBalance->leave_code,
+                    'leave_name' => $leaveBalance->leave_name,
+                    'total_allotted' => (float) $leaveBalance->total_allotted,
+                    'used' => (float) $leaveBalance->used,
+                    'balance' => (float) $leaveBalance->balance,
+                    'carry_forward' => (float) $leaveBalance->carry_forward,
+                    'credit_type' => $leaveBalance->credit_type,
+                    'month' => $leaveBalance->month,
+                    'year' => $leaveBalance->year,
+                    'last_credited_at' => $leaveBalance->last_credited_at,
+                    'updated_at' => $leaveBalance->updated_at,
+                ],
+            ]);
+        } catch (\Exception $e) {
+            DB::rollBack();
+
+            return response()->json([
+                'status' => false,
+                'message' => 'Error updating leave allotment: ' . $e->getMessage(),
+            ], 500);
+        }
+    }
 }

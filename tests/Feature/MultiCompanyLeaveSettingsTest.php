@@ -493,6 +493,63 @@ class MultiCompanyLeaveSettingsTest extends TestCase
             ->assertJsonMissing(['companyTag' => 'Tag B']);
     }
 
+    /** @test */
+    public function update_allotment_updates_existing_company_specific_record()
+    {
+        $this->createAdminUser();
+
+        EmployeeLeaveBalance::create([
+            'corp_id' => $this->corpId,
+            'emp_code' => 'EMP001',
+            'emp_full_name' => 'Alice',
+            'company_name' => 'Company A',
+            'leave_type_puid' => 'puid-update-1',
+            'leave_code' => 'SL',
+            'leave_name' => 'Sick Leave',
+            'total_allotted' => 12,
+            'used' => 2,
+            'balance' => 10,
+            'carry_forward' => 0,
+            'year' => 2026,
+            'credit_type' => 'yearly',
+            'month' => null,
+        ]);
+
+        $response = $this->postJson('/api/employee-leave-balance/update', [
+            'corp_id' => $this->corpId,
+            'emp_code' => 'EMP001',
+            'company_name' => 'Company A',
+            'leave_type_puid' => 'puid-update-1',
+            'leave_code' => 'SL',
+            'year' => 2026,
+            'total_allotted' => 15,
+            'used' => 3,
+            'balance' => 12,
+            'carry_forward' => 2,
+            'credit_type' => 'monthly',
+            'month' => 5,
+        ]);
+
+        $response->assertStatus(200)
+            ->assertJsonPath('status', true)
+            ->assertJsonPath('message', 'Leave allotment updated successfully.');
+
+        $this->assertDatabaseHas('employee_leave_balances', [
+            'corp_id' => $this->corpId,
+            'emp_code' => 'EMP001',
+            'company_name' => 'Company A',
+            'leave_type_puid' => 'puid-update-1',
+            'leave_code' => 'SL',
+            'year' => 2026,
+            'total_allotted' => 15,
+            'used' => 3,
+            'balance' => 12,
+            'carry_forward' => 2,
+            'credit_type' => 'monthly',
+            'month' => 5,
+        ]);
+    }
+
     // -------------------------------------------------------------------------
     // Helpers
     // -------------------------------------------------------------------------
