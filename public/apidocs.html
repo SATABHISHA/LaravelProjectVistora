@@ -2006,7 +2006,7 @@
             icon: "🏝️",
             color: "#69f0ae",
             endpoints: [
-                { method: "POST", path: "/employee-leave-balance/allot", desc: "Allot leaves (Admin, company-scoped)", body: '{\n  "corp_id": "",\n  "emp_code": "",\n  "year": 2025,\n  "company_name": ""\n}' },
+                { method: "POST", path: "/employee-leave-balance/allot", desc: "Allot leaves (Admin, company-scoped, repeat calls for same company are skipped)", body: '{\n  "corp_id": "",\n  "emp_code": "",\n  "year": 2025,\n  "company_name": ""\n}' },
                 { method: "POST", path: "/employee-leave-balance/process-monthly", desc: "Process monthly credits (company-scoped)", body: '{\n  "corp_id": "",\n  "emp_code": "",\n  "year": 2025,\n  "month": 1,\n  "company_name": ""\n}' },
                 { method: "POST", path: "/employee-leave-balance/update-used", desc: "Update leave used", body: '{\n  "corp_id": "",\n  "emp_code": "",\n  "leave_type_puid": "",\n  "days_used": 1,\n  "year": 2025\n}' },
                 { method: "POST", path: "/employee-leave-balance/revert-used", desc: "Revert leave used", body: '{\n  "corp_id": "",\n  "emp_code": "",\n  "leave_type_puid": "",\n  "days_to_revert": 1,\n  "year": 2025\n}' },

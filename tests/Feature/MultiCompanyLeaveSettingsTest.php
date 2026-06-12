@@ -346,6 +346,89 @@ class MultiCompanyLeaveSettingsTest extends TestCase
         $this->assertEquals(1, (int) $companyB->month);
     }
 
+    /** @test */
+    public function allot_leaves_allows_same_employee_year_leave_type_across_companies()
+    {
+        $this->createAdminUser();
+        $this->createBasicLeaveConfig('puid-duplicate-safe', 'SL', 'Sick Leave');
+        $this->createEmployeeForCompanies('EMP001', ['Company A', 'Company B']);
+
+        $payloadA = [
+            'corp_id' => $this->corpId,
+            'emp_code' => 'ADMIN001',
+            'year' => 2026,
+            'company_name' => 'Company A',
+        ];
+
+        $payloadB = [
+            'corp_id' => $this->corpId,
+            'emp_code' => 'ADMIN001',
+            'year' => 2026,
+            'company_name' => 'Company B',
+        ];
+
+        $this->postJson('/api/employee-leave-balance/allot', $payloadA)
+            ->assertStatus(201)
+            ->assertJsonPath('status', true);
+
+        $this->postJson('/api/employee-leave-balance/allot', $payloadB)
+            ->assertStatus(201)
+            ->assertJsonPath('status', true);
+
+        $this->assertDatabaseHas('employee_leave_balances', [
+            'corp_id' => $this->corpId,
+            'emp_code' => 'EMP001',
+            'leave_type_puid' => 'puid-duplicate-safe',
+            'year' => 2026,
+            'company_name' => 'Company A',
+        ]);
+
+        $this->assertDatabaseHas('employee_leave_balances', [
+            'corp_id' => $this->corpId,
+            'emp_code' => 'EMP001',
+            'leave_type_puid' => 'puid-duplicate-safe',
+            'year' => 2026,
+            'company_name' => 'Company B',
+        ]);
+    }
+
+    /** @test */
+    public function repeat_allot_for_same_company_is_skipped_not_duplicated()
+    {
+        $this->createAdminUser();
+        $this->createBasicLeaveConfig('puid-repeat-skip', 'CL', 'Causal Leave');
+        $this->createEmployeeForCompanies('EMP001', ['Company A']);
+
+        $payload = [
+            'corp_id' => $this->corpId,
+            'emp_code' => 'ADMIN001',
+            'year' => 2026,
+            'company_name' => 'Company A',
+        ];
+
+        $first = $this->postJson('/api/employee-leave-balance/allot', $payload);
+        $first->assertStatus(201)
+            ->assertJsonPath('status', true)
+            ->assertJsonPath('data.total_leave_records_created', 1)
+            ->assertJsonPath('data.total_records_skipped', 0);
+
+        $second = $this->postJson('/api/employee-leave-balance/allot', $payload);
+        $second->assertStatus(201)
+            ->assertJsonPath('status', true)
+            ->assertJsonPath('data.total_leave_records_created', 0)
+            ->assertJsonPath('data.total_records_skipped', 1);
+
+        $this->assertEquals(
+            1,
+            EmployeeLeaveBalance::where('corp_id', $this->corpId)
+                ->where('emp_code', 'EMP001')
+                ->where('leave_type_puid', 'puid-repeat-skip')
+                ->where('year', 2026)
+                ->where('company_name', 'Company A')
+                ->count()
+        );
+    }
+
     // -------------------------------------------------------------------------
     // Corp Company Tag Tests
     // -------------------------------------------------------------------------
@@ -424,5 +507,43 @@ class MultiCompanyLeaveSettingsTest extends TestCase
             'password'   => bcrypt('secret'),
             'admin_yn'   => 1,
         ]);
+    }
+
+    private function createBasicLeaveConfig(string $puid, string $leaveCode, string $leaveName): void
+    {
+        LeaveTypeBasicConfiguration::create([
+            'puid' => $puid,
+            'corpid' => $this->corpId,
+            'leaveCode' => $leaveCode,
+            'leaveName' => $leaveName,
+            'leaveCycleStartMonth' => 'January',
+            'leaveCycleEndMonth' => 'December',
+            'leaveTypeTobeCredited' => 'yearly',
+            'LimitDays' => '12',
+            'LeaveType' => 'Sick',
+            'encahsmentAllowedYN' => 0,
+            'isConfigurationCompletedYN' => 1,
+        ]);
+    }
+
+    private function createEmployeeForCompanies(string $empCode, array $companyNames): void
+    {
+        EmployeeDetail::create([
+            'corp_id' => $this->corpId,
+            'EmpCode' => $empCode,
+            'FirstName' => 'Test',
+            'LastName' => 'Employee',
+            'DOB' => '1990-01-01',
+        ]);
+
+        foreach ($companyNames as $companyName) {
+            EmploymentDetail::create([
+                'corp_id' => $this->corpId,
+                'company_name' => $companyName,
+                'dateOfJoining' => '2024-01-01',
+                'EmpCode' => $empCode,
+                'ActiveYn' => 1,
+            ]);
+        }
     }
 }

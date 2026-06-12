@@ -166,30 +166,15 @@ class EmployeeLeaveBalanceApiController extends Controller
                 foreach ($leaveConfigs as $config) {
                     $basic = $config['basic'];
                     $full = $config['full'];
-                    
-                    // Check if leave already exists for this employee, leave type, year, and company
-                    $existingLeave = EmployeeLeaveBalance::where('corp_id', $corpId)
-                        ->where('emp_code', $empCode)
-                        ->where('leave_type_puid', $basic->puid)
-                        ->where('year', $year)
-                        ->where('company_name', $companyName)
-                        ->first();
-
-                    if ($existingLeave) {
-                        // Skip if already allotted
-                        $skippedCount++;
-                        if (!in_array($empCode, $skippedEmployees)) {
-                            $skippedEmployees[] = $empCode;
-                        }
-                        continue;
-                    }
 
                     // Calculate carry forward from previous year
                     $carryForward = 0;
+                    $shouldLapsePreviousYear = false;
                     $previousYearBalance = EmployeeLeaveBalance::where('corp_id', $corpId)
                         ->where('emp_code', $empCode)
                         ->where('leave_type_puid', $basic->puid)
                         ->where('year', $year - 1)
+                        ->where('company_name', $companyName)
                         ->first();
 
                     if ($previousYearBalance && $full) {
@@ -213,10 +198,8 @@ class EmployeeLeaveBalanceApiController extends Controller
                             }
                         }
                         
-                        // Mark previous year's leave as lapsed if applicable
-                        if ($lapseLeave === 'yes') {
-                            $previousYearBalance->update(['is_lapsed' => true]);
-                        }
+                        // Mark previous year's leave as lapsed if applicable (after create succeeds)
+                        $shouldLapsePreviousYear = $lapseLeave === 'yes';
                     }
 
                     // Calculate total allotted based on credit type
@@ -234,25 +217,40 @@ class EmployeeLeaveBalanceApiController extends Controller
 
                     $totalWithCarryForward = $totalAllotted + $carryForward;
 
-                    // Create leave balance record
-                    EmployeeLeaveBalance::create([
-                        'corp_id' => $corpId,
-                        'emp_code' => $empCode,
-                        'emp_full_name' => $empFullName,
-                        'company_name' => $companyName,
-                        'leave_type_puid' => $basic->puid,
-                        'leave_code' => $basic->leaveCode,
-                        'leave_name' => $basic->leaveName,
-                        'total_allotted' => $totalWithCarryForward,
-                        'used' => 0,
-                        'balance' => $totalWithCarryForward,
-                        'carry_forward' => $carryForward,
-                        'year' => $year,
-                        'month' => $creditType === 'monthly' ? $currentMonth : null,
-                        'credit_type' => $creditType,
-                        'is_lapsed' => false,
-                        'last_credited_at' => $currentDate
-                    ]);
+                    $leaveBalance = EmployeeLeaveBalance::firstOrCreate(
+                        [
+                            'corp_id' => $corpId,
+                            'emp_code' => $empCode,
+                            'leave_type_puid' => $basic->puid,
+                            'year' => $year,
+                            'company_name' => $companyName,
+                        ],
+                        [
+                            'emp_full_name' => $empFullName,
+                            'leave_code' => $basic->leaveCode,
+                            'leave_name' => $basic->leaveName,
+                            'total_allotted' => $totalWithCarryForward,
+                            'used' => 0,
+                            'balance' => $totalWithCarryForward,
+                            'carry_forward' => $carryForward,
+                            'month' => $creditType === 'monthly' ? $currentMonth : null,
+                            'credit_type' => $creditType,
+                            'is_lapsed' => false,
+                            'last_credited_at' => $currentDate,
+                        ]
+                    );
+
+                    if (!$leaveBalance->wasRecentlyCreated) {
+                        $skippedCount++;
+                        if (!in_array($empCode, $skippedEmployees)) {
+                            $skippedEmployees[] = $empCode;
+                        }
+                        continue;
+                    }
+
+                    if ($shouldLapsePreviousYear && $previousYearBalance) {
+                        $previousYearBalance->update(['is_lapsed' => true]);
+                    }
 
                     $allottedCount++;
                     if (!in_array($empCode, $allottedEmployees)) {
