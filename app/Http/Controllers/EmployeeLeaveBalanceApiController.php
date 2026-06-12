@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use App\Models\EmployeeLeaveBalance;
+use App\Models\LeaveSetting;
 use App\Models\LeaveTypeBasicConfiguration;
 use App\Models\LeaveTypeFullConfiguration;
 use App\Models\EmployeeDetail;
@@ -45,27 +46,90 @@ class EmployeeLeaveBalanceApiController extends Controller
     }
 
     /**
-     * Get leave configuration with full details
+     * Normalize leave type/leave name strings for consistent matching.
      */
-    private function getLeaveConfigurations($corpId)
+    private function normalizeLeaveType($value)
+    {
+        return strtolower(trim((string) $value));
+    }
+
+    /**
+     * Build leave configs from company/year leave_settings with fallback to basic config.
+     */
+    private function getLeaveConfigurations($corpId, $companyName, $year)
     {
         $basicConfigs = LeaveTypeBasicConfiguration::where('corpid', $corpId)
             ->where('isConfigurationCompletedYN', 1)
             ->get();
 
+        $basicByType = [];
+        foreach ($basicConfigs as $basic) {
+            $basicByType[$this->normalizeLeaveType($basic->leaveName)] = $basic;
+        }
+
+        $settings = LeaveSetting::where('corp_id', $corpId)
+            ->where('company_name', $companyName)
+            ->where('year', (int) $year)
+            ->get();
+
         $configurations = [];
-        
+
+        if ($settings->isNotEmpty()) {
+            foreach ($settings as $setting) {
+                $normalizedType = $this->normalizeLeaveType($setting->leave_type);
+                $basic = $basicByType[$normalizedType] ?? null;
+
+                $fullConfig = null;
+                if ($basic) {
+                    $fullConfig = LeaveTypeFullConfiguration::where('puid', $basic->puid)
+                        ->where('corpid', $corpId)
+                        ->first();
+                }
+
+                $monthlyAllocation = (float) ($setting->monthly_allocation ?? 0);
+                $yearlyAllocation = (float) ($setting->yearly_allocation ?? 0);
+                $creditType = $monthlyAllocation > 0 ? 'monthly' : 'yearly';
+
+                $configurations[] = [
+                    'puid' => $basic ? $basic->puid : ('setting-' . $normalizedType),
+                    'leave_code' => $basic && !empty($basic->leaveCode)
+                        ? $basic->leaveCode
+                        : strtoupper(substr($normalizedType, 0, 1)) . '-SET',
+                    'leave_name' => $basic && !empty($basic->leaveName)
+                        ? $basic->leaveName
+                        : $setting->leave_type,
+                    'credit_type' => $creditType,
+                    'yearly_allocation' => $yearlyAllocation,
+                    'monthly_allocation' => $monthlyAllocation,
+                    'full' => $fullConfig,
+                ];
+            }
+
+            return $configurations;
+        }
+
+        // Fallback for corp/company where leave_settings are not configured yet.
         foreach ($basicConfigs as $basic) {
             $fullConfig = LeaveTypeFullConfiguration::where('puid', $basic->puid)
                 ->where('corpid', $corpId)
                 ->first();
-            
+
+            $limitDays = (float) ($basic->LimitDays ?? 0);
+            $creditType = strtolower($basic->leaveTypeTobeCredited ?? 'yearly');
+
             $configurations[] = [
-                'basic' => $basic,
-                'full' => $fullConfig
+                'puid' => $basic->puid,
+                'leave_code' => $basic->leaveCode,
+                'leave_name' => $basic->leaveName,
+                'credit_type' => $creditType === 'monthly' ? 'monthly' : 'yearly',
+                'yearly_allocation' => $limitDays,
+                'monthly_allocation' => $creditType === 'monthly'
+                    ? $this->calculateMonthlyCredit($limitDays, 'monthly')
+                    : 0,
+                'full' => $fullConfig,
             ];
         }
-        
+
         return $configurations;
     }
 
@@ -136,7 +200,7 @@ class EmployeeLeaveBalanceApiController extends Controller
         }
 
         // Get leave configurations
-        $leaveConfigs = $this->getLeaveConfigurations($corpId);
+        $leaveConfigs = $this->getLeaveConfigurations($corpId, $companyName, $year);
         
         if (empty($leaveConfigs)) {
             return response()->json([
@@ -164,7 +228,9 @@ class EmployeeLeaveBalanceApiController extends Controller
                 }
 
                 foreach ($leaveConfigs as $config) {
-                    $basic = $config['basic'];
+                    $leaveTypePuid = $config['puid'];
+                    $leaveCode = $config['leave_code'];
+                    $leaveName = $config['leave_name'];
                     $full = $config['full'];
 
                     // Calculate carry forward from previous year
@@ -172,7 +238,7 @@ class EmployeeLeaveBalanceApiController extends Controller
                     $shouldLapsePreviousYear = false;
                     $previousYearBalance = EmployeeLeaveBalance::where('corp_id', $corpId)
                         ->where('emp_code', $empCode)
-                        ->where('leave_type_puid', $basic->puid)
+                        ->where('leave_type_puid', $leaveTypePuid)
                         ->where('year', $year - 1)
                         ->where('company_name', $companyName)
                         ->first();
@@ -203,16 +269,15 @@ class EmployeeLeaveBalanceApiController extends Controller
                     }
 
                     // Calculate total allotted based on credit type
-                    $creditType = strtolower($basic->leaveTypeTobeCredited ?? 'yearly');
-                    $limitDays = (float)$basic->LimitDays;
-                    $totalAllotted = $limitDays;
+                    $creditType = strtolower((string) ($config['credit_type'] ?? 'yearly'));
+                    $yearlyAllocation = (float) ($config['yearly_allocation'] ?? 0);
+                    $monthlyAllocation = (float) ($config['monthly_allocation'] ?? 0);
+                    $totalAllotted = $yearlyAllocation;
                     
                     // For monthly credited leaves in current year, calculate based on remaining months
-                    $monthlyCredit = null;
-                    if ($creditType === 'monthly' && $year == $currentDate->year) {
-                        $monthlyCredit = $this->calculateMonthlyCredit($limitDays, $creditType);
-                        // For monthly, start with the months that have passed plus current month
-                        $totalAllotted = $monthlyCredit * $currentMonth;
+                    if ($creditType === 'monthly' && $monthlyAllocation > 0 && $year == $currentDate->year) {
+                        // Monthly credit mode: only credit months elapsed in current year.
+                        $totalAllotted = $monthlyAllocation * $currentMonth;
                     }
 
                     $totalWithCarryForward = $totalAllotted + $carryForward;
@@ -220,7 +285,7 @@ class EmployeeLeaveBalanceApiController extends Controller
                     // Check if record already exists to avoid race-condition duplicate key errors
                     $existing = EmployeeLeaveBalance::where('corp_id', $corpId)
                         ->where('emp_code', $empCode)
-                        ->where('leave_type_puid', $basic->puid)
+                        ->where('leave_type_puid', $leaveTypePuid)
                         ->where('year', $year)
                         ->where('company_name', $companyName)
                         ->exists();
@@ -237,17 +302,19 @@ class EmployeeLeaveBalanceApiController extends Controller
                         $leaveBalance = EmployeeLeaveBalance::create([
                             'corp_id' => $corpId,
                             'emp_code' => $empCode,
-                            'leave_type_puid' => $basic->puid,
+                            'leave_type_puid' => $leaveTypePuid,
                             'year' => $year,
                             'company_name' => $companyName,
                             'emp_full_name' => $empFullName,
-                            'leave_code' => $basic->leaveCode,
-                            'leave_name' => $basic->leaveName,
+                            'leave_code' => $leaveCode,
+                            'leave_name' => $leaveName,
                             'total_allotted' => $totalWithCarryForward,
                             'used' => 0,
                             'balance' => $totalWithCarryForward,
                             'carry_forward' => $carryForward,
-                            'month' => $creditType === 'monthly' ? $currentMonth : null,
+                            'month' => ($creditType === 'monthly' && $monthlyAllocation > 0)
+                                ? ($year == $currentDate->year ? $currentMonth : 12)
+                                : null,
                             'credit_type' => $creditType,
                             'is_lapsed' => false,
                             'last_credited_at' => $currentDate,
@@ -354,15 +421,29 @@ class EmployeeLeaveBalanceApiController extends Controller
                     continue;
                 }
 
-                // Get the leave configuration to know the monthly credit amount
-                $basicConfig = LeaveTypeBasicConfiguration::where('puid', $balance->leave_type_puid)->first();
-                
-                if (!$basicConfig) {
-                    continue;
+                // Resolve monthly credit from leave_settings first (company+year specific).
+                $monthlyCredit = 0;
+                $leaveSetting = LeaveSetting::where('corp_id', $corpId)
+                    ->where('company_name', $companyName)
+                    ->where('year', $year)
+                    ->whereRaw('LOWER(leave_type) = ?', [$this->normalizeLeaveType($balance->leave_name)])
+                    ->first();
+
+                if ($leaveSetting) {
+                    $monthlyCredit = (float) ($leaveSetting->monthly_allocation ?? 0);
+                } else {
+                    // Backward-compatible fallback: infer from basic configuration.
+                    $basicConfig = LeaveTypeBasicConfiguration::where('puid', $balance->leave_type_puid)->first();
+                    if ($basicConfig) {
+                        $limitDays = (float)$basicConfig->LimitDays;
+                        $monthlyCredit = $this->calculateMonthlyCredit($limitDays, 'monthly');
+                    }
                 }
 
-                $limitDays = (float)$basicConfig->LimitDays;
-                $monthlyCredit = $this->calculateMonthlyCredit($limitDays, 'monthly');
+                if ($monthlyCredit <= 0) {
+                    $skippedCount++;
+                    continue;
+                }
                 
                 // Calculate months to credit (from last credited month to current month)
                 $monthsToCredit = $month - ($balance->month ?? 0);
