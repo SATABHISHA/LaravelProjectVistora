@@ -557,6 +557,27 @@
             gap: 14px;
         }
 
+        /* Endpoint notes */
+        .endpoint-notes {
+            margin: 0 0 14px 0;
+            padding: 10px 14px;
+            background: rgba(255, 213, 79, 0.08);
+            border-left: 3px solid #ffd54f;
+            border-radius: 0 6px 6px 0;
+            font-size: 12px;
+            color: var(--text-muted);
+            line-height: 1.6;
+        }
+        .endpoint-notes code {
+            background: rgba(255,255,255,0.08);
+            padding: 1px 5px;
+            border-radius: 3px;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 11px;
+            color: #69f0ae;
+        }
+        .notes-icon { margin-right: 6px; }
+
         /* Body fields */
         .body-fields {
             display: grid;
@@ -2006,7 +2027,7 @@
             icon: "🏝️",
             color: "#69f0ae",
             endpoints: [
-                { method: "POST", path: "/employee-leave-balance/allot", desc: "Allot leaves (Admin, company-scoped, repeat calls for same company are skipped)", body: '{\n  "corp_id": "",\n  "emp_code": "",\n  "year": 2025,\n  "company_name": ""\n}' },
+                { method: "POST", path: "/employee-leave-balance/allot", desc: "Allot leaves (Admin, company-scoped, duplicate-safe)", notes: "Response <code>data.already_allotted</code> is <code>true</code> when all employees were skipped (leaves already exist). In that case <code>employees_allotted</code> is 0 and <code>employees_skipped</code> &gt; 0. Duplicate entries are caught per-record — no transaction rollback on re-runs. New response fields: <code>already_allotted</code> (bool).", body: '{\n  "corp_id": "",\n  "emp_code": "",\n  "year": 2026,\n  "company_name": ""\n}' },
                 { method: "POST", path: "/employee-leave-balance/update", desc: "Update existing leave allotment", body: '{\n  "corp_id": "",\n  "emp_code": "",\n  "company_name": "",\n  "leave_type_puid": "",\n  "leave_code": "",\n  "year": 2026,\n  "total_allotted": 15,\n  "used": 3,\n  "balance": 12,\n  "carry_forward": 2,\n  "credit_type": "monthly",\n  "month": 5\n}' },
                 { method: "POST", path: "/employee-leave-balance/process-monthly", desc: "Process monthly credits (company-scoped)", body: '{\n  "corp_id": "",\n  "emp_code": "",\n  "year": 2025,\n  "month": 1,\n  "company_name": ""\n}' },
                 { method: "POST", path: "/employee-leave-balance/update-used", desc: "Update leave used", body: '{\n  "corp_id": "",\n  "emp_code": "",\n  "leave_type_puid": "",\n  "days_used": 1,\n  "year": 2025\n}' },
@@ -2245,6 +2266,7 @@
                         <span class="expand-icon">▼</span>
                     </div>
                     <div class="endpoint-body">
+                        ${ep.notes ? `<div class="endpoint-notes"><span class="notes-icon">📝</span> ${ep.notes}</div>` : ''}
                         <div class="test-tabs">
                             <div class="test-tab active" onclick="switchTab(this, '${epId}', 'try')">🚀 Try It</div>
                             <div class="test-tab" onclick="switchTab(this, '${epId}', 'curl')">📋 cURL</div>

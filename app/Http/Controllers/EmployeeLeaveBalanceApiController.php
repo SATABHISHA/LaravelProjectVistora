@@ -217,15 +217,29 @@ class EmployeeLeaveBalanceApiController extends Controller
 
                     $totalWithCarryForward = $totalAllotted + $carryForward;
 
-                    $leaveBalance = EmployeeLeaveBalance::firstOrCreate(
-                        [
+                    // Check if record already exists to avoid race-condition duplicate key errors
+                    $existing = EmployeeLeaveBalance::where('corp_id', $corpId)
+                        ->where('emp_code', $empCode)
+                        ->where('leave_type_puid', $basic->puid)
+                        ->where('year', $year)
+                        ->where('company_name', $companyName)
+                        ->exists();
+
+                    if ($existing) {
+                        $skippedCount++;
+                        if (!in_array($empCode, $skippedEmployees)) {
+                            $skippedEmployees[] = $empCode;
+                        }
+                        continue;
+                    }
+
+                    try {
+                        $leaveBalance = EmployeeLeaveBalance::create([
                             'corp_id' => $corpId,
                             'emp_code' => $empCode,
                             'leave_type_puid' => $basic->puid,
                             'year' => $year,
                             'company_name' => $companyName,
-                        ],
-                        [
                             'emp_full_name' => $empFullName,
                             'leave_code' => $basic->leaveCode,
                             'leave_name' => $basic->leaveName,
@@ -237,15 +251,17 @@ class EmployeeLeaveBalanceApiController extends Controller
                             'credit_type' => $creditType,
                             'is_lapsed' => false,
                             'last_credited_at' => $currentDate,
-                        ]
-                    );
-
-                    if (!$leaveBalance->wasRecentlyCreated) {
-                        $skippedCount++;
-                        if (!in_array($empCode, $skippedEmployees)) {
-                            $skippedEmployees[] = $empCode;
+                        ]);
+                    } catch (\Illuminate\Database\QueryException $qe) {
+                        // 23000 = integrity constraint violation (duplicate key)
+                        if ($qe->getCode() === '23000') {
+                            $skippedCount++;
+                            if (!in_array($empCode, $skippedEmployees)) {
+                                $skippedEmployees[] = $empCode;
+                            }
+                            continue;
                         }
-                        continue;
+                        throw $qe;
                     }
 
                     if ($shouldLapsePreviousYear && $previousYearBalance) {
@@ -261,15 +277,21 @@ class EmployeeLeaveBalanceApiController extends Controller
 
             DB::commit();
 
+            $alreadyAllotted = ($allottedCount === 0 && $skippedCount > 0);
+            $message = $alreadyAllotted
+                ? 'Leaves are already allotted for all employees of ' . $companyName . ' in ' . $year . '.'
+                : 'Leave allotment completed successfully.';
+
             return response()->json([
                 'status' => true,
-                'message' => 'Leave allotment completed successfully.',
+                'message' => $message,
                 'data' => [
                     'total_leave_records_created' => $allottedCount,
                     'total_records_skipped' => $skippedCount,
                     'carry_forward_applied' => $carryForwardCount,
                     'employees_allotted' => count($allottedEmployees),
                     'employees_skipped' => count($skippedEmployees),
+                    'already_allotted' => $alreadyAllotted,
                     'company_name' => $companyName,
                     'year' => $year
                 ]
