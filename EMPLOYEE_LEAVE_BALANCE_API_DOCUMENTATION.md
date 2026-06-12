@@ -4,7 +4,9 @@
 
 The Employee Leave Balance API provides functionality to manage employee leave allotments, track leave balances, and handle carry forward logic based on leave type configurations.
 
-**Base URL:** `http://localhost:8000/api`
+**Base URL (Local):** `http://localhost:8000/api`
+
+**Base URL (Deployed):** `/public/api`
 
 ---
 
@@ -19,6 +21,28 @@ The Employee Leave Balance API provides functionality to manage employee leave a
 7. [Get Leave Summary](#7-get-leave-summary)
 8. [Get Leave Names](#8-get-leave-names)
 9. [Deduct Leave by Request](#9-deduct-leave-by-request)
+10. [Get Leave Settings by Corp and Year](#10-get-leave-settings-by-corp-and-year)
+11. [Upsert Leave Settings](#11-upsert-leave-settings)
+12. [Get Corp Company Tags](#12-get-corp-company-tags)
+13. [Upsert Corp Company Tag](#13-upsert-corp-company-tag)
+14. [Delete Corp Company Tag](#14-delete-corp-company-tag)
+
+---
+
+## Validation Error Format (422)
+
+Validation failures return Laravel validation output:
+
+```json
+{
+    "message": "The given data was invalid.",
+    "errors": {
+        "field_name": [
+            "The field_name field is required."
+        ]
+    }
+}
+```
 
 ---
 
@@ -46,6 +70,7 @@ POST /api/employee-leave-balance/allot
 | corp_id | string | Yes | Corporate ID |
 | emp_code | string | Yes | Employee code of the admin user performing the action |
 | year | integer | Yes | Year for which leaves should be allotted (e.g., 2025) |
+| company_name | string | Yes | Company scope for leave allotment |
 
 ### Request Example
 
@@ -53,7 +78,8 @@ POST /api/employee-leave-balance/allot
 {
     "corp_id": "test",
     "emp_code": "EMP001",
-    "year": 2025
+    "year": 2025,
+    "company_name": "Hyderabad Office"
 }
 ```
 
@@ -66,7 +92,8 @@ curl -X POST "http://localhost:8000/api/employee-leave-balance/allot" \
   -d '{
     "corp_id": "test",
     "emp_code": "EMP001",
-    "year": 2025
+        "year": 2025,
+        "company_name": "Hyderabad Office"
   }'
 ```
 
@@ -82,6 +109,7 @@ curl -X POST "http://localhost:8000/api/employee-leave-balance/allot" \
         "carry_forward_applied": 0,
         "employees_allotted": 4,
         "employees_skipped": 0,
+        "company_name": "Hyderabad Office",
         "year": 2025
     }
 }
@@ -118,7 +146,7 @@ curl -X POST "http://localhost:8000/api/employee-leave-balance/allot" \
 ```json
 {
     "status": false,
-    "message": "No employees found for this corp_id."
+    "message": "No employees found for this corp_id and company_name."
 }
 ```
 
@@ -167,6 +195,7 @@ POST /api/employee-leave-balance/process-monthly
 | emp_code | string | Yes | Employee code of the admin user |
 | year | integer | Yes | Year for processing |
 | month | integer | Yes | Month to process (1-12) |
+| company_name | string | Yes | Company scope for monthly credits |
 
 ### Request Example
 
@@ -175,7 +204,8 @@ POST /api/employee-leave-balance/process-monthly
     "corp_id": "test",
     "emp_code": "EMP001",
     "year": 2025,
-    "month": 6
+    "month": 6,
+    "company_name": "Hyderabad Office"
 }
 ```
 
@@ -189,7 +219,8 @@ curl -X POST "http://localhost:8000/api/employee-leave-balance/process-monthly" 
     "corp_id": "test",
     "emp_code": "EMP001",
     "year": 2025,
-    "month": 6
+        "month": 6,
+        "company_name": "Hyderabad Office"
   }'
 ```
 
@@ -202,6 +233,7 @@ curl -X POST "http://localhost:8000/api/employee-leave-balance/process-monthly" 
     "data": {
         "records_updated": 4,
         "records_skipped": 0,
+        "company_name": "Hyderabad Office",
         "year": 2025,
         "month": 6
     }
@@ -241,12 +273,13 @@ GET /api/employee-leave-balance/list/{corpId}/{empCode?}
 | Parameter | Type | Required | Default | Description |
 |-----------|------|----------|---------|-------------|
 | year | integer | No | Current Year | Year for which to retrieve leave balances |
+| company_name | string | No | null | If provided, filters records by company |
 
 ### cURL Examples
 
 **Get all employees:**
 ```bash
-curl -X GET "http://localhost:8000/api/employee-leave-balance/list/test?year=2025" \
+curl -X GET "http://localhost:8000/api/employee-leave-balance/list/test?year=2025&company_name=Hyderabad%20Office" \
   -H "Accept: application/json"
 ```
 
@@ -270,10 +303,12 @@ curl -X GET "http://localhost:8000/api/employee-leave-balance/list/test/EMP001?y
     "message": "Employee leave list retrieved successfully.",
     "total_employees": 4,
     "year": 2025,
+    "company_name": "Hyderabad Office",
     "data": [
         {
             "emp_code": "EMP001",
             "emp_full_name": "Rajesh Kr Patel",
+            "company_name": "Hyderabad Office",
             "year": 2025,
             "leave_types": [
                 {
@@ -681,11 +716,12 @@ GET /api/employee-leave-balance/summary/{corpId}
 | Parameter | Type | Required | Default | Description |
 |-----------|------|----------|---------|-------------|
 | year | integer | No | Current Year | Year for summary |
+| company_name | string | No | null | If provided, aggregates only that company |
 
 ### cURL Example
 
 ```bash
-curl -X GET "http://localhost:8000/api/employee-leave-balance/summary/test?year=2025" \
+curl -X GET "http://localhost:8000/api/employee-leave-balance/summary/test?year=2025&company_name=Hyderabad%20Office" \
   -H "Accept: application/json"
 ```
 
@@ -696,6 +732,7 @@ curl -X GET "http://localhost:8000/api/employee-leave-balance/summary/test?year=
     "status": true,
     "message": "Leave summary retrieved successfully.",
     "year": "2025",
+    "company_name": "Hyderabad Office",
     "data": [
         {
             "leave_code": "CL",
@@ -753,12 +790,13 @@ GET /api/employee-leave-balance/leave-names/{corpId}/{empCode?}
 | Parameter | Type | Required | Default | Description |
 |-----------|------|----------|---------|-------------|
 | year | integer | No | Current Year | Year for leave names |
+| company_name | string | No | null | If provided, filters by company |
 
 ### cURL Examples
 
 **Get all employees' leave names:**
 ```bash
-curl -X GET "http://localhost:8000/api/employee-leave-balance/leave-names/test" \
+curl -X GET "http://localhost:8000/api/employee-leave-balance/leave-names/test?company_name=Hyderabad%20Office" \
   -H "Accept: application/json"
 ```
 
@@ -781,11 +819,13 @@ curl -X GET "http://localhost:8000/api/employee-leave-balance/leave-names/test/E
     "status": true,
     "message": "Leave names retrieved successfully.",
     "year": 2025,
+    "company_name": "Hyderabad Office",
     "total_employees": 4,
     "data": [
         {
             "emp_code": "EMP001",
             "emp_full_name": "Rajesh Kr Patel",
+            "company_name": "Hyderabad Office",
             "leave_types": [
                 {
                     "leave_code": "CL",
@@ -1002,6 +1042,244 @@ curl -X POST "http://localhost:8000/api/employee-leave-balance/deduct-by-request
 
 ---
 
+## 10. Get Leave Settings by Corp and Year
+
+Get leave settings for a specific corp, company, and year.
+
+### Endpoint
+
+```
+GET /api/leave-settings/{corpId}/{year}
+```
+
+### URL Parameters
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| corpId | string | Yes | Corporate ID |
+| year | integer | Yes | Leave settings year |
+
+### Query Parameters
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| company_name | string | Yes | Company name scope |
+
+### cURL Example
+
+```bash
+curl -X GET "http://localhost:8000/api/leave-settings/test/2026?company_name=Hyderabad%20Office" \
+  -H "Accept: application/json"
+```
+
+### Success Response (200 OK)
+
+```json
+{
+    "status": true,
+    "message": "Leave settings retrieved successfully.",
+    "data": [
+        {
+            "leaveType": "Sick",
+            "monthlyAllocation": "1.00",
+            "yearlyAllocation": "12.00",
+            "carryForwardLimit": "5.00",
+            "encashmentLimit": "0.00",
+            "companyName": "Hyderabad Office",
+            "year": 2026
+        }
+    ]
+}
+```
+
+### No Data Response
+
+```json
+{
+    "status": false,
+    "message": "No leave settings found for the given corp, company, and year.",
+    "data": []
+}
+```
+
+---
+
+## 11. Upsert Leave Settings
+
+Create or update company-scoped leave settings.
+
+### Endpoint
+
+```
+POST /api/leave-settings/upsert
+```
+
+### Request Body Parameters
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| corpId | string | Yes | Corporate ID |
+| companyName | string | Yes | Company name scope |
+| year | integer | Yes | Year (2020-2100) |
+| leaveSettings | array | Yes | Leave settings list |
+| leaveSettings[].leaveType | string | Yes | One of: Sick, Paid, Casual |
+| leaveSettings[].monthlyAllocation | number | Yes | Monthly allocation >= 0 |
+| leaveSettings[].yearlyAllocation | number | Yes | Yearly allocation >= 0 |
+| leaveSettings[].carryForwardLimit | number | Yes | Carry forward limit >= 0 |
+| leaveSettings[].encashmentLimit | number | Yes | Encashment limit >= 0 |
+
+### Request Example
+
+```json
+{
+    "corpId": "CORP001",
+    "companyName": "Hyderabad Office",
+    "year": 2026,
+    "leaveSettings": [
+        {
+            "leaveType": "Sick",
+            "monthlyAllocation": "1",
+            "yearlyAllocation": "12",
+            "carryForwardLimit": "5",
+            "encashmentLimit": "0"
+        }
+    ]
+}
+```
+
+### Success Response (200 OK)
+
+```json
+{
+    "status": true,
+    "message": "Leave settings saved successfully.",
+    "data": [
+        {
+            "leaveType": "Sick",
+            "monthlyAllocation": "1.00",
+            "yearlyAllocation": "12.00",
+            "carryForwardLimit": "5.00",
+            "encashmentLimit": "0.00",
+            "companyName": "Hyderabad Office",
+            "year": 2026
+        }
+    ]
+}
+```
+
+---
+
+## 12. Get Corp Company Tags
+
+List active company tags for a corp.
+
+### Endpoint
+
+```
+GET /api/corp-company-tags/{corpId}
+```
+
+### Success Response (200 OK)
+
+```json
+{
+    "status": true,
+    "message": "Company tags retrieved successfully.",
+    "data": [
+        {
+            "corpId": "CORP001",
+            "companyTag": "Hyderabad Office",
+            "activeYn": 1
+        }
+    ]
+}
+```
+
+---
+
+## 13. Upsert Corp Company Tag
+
+Create a new company tag or rename an existing one.
+
+### Endpoint
+
+```
+POST /api/corp-company-tags/upsert
+```
+
+### Request Body Parameters
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| corpId | string | Yes | Corporate ID |
+| companyTag | string | Yes | New/current company tag |
+| oldCompanyTag | string | No | Old tag to rename from |
+
+### Success Response (200 OK)
+
+```json
+{
+    "status": true,
+    "message": "Company tag saved successfully.",
+    "data": {
+        "corpId": "CORP001",
+        "companyTag": "Hyderabad Office",
+        "activeYn": 1
+    }
+}
+```
+
+### Rename Success Response (200 OK)
+
+```json
+{
+    "status": true,
+    "message": "Company tag renamed successfully.",
+    "data": {
+        "corpId": "CORP001",
+        "companyTag": "Hyderabad HQ",
+        "activeYn": 1
+    }
+}
+```
+
+---
+
+## 14. Delete Corp Company Tag
+
+Deactivate an existing company tag (soft delete via `active_yn = 0`).
+
+### Endpoint
+
+```
+DELETE /api/corp-company-tags/{corpId}/{companyTag}
+```
+
+### Success Response (200 OK)
+
+```json
+{
+    "status": true,
+    "message": "Company tag deactivated successfully.",
+    "data": {
+        "corpId": "CORP001",
+        "companyTag": "Hyderabad HQ",
+        "activeYn": 0
+    }
+}
+```
+
+### Error Response (404 Not Found)
+
+```json
+{
+    "status": false,
+    "message": "Company tag not found."
+}
+```
+
+---
+
 ## Database Schema
 
 ### Table: `employee_leave_balances`
@@ -1012,6 +1290,7 @@ curl -X POST "http://localhost:8000/api/employee-leave-balance/deduct-by-request
 | corp_id | varchar(255) | Corporate ID |
 | emp_code | varchar(255) | Employee code |
 | emp_full_name | varchar(255) | Employee full name |
+| company_name | varchar(255), nullable | Company scope for leave balances |
 | leave_type_puid | varchar(255) | Reference to leave_type_basic_configurations |
 | leave_code | varchar(255) | Leave code (e.g., CL, SL) |
 | leave_name | varchar(255) | Leave name |
@@ -1027,9 +1306,9 @@ curl -X POST "http://localhost:8000/api/employee-leave-balance/deduct-by-request
 | created_at | timestamp | Record creation time |
 | updated_at | timestamp | Record update time |
 
-### Unique Constraint
+### Indexes
 
-`unique_leave_balance` on (`corp_id`, `emp_code`, `leave_type_puid`, `year`)
+- `idx_elb_corp_company_year_emp` on (`corp_id`, `company_name`, `year`, `emp_code`)
 
 ---
 
