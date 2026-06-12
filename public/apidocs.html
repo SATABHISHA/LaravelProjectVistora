@@ -2006,15 +2006,34 @@
             icon: "🏝️",
             color: "#69f0ae",
             endpoints: [
-                { method: "POST", path: "/employee-leave-balance/allot", desc: "Allot leaves (Admin)", body: '{\n  "corp_id": "",\n  "emp_code": "",\n  "year": 2025\n}' },
-                { method: "POST", path: "/employee-leave-balance/process-monthly", desc: "Process monthly credits", body: '{\n  "corp_id": "",\n  "emp_code": "",\n  "year": 2025,\n  "month": 1\n}' },
+                { method: "POST", path: "/employee-leave-balance/allot", desc: "Allot leaves (Admin, company-scoped)", body: '{\n  "corp_id": "",\n  "emp_code": "",\n  "year": 2025,\n  "company_name": ""\n}' },
+                { method: "POST", path: "/employee-leave-balance/process-monthly", desc: "Process monthly credits (company-scoped)", body: '{\n  "corp_id": "",\n  "emp_code": "",\n  "year": 2025,\n  "month": 1,\n  "company_name": ""\n}' },
                 { method: "POST", path: "/employee-leave-balance/update-used", desc: "Update leave used", body: '{\n  "corp_id": "",\n  "emp_code": "",\n  "leave_type_puid": "",\n  "days_used": 1,\n  "year": 2025\n}' },
                 { method: "POST", path: "/employee-leave-balance/revert-used", desc: "Revert leave used", body: '{\n  "corp_id": "",\n  "emp_code": "",\n  "leave_type_puid": "",\n  "days_to_revert": 1,\n  "year": 2025\n}' },
                 { method: "POST", path: "/employee-leave-balance/deduct-by-request", desc: "Deduct by request", body: '{\n  "corp_id": "",\n  "emp_code": "",\n  "leave_name": "",\n  "leave_request_puid": "",\n  "year": 2025\n}' },
-                { method: "GET", path: "/employee-leave-balance/list/{corpId}/{empCode?}", desc: "Get leave list" },
-                { method: "GET", path: "/employee-leave-balance/summary/{corpId}", desc: "Get leave summary" },
-                { method: "GET", path: "/employee-leave-balance/leave-names/{corpId}/{empCode?}", desc: "Get leave names" },
+                { method: "GET", path: "/employee-leave-balance/list/{corpId}/{empCode?}", desc: "Get leave list (?year=YYYY&company_name=...)" },
+                { method: "GET", path: "/employee-leave-balance/summary/{corpId}", desc: "Get leave summary (?year=YYYY&company_name=...)" },
+                { method: "GET", path: "/employee-leave-balance/leave-names/{corpId}/{empCode?}", desc: "Get leave names (?year=YYYY&company_name=...)" },
                 { method: "GET", path: "/employee-leave-balance/{corpId}/{empCode}", desc: "Get employee leave balance" }
+            ]
+        },
+        {
+            category: "Leave Settings",
+            icon: "⚙️",
+            color: "#81c784",
+            endpoints: [
+                { method: "GET", path: "/leave-settings/{corpId}/{year}", desc: "Get leave settings (?company_name=...)" },
+                { method: "POST", path: "/leave-settings/upsert", desc: "Upsert company leave settings", body: '{\n  "corpId": "",\n  "companyName": "",\n  "year": 2026,\n  "leaveSettings": [\n    {\n      "leaveType": "Sick",\n      "monthlyAllocation": "1",\n      "yearlyAllocation": "12",\n      "carryForwardLimit": "5",\n      "encashmentLimit": "0"\n    }\n  ]\n}' }
+            ]
+        },
+        {
+            category: "Corp Company Tags",
+            icon: "🏢",
+            color: "#4dd0e1",
+            endpoints: [
+                { method: "GET", path: "/corp-company-tags/{corpId}", desc: "List active company tags" },
+                { method: "POST", path: "/corp-company-tags/upsert", desc: "Create or rename company tag", body: '{\n  "corpId": "",\n  "companyTag": "",\n  "oldCompanyTag": ""\n}' },
+                { method: "DELETE", path: "/corp-company-tags/{corpId}/{companyTag}", desc: "Deactivate company tag" }
             ]
         },
         {
