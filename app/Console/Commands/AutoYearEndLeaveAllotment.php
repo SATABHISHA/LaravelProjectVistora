@@ -3,6 +3,7 @@
 namespace App\Console\Commands;
 
 use Illuminate\Console\Command;
+use Illuminate\Support\Facades\Schema;
 use App\Models\LeaveYearEndPreference;
 use App\Http\Controllers\EmployeeLeaveBalanceApiController;
 use Carbon\Carbon;
@@ -42,6 +43,11 @@ class AutoYearEndLeaveAllotment extends Command
 
         $toYear = $forcedYear ? (int) $forcedYear : (int) $now->year;
         $fromYear = $toYear - 1;
+
+        if (!Schema::hasTable('leave_year_end_preferences')) {
+            $this->warn('Skipping: leave_year_end_preferences table is not available yet.');
+            return self::SUCCESS;
+        }
 
         $prefsQuery = LeaveYearEndPreference::where('auto_allot_enabled', true);
         if ($this->option('corp_id')) {

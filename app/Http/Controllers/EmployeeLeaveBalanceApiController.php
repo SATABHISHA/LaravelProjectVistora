@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
+use Illuminate\Database\Schema\Blueprint;
 use App\Models\EmployeeLeaveBalance;
 use App\Models\LeaveSetting;
 use App\Models\LeaveYearEndPreference;
@@ -17,6 +18,28 @@ use Carbon\Carbon;
 
 class EmployeeLeaveBalanceApiController extends Controller
 {
+    /**
+     * Ensure year-end preference storage table exists.
+     */
+    private function ensureYearEndPreferenceTableExists(): void
+    {
+        if (Schema::hasTable('leave_year_end_preferences')) {
+            return;
+        }
+
+        Schema::create('leave_year_end_preferences', function (Blueprint $table) {
+            $table->id();
+            $table->string('corp_id')->index();
+            $table->string('company_name')->index();
+            $table->boolean('auto_allot_enabled')->default(false);
+            $table->string('timezone')->default('Asia/Kolkata');
+            $table->integer('last_run_year')->nullable();
+            $table->timestamps();
+
+            $table->unique(['corp_id', 'company_name'], 'uniq_leave_year_end_pref');
+        });
+    }
+
     /**
      * Check if the user is admin
      */
@@ -1364,15 +1387,13 @@ class EmployeeLeaveBalanceApiController extends Controller
             ], 403);
         }
 
-        if (!Schema::hasTable('leave_year_end_preferences')) {
+        try {
+            $this->ensureYearEndPreferenceTableExists();
+        } catch (\Throwable $e) {
             return response()->json([
                 'status' => false,
-                'message' => 'Year-end preference table is missing. Please run migration: php artisan migrate',
-                'data' => [
-                    'auto_allot_enabled' => false,
-                    'timezone' => 'Asia/Kolkata',
-                ],
-            ], 503);
+                'message' => 'Unable to initialize year-end preference storage: ' . $e->getMessage(),
+            ], 500);
         }
 
         $pref = LeaveYearEndPreference::updateOrCreate(
@@ -1404,10 +1425,12 @@ class EmployeeLeaveBalanceApiController extends Controller
 
         $companyName = $request->query('company_name');
 
-        if (!Schema::hasTable('leave_year_end_preferences')) {
+        try {
+            $this->ensureYearEndPreferenceTableExists();
+        } catch (\Throwable $e) {
             return response()->json([
                 'status' => true,
-                'message' => 'Year-end auto preference table not found. Returning default values.',
+                'message' => 'Year-end preference storage unavailable. Returning default values.',
                 'data' => [
                     'corp_id' => $corpId,
                     'company_name' => $companyName,
