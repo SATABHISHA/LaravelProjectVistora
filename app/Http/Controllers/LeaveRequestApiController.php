@@ -253,17 +253,24 @@ class LeaveRequestApiController extends Controller
         }
 
         try {
+            DB::beginTransaction();
+
             // 2. Find the leave request to be updated.
             $leaveRequest = LeaveRequest::find($id);
             if (!$leaveRequest) {
+                DB::rollBack();
                 return response()->json(['status' => false, 'message' => 'Leave request not found.'], 404);
             }
+
+            $previousStatus = (string) $leaveRequest->status;
+            $newStatus = (string) $request->input('status');
 
             // 3. Construct the 'approved_reject_return_by' string for the admin/supervisor.
             $adminEmployment = DB::table('employment_details')->where('corp_id', $adminCorpId)->where('EmpCode', $adminEmpcode)->first();
             $adminDetails = DB::table('employee_details')->where('corp_id', $adminCorpId)->where('EmpCode', $adminEmpcode)->first();
 
             if (!$adminEmployment || !$adminDetails) {
+                DB::rollBack();
                 return response()->json(['status' => false, 'message' => 'Approver details not found.'], 404);
             }
 
@@ -272,10 +279,19 @@ class LeaveRequestApiController extends Controller
             $approvedByString = "{$adminEmployment->Designation} - {$adminFullName}";
 
             // 4. Update the leave request fields.
-            $leaveRequest->status = $request->input('status');
+            $leaveRequest->status = $newStatus;
             $leaveRequest->approved_reject_return_by = $approvedByString;
-            $leaveRequest->reject_reason = $request->input('status') === 'Rejected' ? $request->input('reject_reason') : null;
+            $leaveRequest->reject_reason = $newStatus === 'Rejected' ? $request->input('reject_reason') : null;
             $leaveRequest->save();
+
+            // Keep employee_leave_balances in sync with approval transitions.
+            if ($previousStatus !== 'Approved' && $newStatus === 'Approved') {
+                $this->applyLeaveBalanceUsageFromRequest($leaveRequest);
+            } elseif ($previousStatus === 'Approved' && in_array($newStatus, ['Rejected', 'Returned'])) {
+                $this->revertLeaveBalanceUsageFromRequest($leaveRequest);
+            }
+
+            DB::commit();
 
             return response()->json([
                 'status' => true,
@@ -284,8 +300,105 @@ class LeaveRequestApiController extends Controller
             ], 200);
 
         } catch (\Exception $e) {
+            DB::rollBack();
             return response()->json(['status' => false, 'message' => 'An error occurred while updating the request.', 'error' => $e->getMessage()], 500);
         }
+    }
+
+    private function normalizeLeaveTypeKey($value)
+    {
+        $normalized = strtolower(trim((string) $value));
+        return trim((string) preg_replace('/\s+leave$/', '', $normalized));
+    }
+
+    private function parseLeaveRequestDates(LeaveRequest $leaveRequest): array
+    {
+        $fromDateStr = (string) $leaveRequest->from_date;
+        $toDateStr = (string) $leaveRequest->to_date;
+
+        if (preg_match('/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/', $fromDateStr)) {
+            $fromDate = Carbon::createFromFormat('d/m/Y', $fromDateStr);
+            $toDate = Carbon::createFromFormat('d/m/Y', $toDateStr);
+        } else {
+            $fromDate = Carbon::parse($fromDateStr);
+            $toDate = Carbon::parse($toDateStr);
+        }
+
+        return [$fromDate, $toDate];
+    }
+
+    private function findTargetLeaveBalance(LeaveRequest $leaveRequest, int $year)
+    {
+        $candidateBalances = DB::table('employee_leave_balances')
+            ->where('corp_id', $leaveRequest->corp_id)
+            ->where('company_name', $leaveRequest->company_name)
+            ->where('emp_code', $leaveRequest->empcode)
+            ->where('year', $year)
+            ->select('id', 'leave_name', 'used', 'balance')
+            ->get();
+
+        $reasonKey = $this->normalizeLeaveTypeKey($leaveRequest->reason);
+        $best = null;
+        $bestExact = false;
+
+        foreach ($candidateBalances as $row) {
+            $nameKey = $this->normalizeLeaveTypeKey($row->leave_name);
+            if ($nameKey !== $reasonKey) {
+                continue;
+            }
+
+            $rowExact = strtolower(trim((string) $row->leave_name)) === $reasonKey;
+            if ($best === null || ($rowExact && !$bestExact)) {
+                $best = $row;
+                $bestExact = $rowExact;
+            }
+        }
+
+        return $best;
+    }
+
+    private function applyLeaveBalanceUsageFromRequest(LeaveRequest $leaveRequest): void
+    {
+        [$fromDate, $toDate] = $this->parseLeaveRequestDates($leaveRequest);
+        $days = (float) ($fromDate->diffInDays($toDate) + 1);
+        $year = (int) $fromDate->format('Y');
+
+        $target = $this->findTargetLeaveBalance($leaveRequest, $year);
+        if (!$target) {
+            throw new \Exception('Matching leave balance not found for approved request.');
+        }
+
+        if ((float) $target->balance < $days) {
+            throw new \Exception('Insufficient leave balance for approval.');
+        }
+
+        DB::table('employee_leave_balances')
+            ->where('id', $target->id)
+            ->update([
+                'used' => (float) $target->used + $days,
+                'balance' => (float) $target->balance - $days,
+                'updated_at' => now(),
+            ]);
+    }
+
+    private function revertLeaveBalanceUsageFromRequest(LeaveRequest $leaveRequest): void
+    {
+        [$fromDate, $toDate] = $this->parseLeaveRequestDates($leaveRequest);
+        $days = (float) ($fromDate->diffInDays($toDate) + 1);
+        $year = (int) $fromDate->format('Y');
+
+        $target = $this->findTargetLeaveBalance($leaveRequest, $year);
+        if (!$target) {
+            return;
+        }
+
+        DB::table('employee_leave_balances')
+            ->where('id', $target->id)
+            ->update([
+                'used' => max(0, (float) $target->used - $days),
+                'balance' => (float) $target->balance + $days,
+                'updated_at' => now(),
+            ]);
     }
 
     /**

@@ -54,6 +54,55 @@ class EmployeeLeaveBalanceApiController extends Controller
     }
 
     /**
+     * Convert variants like "Sick Leave" and "Sick" to a single canonical key.
+     */
+    private function getCanonicalLeaveKey($value)
+    {
+        $normalized = $this->normalizeLeaveType($value);
+        $canonical = preg_replace('/\s+leave$/', '', $normalized);
+        return trim((string) $canonical);
+    }
+
+    /**
+     * Pick one record per canonical leave type (prefer exact canonical name, then latest update).
+     */
+    private function dedupeLeaveBalances($leaveBalances)
+    {
+        $picked = [];
+
+        foreach ($leaveBalances as $balance) {
+            $key = $this->getCanonicalLeaveKey($balance->leave_name);
+            $currentName = $this->normalizeLeaveType($balance->leave_name);
+
+            if (!isset($picked[$key])) {
+                $picked[$key] = $balance;
+                continue;
+            }
+
+            $existing = $picked[$key];
+            $existingName = $this->normalizeLeaveType($existing->leave_name);
+
+            $currentIsExact = $currentName === $key;
+            $existingIsExact = $existingName === $key;
+
+            if ($currentIsExact && !$existingIsExact) {
+                $picked[$key] = $balance;
+                continue;
+            }
+
+            if ($currentIsExact === $existingIsExact) {
+                $currentUpdatedAt = $balance->updated_at ? strtotime((string) $balance->updated_at) : 0;
+                $existingUpdatedAt = $existing->updated_at ? strtotime((string) $existing->updated_at) : 0;
+                if ($currentUpdatedAt >= $existingUpdatedAt) {
+                    $picked[$key] = $balance;
+                }
+            }
+        }
+
+        return collect(array_values($picked));
+    }
+
+    /**
      * Build leave configs from company/year leave_settings with fallback to basic config.
      */
     private function getLeaveConfigurations($corpId, $companyName, $year)
@@ -528,22 +577,35 @@ class EmployeeLeaveBalanceApiController extends Controller
                     'emp_full_name' => $balance->emp_full_name,
                     'company_name' => $balance->company_name,
                     'year' => $year,
-                    'leave_types' => []
+                    'leave_types' => [],
+                    '_raw_balances' => []
                 ];
             }
-            
-            $employeeLeaves[$empCode]['leave_types'][] = [
-                'leave_code' => $balance->leave_code,
-                'leave_name' => $balance->leave_name,
-                'total_allotted' => (float)$balance->total_allotted,
-                'used' => (float)$balance->used,
-                'balance' => (float)$balance->balance,
-                'carry_forward' => (float)$balance->carry_forward,
-                'credit_type' => $balance->credit_type,
-                'is_lapsed' => $balance->is_lapsed,
-                'created_at' => $balance->created_at,
-                'updated_at' => $balance->updated_at
-            ];
+
+            $employeeLeaves[$empCode]['_raw_balances'][] = $balance;
+        }
+
+        foreach ($employeeLeaves as $empCodeKey => $employeeData) {
+            $deduped = $this->dedupeLeaveBalances(collect($employeeData['_raw_balances']));
+            $leaveTypes = [];
+
+            foreach ($deduped as $balance) {
+                $leaveTypes[] = [
+                    'leave_code' => $balance->leave_code,
+                    'leave_name' => $balance->leave_name,
+                    'total_allotted' => (float)$balance->total_allotted,
+                    'used' => (float)$balance->used,
+                    'balance' => (float)$balance->balance,
+                    'carry_forward' => (float)$balance->carry_forward,
+                    'credit_type' => $balance->credit_type,
+                    'is_lapsed' => $balance->is_lapsed,
+                    'created_at' => $balance->created_at,
+                    'updated_at' => $balance->updated_at
+                ];
+            }
+
+            $employeeLeaves[$empCodeKey]['leave_types'] = $leaveTypes;
+            unset($employeeLeaves[$empCodeKey]['_raw_balances']);
         }
 
         return response()->json([
@@ -590,6 +652,8 @@ class EmployeeLeaveBalanceApiController extends Controller
                 'data' => []
             ]);
         }
+
+        $leaveBalances = $this->dedupeLeaveBalances($leaveBalances);
 
         $empFullName = $leaveBalances->first()->emp_full_name;
         $leaveTypes = [];

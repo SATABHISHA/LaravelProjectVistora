@@ -266,70 +266,65 @@ class EmployeeListApiController extends Controller
                 ->limit(5)
                 ->get();
 
-            // Get leave policies for this corp
-            $leavePolicies = DB::table('leave_policy')
-                ->where('corpid', $corpId)
-                ->get();
-
-            // Calculate total leave entitlement and used leaves
-            $totalLeaveEntitlement = 0;
-            $sickLeaveEntitlement = 0;
-            
-            foreach ($leavePolicies as $policy) {
-                $days = (float) $policy->toDays;
-                $totalLeaveEntitlement += $days;
-                
-                // Check if this policy includes sick leave
-                $leaveTypes = explode(',', $policy->leaveType);
-                foreach ($leaveTypes as $type) {
-                    if (stripos(trim($type), 'Sick') !== false) {
-                        $sickLeaveEntitlement += $days;
-                    }
-                }
-            }
-
-            // Get approved leave requests for this employee (all time)
-            $approvedLeaves = DB::table('leave_request')
+            // Pull leave values from employee_leave_balances (same source as leave allotment APIs).
+            $currentYear = (int) $now->format('Y');
+            $leaveBalances = DB::table('employee_leave_balances')
                 ->where('corp_id', $corpId)
                 ->where('company_name', $companyName)
-                ->where('empcode', $empcode)
-                ->where('status', 'Approved')
+                ->where('emp_code', $empcode)
+                ->where('year', $currentYear)
+                ->select('leave_name', 'total_allotted', 'used', 'balance', 'updated_at')
                 ->get();
 
-            // Calculate total used leave days
-            $totalUsedLeaves = 0;
-            $sickLeaveUsed = 0;
+            $canonicalMap = [];
+            foreach ($leaveBalances as $row) {
+                $normalized = strtolower(trim((string) $row->leave_name));
+                $canonical = trim((string) preg_replace('/\s+leave$/', '', $normalized));
 
-            foreach ($approvedLeaves as $leave) {
-                try {
-                    // Parse dates - handle dd/mm/yyyy format
-                    $fromDateStr = $leave->from_date;
-                    $toDateStr = $leave->to_date;
-                    
-                    if (preg_match('/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/', $fromDateStr)) {
-                        $fromDate = Carbon::createFromFormat('d/m/Y', $fromDateStr);
-                        $toDate = Carbon::createFromFormat('d/m/Y', $toDateStr);
-                    } else {
-                        $fromDate = Carbon::parse($fromDateStr);
-                        $toDate = Carbon::parse($toDateStr);
-                    }
-                    
-                    $days = $fromDate->diffInDays($toDate) + 1;
-                    $totalUsedLeaves += $days;
-                    
-                    // Check if it's sick leave
-                    if (stripos($leave->reason, 'Sick') !== false) {
-                        $sickLeaveUsed += $days;
-                    }
-                } catch (\Exception $e) {
-                    // Skip if date parsing fails
+                if (!isset($canonicalMap[$canonical])) {
+                    $canonicalMap[$canonical] = $row;
                     continue;
+                }
+
+                $existing = $canonicalMap[$canonical];
+                $currentIsExact = $normalized === $canonical;
+                $existingNormalized = strtolower(trim((string) $existing->leave_name));
+                $existingIsExact = $existingNormalized === $canonical;
+
+                if ($currentIsExact && !$existingIsExact) {
+                    $canonicalMap[$canonical] = $row;
+                    continue;
+                }
+
+                $currentTs = $row->updated_at ? strtotime((string) $row->updated_at) : 0;
+                $existingTs = $existing->updated_at ? strtotime((string) $existing->updated_at) : 0;
+                if ($currentTs >= $existingTs) {
+                    $canonicalMap[$canonical] = $row;
                 }
             }
 
-            // Calculate balances
-            $totalLeaveBalance = max(0, $totalLeaveEntitlement - $totalUsedLeaves);
-            $sickLeaveBalance = max(0, $sickLeaveEntitlement - $sickLeaveUsed);
+            $totalLeaveEntitlement = 0.0;
+            $totalUsedLeaves = 0.0;
+            $totalLeaveBalance = 0.0;
+            $sickLeaveEntitlement = 0.0;
+            $sickLeaveUsed = 0.0;
+            $sickLeaveBalance = 0.0;
+
+            foreach ($canonicalMap as $canonical => $row) {
+                $allotted = (float) ($row->total_allotted ?? 0);
+                $used = (float) ($row->used ?? 0);
+                $balance = (float) ($row->balance ?? 0);
+
+                $totalLeaveEntitlement += $allotted;
+                $totalUsedLeaves += $used;
+                $totalLeaveBalance += $balance;
+
+                if ($canonical === 'sick') {
+                    $sickLeaveEntitlement += $allotted;
+                    $sickLeaveUsed += $used;
+                    $sickLeaveBalance += $balance;
+                }
+            }
 
             return response()->json([
                 'status' => true,

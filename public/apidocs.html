@@ -1901,7 +1901,7 @@
             endpoints: [
                 { method: "POST", path: "/leave-request", desc: "Submit leave request", body: '{\n  "corp_id": "",\n  "company_name": "",\n  "empcode": "",\n  "full_name": "",\n  "emp_designation": "",\n  "from_date": "",\n  "to_date": "",\n  "reason": "",\n  "leave_reason_description": ""\n}' },
                 { method: "GET", path: "/leave-requests/{status}/{corp_id}/{empcode}", desc: "Get requests by status (Admin)" },
-                { method: "PATCH", path: "/leave-request/{id}", desc: "Update leave request status", body: '{\n  "corp_id": "",\n  "empcode": "",\n  "status": "",\n  "reject_reason": "",\n  "approved_reject_return_by": ""\n}' },
+                { method: "PATCH", path: "/leave-request/{id}", desc: "Update leave request status", notes: "When status changes to <code>Approved</code>, leave days are auto-deducted from <code>employee_leave_balances</code> (matched by employee/company/year + leave reason). If an approved request is later changed to <code>Rejected</code> or <code>Returned</code>, the deducted days are auto-reverted.", body: '{\n  "corp_id": "",\n  "empcode": "",\n  "status": "Approved",\n  "reject_reason": "",\n  "approved_reject_return_by": ""\n}' },
                 { method: "GET", path: "/leave-requests/employee/{corp_id}/{company_name}/{empcode}", desc: "Get employee leave requests" },
                 { method: "GET", path: "/employee/leave-requests/{status}/{corp_id}/{company_name}/{empcode}", desc: "Employee leaves by status" },
                 { method: "GET", path: "/people-on-leave-today/{corp_id}/{empcode}", desc: "People on leave today" },
@@ -2019,7 +2019,7 @@
             endpoints: [
                 { method: "GET", path: "/employee-list", desc: "Get employee list" },
                 { method: "GET", path: "/birthdays/today", desc: "Get today's birthdays" },
-                { method: "GET", path: "/employee/leave-summary", desc: "Get employee leave summary" }
+                { method: "GET", path: "/employee/leave-summary", desc: "Get employee leave summary", notes: "Leave values come from <code>employee_leave_balances</code> (same data used by leave allotment), not legacy leave_policy entitlement. Duplicate legacy names like <code>Sick Leave</code> and <code>Sick</code> are canonicalized before totals are returned." }
             ]
         },
         {
