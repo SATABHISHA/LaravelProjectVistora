@@ -19,6 +19,14 @@ class Kernel extends ConsoleKernel
             ->appendOutputTo(storage_path('logs/leave-credits-cron.log'))
             ->emailOutputOnFailure(env('ADMIN_EMAIL'));
 
+        // Run auto year-end allotment check daily at midnight.
+        // Command itself processes only when Jan 1 (unless forced).
+        $schedule->command('leave:auto-year-end-allot')
+            ->dailyAt('00:00')
+            ->withoutOverlapping()
+            ->appendOutputTo(storage_path('logs/leave-year-end-cron.log'))
+            ->emailOutputOnFailure(env('ADMIN_EMAIL'));
+
         // Alternative: Run daily and let the command handle month logic
         // $schedule->command('leave:process-monthly-credits')
         //     ->dailyAt('00:05')

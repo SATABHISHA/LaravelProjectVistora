@@ -6,6 +6,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use App\Models\EmployeeLeaveBalance;
 use App\Models\LeaveSetting;
+use App\Models\LeaveYearEndPreference;
 use App\Models\LeaveTypeBasicConfiguration;
 use App\Models\LeaveTypeFullConfiguration;
 use App\Models\EmployeeDetail;
@@ -289,6 +290,7 @@ class EmployeeLeaveBalanceApiController extends Controller
         }
 
         $allottedCount = 0;
+        $updatedCount = 0;
         $skippedCount = 0;
         $carryForwardCount = 0;
         $allottedEmployees = [];
@@ -361,19 +363,59 @@ class EmployeeLeaveBalanceApiController extends Controller
 
                     $totalWithCarryForward = $totalAllotted + $carryForward;
 
-                    // Check if record already exists to avoid race-condition duplicate key errors
+                    // Reconcile existing record if present, otherwise create a new one.
                     $existing = EmployeeLeaveBalance::where('corp_id', $corpId)
                         ->where('emp_code', $empCode)
                         ->where('leave_type_puid', $leaveTypePuid)
                         ->where('year', $year)
                         ->where('company_name', $companyName)
-                        ->exists();
+                        ->first();
 
                     if ($existing) {
-                        $skippedCount++;
-                        if (!in_array($empCode, $skippedEmployees)) {
-                            $skippedEmployees[] = $empCode;
+                        $newTotalAllotted = $totalWithCarryForward;
+                        $newUsed = (float) $existing->used;
+                        $newBalance = max(0, $newTotalAllotted - $newUsed);
+                        $newMonth = ($creditType === 'monthly' && $monthlyAllocation > 0)
+                            ? ($year == $currentDate->year ? $currentMonth : 12)
+                            : null;
+
+                        $needsUpdate =
+                            abs((float) $existing->total_allotted - $newTotalAllotted) > 0.0001 ||
+                            abs((float) $existing->balance - $newBalance) > 0.0001 ||
+                            abs((float) $existing->carry_forward - $carryForward) > 0.0001 ||
+                            (string) $existing->credit_type !== (string) $creditType ||
+                            (string) $existing->leave_code !== (string) $leaveCode ||
+                            (string) $existing->leave_name !== (string) $leaveName ||
+                            (int) ($existing->month ?? 0) !== (int) ($newMonth ?? 0);
+
+                        if ($needsUpdate) {
+                            $existing->update([
+                                'emp_full_name' => $empFullName,
+                                'leave_code' => $leaveCode,
+                                'leave_name' => $leaveName,
+                                'total_allotted' => $newTotalAllotted,
+                                'balance' => $newBalance,
+                                'carry_forward' => $carryForward,
+                                'month' => $newMonth,
+                                'credit_type' => $creditType,
+                                'last_credited_at' => $currentDate,
+                            ]);
+
+                            if ($shouldLapsePreviousYear && $previousYearBalance) {
+                                $previousYearBalance->update(['is_lapsed' => true]);
+                            }
+
+                            $updatedCount++;
+                            if (!in_array($empCode, $allottedEmployees)) {
+                                $allottedEmployees[] = $empCode;
+                            }
+                        } else {
+                            $skippedCount++;
+                            if (!in_array($empCode, $skippedEmployees)) {
+                                $skippedEmployees[] = $empCode;
+                            }
                         }
+
                         continue;
                     }
 
@@ -423,7 +465,7 @@ class EmployeeLeaveBalanceApiController extends Controller
 
             DB::commit();
 
-            $alreadyAllotted = ($allottedCount === 0 && $skippedCount > 0);
+            $alreadyAllotted = ($allottedCount === 0 && $updatedCount === 0 && $skippedCount > 0);
             $message = $alreadyAllotted
                 ? 'Leaves are already allotted for all employees of ' . $companyName . ' in ' . $year . '.'
                 : 'Leave allotment completed successfully.';
@@ -433,6 +475,7 @@ class EmployeeLeaveBalanceApiController extends Controller
                 'message' => $message,
                 'data' => [
                     'total_leave_records_created' => $allottedCount,
+                    'total_leave_records_updated' => $updatedCount,
                     'total_records_skipped' => $skippedCount,
                     'carry_forward_applied' => $carryForwardCount,
                     'employees_allotted' => count($allottedEmployees),
@@ -654,11 +697,18 @@ class EmployeeLeaveBalanceApiController extends Controller
     public function getEmployeeLeaveBalance(Request $request, $corpId, $empCode)
     {
         $year = $request->query('year', Carbon::now()->year);
+        $companyName = $request->query('company_name');
 
         // Get leave balances for the specific employee
-        $leaveBalances = EmployeeLeaveBalance::where('corp_id', $corpId)
+        $query = EmployeeLeaveBalance::where('corp_id', $corpId)
             ->where('emp_code', $empCode)
-            ->where('year', $year)
+            ->where('year', $year);
+
+        if (!empty($companyName)) {
+            $query->where('company_name', $companyName);
+        }
+
+        $leaveBalances = $query
             ->orderBy('leave_code')
             ->get();
 
@@ -1043,6 +1093,519 @@ class EmployeeLeaveBalanceApiController extends Controller
                 'year' => $year
             ]
         ]);
+    }
+
+    /**
+     * Revert/delete all leave allotments for a company + year (admin only).
+     */
+    public function revertAllotment(Request $request)
+    {
+        $request->validate([
+            'corp_id' => 'required|string',
+            'emp_code' => 'required|string',
+            'company_name' => 'required|string',
+            'year' => 'required|integer|min:2020|max:2100',
+            'force' => 'nullable|boolean',
+        ]);
+
+        $corpId = $request->corp_id;
+        $adminEmpCode = $request->emp_code;
+        $companyName = $request->company_name;
+        $year = (int) $request->year;
+        $force = (bool) ($request->force ?? false);
+
+        if (!$this->isAdmin($corpId, $adminEmpCode)) {
+            return response()->json([
+                'status' => false,
+                'message' => 'Access denied. Only admin users can revert allotments.'
+            ], 403);
+        }
+
+        $query = EmployeeLeaveBalance::where('corp_id', $corpId)
+            ->where('company_name', $companyName)
+            ->where('year', $year);
+
+        $total = (clone $query)->count();
+        if ($total === 0) {
+            return response()->json([
+                'status' => false,
+                'message' => 'No leave allotments found for selected company and year.',
+                'data' => [
+                    'deleted_records' => 0,
+                    'company_name' => $companyName,
+                    'year' => $year,
+                ],
+            ], 404);
+        }
+
+        $usedCount = (clone $query)->where('used', '>', 0)->count();
+        if ($usedCount > 0 && !$force) {
+            return response()->json([
+                'status' => false,
+                'message' => 'Cannot revert because some records already have used leaves. Pass force=true to override.',
+                'data' => [
+                    'total_records' => $total,
+                    'records_with_used' => $usedCount,
+                    'company_name' => $companyName,
+                    'year' => $year,
+                ],
+            ], 409);
+        }
+
+        $deleted = $query->delete();
+
+        return response()->json([
+            'status' => true,
+            'message' => 'Leave allotments reverted successfully.',
+            'data' => [
+                'deleted_records' => $deleted,
+                'records_with_used' => $usedCount,
+                'company_name' => $companyName,
+                'year' => $year,
+            ],
+        ]);
+    }
+
+    /**
+     * Get per-employee year-end carry-forward and encashment status preview.
+     */
+    public function getYearEndStatus(Request $request, $corpId)
+    {
+        $request->validate([
+            'company_name' => 'required|string',
+            'from_year' => 'required|integer|min:2020|max:2100',
+            'to_year' => 'nullable|integer|min:2020|max:2100',
+        ]);
+
+        $companyName = $request->query('company_name');
+        $fromYear = (int) $request->query('from_year');
+        $toYear = (int) ($request->query('to_year') ?? ($fromYear + 1));
+
+        $settings = LeaveSetting::where('corp_id', $corpId)
+            ->where('company_name', $companyName)
+            ->where('year', $toYear)
+            ->get();
+
+        if ($settings->isEmpty()) {
+            $settings = LeaveSetting::where('corp_id', $corpId)
+                ->where('company_name', $companyName)
+                ->where('year', $fromYear)
+                ->get();
+        }
+
+        if ($settings->isEmpty()) {
+            return response()->json([
+                'status' => false,
+                'message' => 'No leave settings found for source/target years.',
+                'data' => [],
+            ], 404);
+        }
+
+        $empCodes = EmploymentDetail::where('corp_id', $corpId)
+            ->where('company_name', $companyName)
+            ->pluck('EmpCode')
+            ->toArray();
+
+        if (empty($empCodes)) {
+            return response()->json([
+                'status' => false,
+                'message' => 'No employees found for this corp_id and company_name.',
+                'data' => [],
+            ], 404);
+        }
+
+        $prevRows = EmployeeLeaveBalance::where('corp_id', $corpId)
+            ->where('company_name', $companyName)
+            ->where('year', $fromYear)
+            ->whereIn('emp_code', $empCodes)
+            ->get();
+
+        $targetRows = EmployeeLeaveBalance::where('corp_id', $corpId)
+            ->where('company_name', $companyName)
+            ->where('year', $toYear)
+            ->whereIn('emp_code', $empCodes)
+            ->get();
+
+        $byEmpPrev = [];
+        foreach ($prevRows as $row) {
+            $emp = $row->emp_code;
+            $key = $this->getCanonicalLeaveKey($row->leave_name);
+            $byEmpPrev[$emp][$key] = $row;
+        }
+
+        $byEmpTarget = [];
+        foreach ($targetRows as $row) {
+            $emp = $row->emp_code;
+            $key = $this->getCanonicalLeaveKey($row->leave_name);
+            $byEmpTarget[$emp][$key] = $row;
+        }
+
+        $employees = EmployeeDetail::where('corp_id', $corpId)
+            ->whereIn('EmpCode', $empCodes)
+            ->get()
+            ->keyBy('EmpCode');
+
+        $result = [];
+
+        foreach ($empCodes as $empCode) {
+            $employee = $employees->get($empCode);
+            $empName = $employee
+                ? preg_replace('/\s+/', ' ', trim(($employee->FirstName ?? '') . ' ' . ($employee->MiddleName ?? '') . ' ' . ($employee->LastName ?? '')))
+                : $empCode;
+
+            $leaveStatuses = [];
+
+            foreach ($settings as $setting) {
+                $key = $this->getCanonicalLeaveKey($setting->leave_type);
+                $prev = $byEmpPrev[$empCode][$key] ?? null;
+                $target = $byEmpTarget[$empCode][$key] ?? null;
+
+                $prevBalance = $prev ? (float) $prev->balance : 0.0;
+                $carryLimit = (float) ($setting->carry_forward_limit ?? 0);
+                $encashLimit = (float) ($setting->encashment_limit ?? 0);
+
+                $carryAmount = min($prevBalance, $carryLimit);
+                $rawExcess = max(0, $prevBalance - $carryAmount);
+                $encashAmount = $encashLimit > 0 ? min($rawExcess, $encashLimit) : 0.0;
+
+                $carryStatus = $carryAmount > 0 ? ($target ? 'Done' : 'Pending') : 'Done';
+                $encashStatus = $encashAmount > 0 ? ($target ? 'Done' : 'Pending') : 'Done';
+
+                $leaveStatuses[] = [
+                    'leave_type' => $setting->leave_type,
+                    'previous_balance' => round($prevBalance, 2),
+                    'carry_forward_amount' => round($carryAmount, 2),
+                    'encash_amount' => round($encashAmount, 2),
+                    'carry_forward_status' => $carryStatus,
+                    'encashment_status' => $encashStatus,
+                ];
+            }
+
+            $result[] = [
+                'emp_code' => $empCode,
+                'emp_full_name' => $empName,
+                'from_year' => $fromYear,
+                'to_year' => $toYear,
+                'leave_statuses' => $leaveStatuses,
+            ];
+        }
+
+        return response()->json([
+            'status' => true,
+            'message' => 'Year-end leave status preview fetched successfully.',
+            'data' => $result,
+            'company_name' => $companyName,
+            'from_year' => $fromYear,
+            'to_year' => $toYear,
+        ]);
+    }
+
+    /**
+     * Manual year-end allotment run by HR admin.
+     */
+    public function processYearEndAllotment(Request $request)
+    {
+        $request->validate([
+            'corp_id' => 'required|string',
+            'emp_code' => 'required|string',
+            'company_name' => 'required|string',
+            'from_year' => 'required|integer|min:2020|max:2100',
+            'to_year' => 'nullable|integer|min:2020|max:2100',
+        ]);
+
+        if (!$this->isAdmin($request->corp_id, $request->emp_code)) {
+            return response()->json([
+                'status' => false,
+                'message' => 'Access denied. Only admin users can process year-end allotment.'
+            ], 403);
+        }
+
+        $toYear = (int) ($request->to_year ?? ((int) $request->from_year + 1));
+
+        try {
+            $result = $this->runYearEndAllotmentForCompany(
+                $request->corp_id,
+                $request->company_name,
+                (int) $request->from_year,
+                $toYear
+            );
+
+            return response()->json([
+                'status' => true,
+                'message' => 'Year-end leave allotment processed successfully.',
+                'data' => $result,
+            ]);
+        } catch (\Exception $e) {
+            return response()->json([
+                'status' => false,
+                'message' => 'Error processing year-end allotment: ' . $e->getMessage(),
+            ], 500);
+        }
+    }
+
+    /**
+     * Upsert auto-allot preference for company (admin only).
+     */
+    public function setYearEndAutoPreference(Request $request)
+    {
+        $request->validate([
+            'corp_id' => 'required|string',
+            'emp_code' => 'required|string',
+            'company_name' => 'required|string',
+            'auto_allot_enabled' => 'required|boolean',
+            'timezone' => 'nullable|string',
+        ]);
+
+        if (!$this->isAdmin($request->corp_id, $request->emp_code)) {
+            return response()->json([
+                'status' => false,
+                'message' => 'Access denied. Only admin users can configure auto year-end allotment.'
+            ], 403);
+        }
+
+        $pref = LeaveYearEndPreference::updateOrCreate(
+            [
+                'corp_id' => $request->corp_id,
+                'company_name' => $request->company_name,
+            ],
+            [
+                'auto_allot_enabled' => (bool) $request->auto_allot_enabled,
+                'timezone' => $request->timezone ?: 'Asia/Kolkata',
+            ]
+        );
+
+        return response()->json([
+            'status' => true,
+            'message' => 'Year-end auto allotment preference saved successfully.',
+            'data' => $pref,
+        ]);
+    }
+
+    /**
+     * Fetch auto-allot preference for company.
+     */
+    public function getYearEndAutoPreference(Request $request, $corpId)
+    {
+        $request->validate([
+            'company_name' => 'required|string',
+        ]);
+
+        $companyName = $request->query('company_name');
+
+        $pref = LeaveYearEndPreference::firstOrCreate(
+            [
+                'corp_id' => $corpId,
+                'company_name' => $companyName,
+            ],
+            [
+                'auto_allot_enabled' => false,
+                'timezone' => 'Asia/Kolkata',
+            ]
+        );
+
+        return response()->json([
+            'status' => true,
+            'message' => 'Year-end auto allotment preference fetched successfully.',
+            'data' => $pref,
+        ]);
+    }
+
+    /**
+     * Shared implementation for manual and scheduled year-end allotment.
+     */
+    public function runYearEndAllotmentForCompany(string $corpId, string $companyName, int $fromYear, int $toYear): array
+    {
+        $currentDate = Carbon::now();
+        $currentMonth = $currentDate->month;
+
+        $empCodes = EmploymentDetail::where('corp_id', $corpId)
+            ->where('company_name', $companyName)
+            ->pluck('EmpCode')
+            ->toArray();
+
+        if (empty($empCodes)) {
+            return [
+                'company_name' => $companyName,
+                'from_year' => $fromYear,
+                'to_year' => $toYear,
+                'total_leave_records_created' => 0,
+                'total_leave_records_updated' => 0,
+                'total_records_skipped' => 0,
+                'employees_processed' => 0,
+                'employees_skipped' => 0,
+            ];
+        }
+
+        $employees = EmployeeDetail::where('corp_id', $corpId)
+            ->whereIn('EmpCode', $empCodes)
+            ->get();
+
+        $configs = $this->getLeaveConfigurations($corpId, $companyName, $toYear);
+        if (empty($configs)) {
+            throw new \Exception('No leave settings/configurations found for target year.');
+        }
+
+        $settings = LeaveSetting::where('corp_id', $corpId)
+            ->where('company_name', $companyName)
+            ->where('year', $toYear)
+            ->get();
+
+        if ($settings->isEmpty()) {
+            $settings = LeaveSetting::where('corp_id', $corpId)
+                ->where('company_name', $companyName)
+                ->where('year', $fromYear)
+                ->get();
+        }
+
+        $settingsByType = [];
+        foreach ($settings as $setting) {
+            $settingsByType[$this->getCanonicalLeaveKey($setting->leave_type)] = $setting;
+        }
+
+        $createdCount = 0;
+        $updatedCount = 0;
+        $skippedCount = 0;
+        $employeesProcessed = [];
+        $employeesSkipped = [];
+
+        DB::beginTransaction();
+        try {
+            foreach ($employees as $employee) {
+                $empCode = $employee->EmpCode;
+                $empFullName = $this->getEmployeeFullName($corpId, $empCode)
+                    ?: preg_replace('/\s+/', ' ', trim(($employee->FirstName ?? '') . ' ' . ($employee->MiddleName ?? '') . ' ' . ($employee->LastName ?? '')));
+
+                $prevRows = EmployeeLeaveBalance::where('corp_id', $corpId)
+                    ->where('company_name', $companyName)
+                    ->where('emp_code', $empCode)
+                    ->where('year', $fromYear)
+                    ->get();
+
+                $prevByCanonical = [];
+                foreach ($prevRows as $row) {
+                    $prevByCanonical[$this->getCanonicalLeaveKey($row->leave_name)] = $row;
+                }
+
+                foreach ($configs as $config) {
+                    $leaveTypePuid = $config['puid'];
+                    $leaveCode = $config['leave_code'];
+                    $leaveName = $config['leave_name'];
+                    $canonicalType = $this->getCanonicalLeaveKey($leaveName);
+
+                    $setting = $settingsByType[$canonicalType] ?? null;
+                    $carryLimit = $setting ? (float) ($setting->carry_forward_limit ?? 0) : 0.0;
+                    $encashLimit = $setting ? (float) ($setting->encashment_limit ?? 0) : 0.0;
+
+                    $prev = $prevByCanonical[$canonicalType] ?? null;
+                    $prevBalance = $prev ? (float) $prev->balance : 0.0;
+                    $carryForward = min($prevBalance, $carryLimit);
+
+                    $creditType = strtolower((string) ($config['credit_type'] ?? 'yearly'));
+                    $yearlyAllocation = (float) ($config['yearly_allocation'] ?? 0);
+                    $monthlyAllocation = (float) ($config['monthly_allocation'] ?? 0);
+                    $baseAllotted = $yearlyAllocation;
+                    if ($creditType === 'monthly' && $monthlyAllocation > 0 && $toYear === (int) $currentDate->year) {
+                        $baseAllotted = $monthlyAllocation * $currentMonth;
+                    }
+
+                    $totalAllotted = $baseAllotted + $carryForward;
+                    $encashableExcess = max(0, $prevBalance - $carryForward);
+                    $encashedAmount = $encashLimit > 0 ? min($encashableExcess, $encashLimit) : 0.0;
+
+                    $existing = EmployeeLeaveBalance::where('corp_id', $corpId)
+                        ->where('company_name', $companyName)
+                        ->where('emp_code', $empCode)
+                        ->where('year', $toYear)
+                        ->where('leave_type_puid', $leaveTypePuid)
+                        ->first();
+
+                    if ($existing) {
+                        $newUsed = (float) $existing->used;
+                        $newBalance = max(0, $totalAllotted - $newUsed);
+
+                        $needsUpdate =
+                            abs((float) $existing->total_allotted - $totalAllotted) > 0.0001 ||
+                            abs((float) $existing->balance - $newBalance) > 0.0001 ||
+                            abs((float) $existing->carry_forward - $carryForward) > 0.0001 ||
+                            (string) $existing->credit_type !== (string) $creditType ||
+                            (string) $existing->leave_name !== (string) $leaveName ||
+                            (string) $existing->leave_code !== (string) $leaveCode;
+
+                        if ($needsUpdate) {
+                            $existing->update([
+                                'emp_full_name' => $empFullName,
+                                'leave_code' => $leaveCode,
+                                'leave_name' => $leaveName,
+                                'total_allotted' => $totalAllotted,
+                                'balance' => $newBalance,
+                                'carry_forward' => $carryForward,
+                                'credit_type' => $creditType,
+                                'month' => ($creditType === 'monthly' && $monthlyAllocation > 0)
+                                    ? ($toYear === (int) $currentDate->year ? $currentMonth : 12)
+                                    : null,
+                                'last_credited_at' => $currentDate,
+                            ]);
+                            $updatedCount++;
+                            if (!in_array($empCode, $employeesProcessed)) {
+                                $employeesProcessed[] = $empCode;
+                            }
+                        } else {
+                            $skippedCount++;
+                            if (!in_array($empCode, $employeesSkipped)) {
+                                $employeesSkipped[] = $empCode;
+                            }
+                        }
+
+                        continue;
+                    }
+
+                    EmployeeLeaveBalance::create([
+                        'corp_id' => $corpId,
+                        'emp_code' => $empCode,
+                        'emp_full_name' => $empFullName,
+                        'company_name' => $companyName,
+                        'leave_type_puid' => $leaveTypePuid,
+                        'leave_code' => $leaveCode,
+                        'leave_name' => $leaveName,
+                        'total_allotted' => $totalAllotted,
+                        'used' => 0,
+                        'balance' => $totalAllotted,
+                        'carry_forward' => $carryForward,
+                        'year' => $toYear,
+                        'month' => ($creditType === 'monthly' && $monthlyAllocation > 0)
+                            ? ($toYear === (int) $currentDate->year ? $currentMonth : 12)
+                            : null,
+                        'credit_type' => $creditType,
+                        'is_lapsed' => false,
+                        'last_credited_at' => $currentDate,
+                    ]);
+
+                    // Encash amount is a derived output for status/preview, not persisted in current schema.
+                    $encashedAmount = $encashedAmount; // keep variable explicit for readability.
+
+                    $createdCount++;
+                    if (!in_array($empCode, $employeesProcessed)) {
+                        $employeesProcessed[] = $empCode;
+                    }
+                }
+            }
+
+            DB::commit();
+
+            return [
+                'company_name' => $companyName,
+                'from_year' => $fromYear,
+                'to_year' => $toYear,
+                'total_leave_records_created' => $createdCount,
+                'total_leave_records_updated' => $updatedCount,
+                'total_records_skipped' => $skippedCount,
+                'employees_processed' => count($employeesProcessed),
+                'employees_skipped' => count($employeesSkipped),
+            ];
+        } catch (\Exception $e) {
+            DB::rollBack();
+            throw $e;
+        }
     }
 
     /**

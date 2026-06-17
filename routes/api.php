@@ -842,6 +842,11 @@ Route::get('/fms/category-summary', [FmsCategoryController::class, 'summary']);
 Route::post('/employee-leave-balance/allot', [EmployeeLeaveBalanceApiController::class, 'allotLeaves']); // Admin only - allot leaves to all employees
 Route::post('/employee-leave-balance/update', [EmployeeLeaveBalanceApiController::class, 'updateAllotment']); // Update existing leave allotment
 Route::post('/employee-leave-balance/process-monthly', [EmployeeLeaveBalanceApiController::class, 'processMonthlyCredits']); // Admin only - process monthly credits
+Route::post('/employee-leave-balance/revert-allotment', [EmployeeLeaveBalanceApiController::class, 'revertAllotment']); // Admin only - revert company/year allotments
+Route::post('/employee-leave-balance/year-end-allot', [EmployeeLeaveBalanceApiController::class, 'processYearEndAllotment']); // Admin only - manual year-end allotment
+Route::get('/employee-leave-balance/year-end-status/{corpId}', [EmployeeLeaveBalanceApiController::class, 'getYearEndStatus']); // Year-end carry/encash status preview by employee
+Route::get('/employee-leave-balance/year-end-auto/{corpId}', [EmployeeLeaveBalanceApiController::class, 'getYearEndAutoPreference']); // Get auto year-end preference
+Route::post('/employee-leave-balance/year-end-auto', [EmployeeLeaveBalanceApiController::class, 'setYearEndAutoPreference']); // Set auto year-end preference (admin)
 Route::post('/employee-leave-balance/update-used', [EmployeeLeaveBalanceApiController::class, 'updateLeaveUsed']); // Update leave when used
 Route::post('/employee-leave-balance/revert-used', [EmployeeLeaveBalanceApiController::class, 'revertLeaveUsed']); // Revert leave when cancelled
 Route::post('/employee-leave-balance/deduct-by-request', [EmployeeLeaveBalanceApiController::class, 'deductLeaveByRequest']); // Deduct leave based on leave request puid
