@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 use App\Models\EmployeeLeaveBalance;
 use App\Models\LeaveSetting;
 use App\Models\LeaveYearEndPreference;
@@ -1363,6 +1364,17 @@ class EmployeeLeaveBalanceApiController extends Controller
             ], 403);
         }
 
+        if (!Schema::hasTable('leave_year_end_preferences')) {
+            return response()->json([
+                'status' => false,
+                'message' => 'Year-end preference table is missing. Please run migration: php artisan migrate',
+                'data' => [
+                    'auto_allot_enabled' => false,
+                    'timezone' => 'Asia/Kolkata',
+                ],
+            ], 503);
+        }
+
         $pref = LeaveYearEndPreference::updateOrCreate(
             [
                 'corp_id' => $request->corp_id,
@@ -1391,6 +1403,20 @@ class EmployeeLeaveBalanceApiController extends Controller
         ]);
 
         $companyName = $request->query('company_name');
+
+        if (!Schema::hasTable('leave_year_end_preferences')) {
+            return response()->json([
+                'status' => true,
+                'message' => 'Year-end auto preference table not found. Returning default values.',
+                'data' => [
+                    'corp_id' => $corpId,
+                    'company_name' => $companyName,
+                    'auto_allot_enabled' => false,
+                    'timezone' => 'Asia/Kolkata',
+                    'last_run_year' => null,
+                ],
+            ]);
+        }
 
         $pref = LeaveYearEndPreference::firstOrCreate(
             [
