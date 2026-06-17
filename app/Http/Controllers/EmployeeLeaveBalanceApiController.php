@@ -55,16 +55,33 @@ class EmployeeLeaveBalanceApiController extends Controller
 
     /**
      * Convert variants like "Sick Leave" and "Sick" to a single canonical key.
+     * Also maps known typos: "causal" → "casual".
      */
     private function getCanonicalLeaveKey($value)
     {
         $normalized = $this->normalizeLeaveType($value);
+        // Strip trailing " leave" suffix
         $canonical = preg_replace('/\s+leave$/', '', $normalized);
-        return trim((string) $canonical);
+        $canonical = trim((string) $canonical);
+
+        // Known typo / alias corrections
+        $aliases = [
+            'causal' => 'casual',
+            'el'     => 'earned',
+            'pl'     => 'paid',
+            'sl'     => 'sick',
+            'cl'     => 'casual',
+        ];
+
+        return $aliases[$canonical] ?? $canonical;
     }
 
     /**
-     * Pick one record per canonical leave type (prefer exact canonical name, then latest update).
+     * Pick one record per canonical leave type.
+     * Priority (highest first):
+     *   1. leave_type_puid starting with "setting-" (company/year specific, most accurate)
+     *   2. Exact canonical name match (without trailing "leave")
+     *   3. Most recently updated
      */
     private function dedupeLeaveBalances($leaveBalances)
     {
@@ -72,34 +89,47 @@ class EmployeeLeaveBalanceApiController extends Controller
 
         foreach ($leaveBalances as $balance) {
             $key = $this->getCanonicalLeaveKey($balance->leave_name);
-            $currentName = $this->normalizeLeaveType($balance->leave_name);
+            $puid = (string) ($balance->leave_type_puid ?? '');
+            $isSettingBased = str_starts_with($puid, 'setting-');
 
             if (!isset($picked[$key])) {
-                $picked[$key] = $balance;
+                $picked[$key] = ['record' => $balance, 'is_setting' => $isSettingBased];
                 continue;
             }
 
             $existing = $picked[$key];
-            $existingName = $this->normalizeLeaveType($existing->leave_name);
 
-            $currentIsExact = $currentName === $key;
-            $existingIsExact = $existingName === $key;
+            // Prefer settings-based over legacy
+            if ($isSettingBased && !$existing['is_setting']) {
+                $picked[$key] = ['record' => $balance, 'is_setting' => true];
+                continue;
+            }
+
+            if (!$isSettingBased && $existing['is_setting']) {
+                continue;
+            }
+
+            // Same tier: prefer exact canonical name, then latest updated_at
+            $currentNorm = $this->normalizeLeaveType($balance->leave_name);
+            $existingNorm = $this->normalizeLeaveType($existing['record']->leave_name);
+            $currentIsExact = $currentNorm === $key;
+            $existingIsExact = $existingNorm === $key;
 
             if ($currentIsExact && !$existingIsExact) {
-                $picked[$key] = $balance;
+                $picked[$key] = ['record' => $balance, 'is_setting' => $isSettingBased];
                 continue;
             }
 
             if ($currentIsExact === $existingIsExact) {
-                $currentUpdatedAt = $balance->updated_at ? strtotime((string) $balance->updated_at) : 0;
-                $existingUpdatedAt = $existing->updated_at ? strtotime((string) $existing->updated_at) : 0;
-                if ($currentUpdatedAt >= $existingUpdatedAt) {
-                    $picked[$key] = $balance;
+                $currentTs = $balance->updated_at ? strtotime((string) $balance->updated_at) : 0;
+                $existingTs = $existing['record']->updated_at ? strtotime((string) $existing['record']->updated_at) : 0;
+                if ($currentTs >= $existingTs) {
+                    $picked[$key] = ['record' => $balance, 'is_setting' => $isSettingBased];
                 }
             }
         }
 
-        return collect(array_values($picked));
+        return collect(array_map(fn($v) => $v['record'], array_values($picked)));
     }
 
     /**

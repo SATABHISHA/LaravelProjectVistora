@@ -284,12 +284,9 @@ class LeaveRequestApiController extends Controller
             $leaveRequest->reject_reason = $newStatus === 'Rejected' ? $request->input('reject_reason') : null;
             $leaveRequest->save();
 
-            // Keep employee_leave_balances in sync with approval transitions.
-            if ($previousStatus !== 'Approved' && $newStatus === 'Approved') {
-                $this->applyLeaveBalanceUsageFromRequest($leaveRequest);
-            } elseif ($previousStatus === 'Approved' && in_array($newStatus, ['Rejected', 'Returned'])) {
-                $this->revertLeaveBalanceUsageFromRequest($leaveRequest);
-            }
+            // NOTE: Leave balance deduction is handled by the Flutter client via
+            // POST /employee-leave-balance/deduct-by-request after this call succeeds.
+            // Do NOT deduct here to avoid double-deduction.
 
             DB::commit();
 
@@ -303,102 +300,6 @@ class LeaveRequestApiController extends Controller
             DB::rollBack();
             return response()->json(['status' => false, 'message' => 'An error occurred while updating the request.', 'error' => $e->getMessage()], 500);
         }
-    }
-
-    private function normalizeLeaveTypeKey($value)
-    {
-        $normalized = strtolower(trim((string) $value));
-        return trim((string) preg_replace('/\s+leave$/', '', $normalized));
-    }
-
-    private function parseLeaveRequestDates(LeaveRequest $leaveRequest): array
-    {
-        $fromDateStr = (string) $leaveRequest->from_date;
-        $toDateStr = (string) $leaveRequest->to_date;
-
-        if (preg_match('/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/', $fromDateStr)) {
-            $fromDate = Carbon::createFromFormat('d/m/Y', $fromDateStr);
-            $toDate = Carbon::createFromFormat('d/m/Y', $toDateStr);
-        } else {
-            $fromDate = Carbon::parse($fromDateStr);
-            $toDate = Carbon::parse($toDateStr);
-        }
-
-        return [$fromDate, $toDate];
-    }
-
-    private function findTargetLeaveBalance(LeaveRequest $leaveRequest, int $year)
-    {
-        $candidateBalances = DB::table('employee_leave_balances')
-            ->where('corp_id', $leaveRequest->corp_id)
-            ->where('company_name', $leaveRequest->company_name)
-            ->where('emp_code', $leaveRequest->empcode)
-            ->where('year', $year)
-            ->select('id', 'leave_name', 'used', 'balance')
-            ->get();
-
-        $reasonKey = $this->normalizeLeaveTypeKey($leaveRequest->reason);
-        $best = null;
-        $bestExact = false;
-
-        foreach ($candidateBalances as $row) {
-            $nameKey = $this->normalizeLeaveTypeKey($row->leave_name);
-            if ($nameKey !== $reasonKey) {
-                continue;
-            }
-
-            $rowExact = strtolower(trim((string) $row->leave_name)) === $reasonKey;
-            if ($best === null || ($rowExact && !$bestExact)) {
-                $best = $row;
-                $bestExact = $rowExact;
-            }
-        }
-
-        return $best;
-    }
-
-    private function applyLeaveBalanceUsageFromRequest(LeaveRequest $leaveRequest): void
-    {
-        [$fromDate, $toDate] = $this->parseLeaveRequestDates($leaveRequest);
-        $days = (float) ($fromDate->diffInDays($toDate) + 1);
-        $year = (int) $fromDate->format('Y');
-
-        $target = $this->findTargetLeaveBalance($leaveRequest, $year);
-        if (!$target) {
-            throw new \Exception('Matching leave balance not found for approved request.');
-        }
-
-        if ((float) $target->balance < $days) {
-            throw new \Exception('Insufficient leave balance for approval.');
-        }
-
-        DB::table('employee_leave_balances')
-            ->where('id', $target->id)
-            ->update([
-                'used' => (float) $target->used + $days,
-                'balance' => (float) $target->balance - $days,
-                'updated_at' => now(),
-            ]);
-    }
-
-    private function revertLeaveBalanceUsageFromRequest(LeaveRequest $leaveRequest): void
-    {
-        [$fromDate, $toDate] = $this->parseLeaveRequestDates($leaveRequest);
-        $days = (float) ($fromDate->diffInDays($toDate) + 1);
-        $year = (int) $fromDate->format('Y');
-
-        $target = $this->findTargetLeaveBalance($leaveRequest, $year);
-        if (!$target) {
-            return;
-        }
-
-        DB::table('employee_leave_balances')
-            ->where('id', $target->id)
-            ->update([
-                'used' => max(0, (float) $target->used - $days),
-                'balance' => (float) $target->balance + $days,
-                'updated_at' => now(),
-            ]);
     }
 
     /**
