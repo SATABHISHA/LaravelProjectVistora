@@ -45,6 +45,23 @@ class EmployeeAttendanceSummaryApiController extends Controller
             $month = $request->input('month');
             $year = $request->input('year');
 
+            $employeeCodes = DB::table('employment_details')
+                ->where('corp_id', $corpId)
+                ->where('company_name', $companyName)
+                ->whereNotNull('EmpCode')
+                ->where('ActiveYn', 1)
+                ->pluck('EmpCode')
+                ->filter()
+                ->unique()
+                ->values();
+
+            if ($employeeCodes->isEmpty()) {
+                return response()->json([
+                    'status' => false,
+                    'message' => 'No employees found for the selected company'
+                ], 404);
+            }
+
             // Check if data already exists for this period
             $existingRecords = EmployeeAttendanceSummary::where('corpId', $corpId)
                 ->where('companyName', $companyName)
@@ -71,13 +88,6 @@ class EmployeeAttendanceSummaryApiController extends Controller
                 ->whereRaw("DATE_FORMAT(date, '%M') = ?", [$month])
                 ->whereRaw("YEAR(date) = ?", [$year])
                 ->get();
-
-            if ($attendanceData->isEmpty()) {
-                return response()->json([
-                    'status' => false,
-                    'message' => 'No attendance data found for the specified period'
-                ], 404);
-            }
 
             // Get holiday dates for the month
             $holidays = DB::table('holiday_lists')
@@ -228,13 +238,10 @@ class EmployeeAttendanceSummaryApiController extends Controller
             // Combine holidays and week-offs to skip
             $daysToSkip = array_unique(array_merge($holidayDates, $weekOffDates));
 
-            // Get unique employee codes from attendance data
-            $empCodes = $attendanceData->pluck('empCode')->unique();
-
             $summaryData = [];
             $processedCount = 0;
 
-            foreach ($empCodes as $empCode) {
+            foreach ($employeeCodes as $empCode) {
                 // Calculate attendance statistics for this employee
                 $employeeAttendance = $attendanceData->where('empCode', $empCode);
 
@@ -362,6 +369,8 @@ class EmployeeAttendanceSummaryApiController extends Controller
             'holidays' => 'sometimes|integer|min:0',
             'weekOff' => 'sometimes|integer|min:0',
             'leave' => 'sometimes|numeric|min:0',
+                'paidDays' => 'sometimes|numeric|min:0',
+                'absent' => 'sometimes|integer|min:0',
             'month' => 'sometimes|string|max:30',
             'year' => 'sometimes|string|max:4',
         ]);
@@ -395,6 +404,8 @@ class EmployeeAttendanceSummaryApiController extends Controller
                 'holidays',
                 'weekOff',
                 'leave',
+                'paidDays',
+                'absent',
                 'month',
                 'year'
             ]));
@@ -627,6 +638,23 @@ class EmployeeAttendanceSummaryApiController extends Controller
             $month = $request->input('month');
             $year = $request->input('year');
 
+            $employeeCodes = DB::table('employment_details')
+                ->where('corp_id', $corpId)
+                ->where('company_name', $companyName)
+                ->whereNotNull('EmpCode')
+                ->where('ActiveYn', 1)
+                ->pluck('EmpCode')
+                ->filter()
+                ->unique()
+                ->values();
+
+            if ($employeeCodes->isEmpty()) {
+                return response()->json([
+                    'status' => false,
+                    'message' => 'No employees found for the selected company'
+                ], 404);
+            }
+
             // Check if data already exists for this period
             $existingRecords = EmployeeAttendanceSummary::where('corpId', $corpId)
                 ->where('companyName', $companyName)
@@ -653,13 +681,6 @@ class EmployeeAttendanceSummaryApiController extends Controller
                 ->whereRaw("DATE_FORMAT(date, '%M') = ?", [$month])
                 ->whereRaw("YEAR(date) = ?", [$year])
                 ->get();
-
-            if ($attendanceData->isEmpty()) {
-                return response()->json([
-                    'status' => false,
-                    'message' => 'No attendance data found for the specified period'
-                ], 404);
-            }
 
             // Get holiday dates for the month
             $holidays = DB::table('holiday_lists')
@@ -783,11 +804,8 @@ class EmployeeAttendanceSummaryApiController extends Controller
             $totalDaysInMonth = Carbon::createFromFormat('F Y', $month . ' ' . $year)->daysInMonth;
             $workingDays = $totalDaysInMonth - count($nonWorkingDates);
 
-            // Get unique employee codes from attendance data
-            $empCodes = $attendanceData->pluck('empCode')->unique();
-
             $summaryData = [];
-            foreach ($empCodes as $empCode) {
+            foreach ($employeeCodes as $empCode) {
                 // Calculate attendance statistics for this employee
                 $employeeAttendance = $attendanceData->where('empCode', $empCode);
 
@@ -864,7 +882,7 @@ class EmployeeAttendanceSummaryApiController extends Controller
                 'status' => true,
                 'message' => 'Attendance summary created successfully for all employees' . ($usedFallback ? ' (using fallback weekend logic)' : ''),
                 'summary' => [
-                    'total_employees_processed' => count($empCodes),
+                    'total_employees_processed' => count($employeeCodes),
                     'period' => $month . ' ' . $year,
                     'company' => $companyName,
                     'corpId' => $corpId,
@@ -1066,10 +1084,21 @@ class EmployeeAttendanceSummaryApiController extends Controller
                 ->where('companyName', $companyName)
                 ->where('month', $month)
                 ->where('year', $year)
-                ->get();
+                ->get()
+                ->keyBy('empCode');
 
-            if ($existingSummaries->isEmpty()) {
-                return response()->json(['status' => false, 'message' => 'No existing attendance summaries found for the specified period to recalculate.'], 404);
+            $employeeCodes = DB::table('employment_details')
+                ->where('corp_id', $corpId)
+                ->where('company_name', $companyName)
+                ->whereNotNull('EmpCode')
+                ->where('ActiveYn', 1)
+                ->pluck('EmpCode')
+                ->filter()
+                ->unique()
+                ->values();
+
+            if ($employeeCodes->isEmpty()) {
+                return response()->json(['status' => false, 'message' => 'No employees found for the selected company.'], 404);
             }
 
             // --- Recalculation Logic (adapted from bulkInsert) ---
@@ -1154,8 +1183,9 @@ class EmployeeAttendanceSummaryApiController extends Controller
             }
 
             $updatedCount = 0;
-            foreach ($existingSummaries as $summary) {
-                $empCode = $summary->empCode;
+            $createdCount = 0;
+            foreach ($employeeCodes as $empCode) {
+                $summary = $existingSummaries->get($empCode);
                 $employeeAttendance = $attendanceData->get($empCode) ?? collect();
 
                 $totalPresent = 0;
@@ -1165,7 +1195,12 @@ class EmployeeAttendanceSummaryApiController extends Controller
                 $absentWithoutLeave = 0;   // Absent without leave request (LOP - Unpaid)
 
                 foreach ($employeeAttendance as $attendance) {
-                    $attendanceDate = Carbon::parse($attendance->date)->format('Y-m-d');
+                    $dateString = $attendance->date;
+                    if (preg_match('/^\d{2}\/\d{2}\/\d{4}$/', $dateString)) {
+                        $attendanceDate = Carbon::createFromFormat('d/m/Y', $dateString)->format('Y-m-d');
+                    } else {
+                        $attendanceDate = Carbon::parse($dateString)->format('Y-m-d');
+                    }
                     if (in_array($attendanceDate, $nonWorkingDates)) continue;
 
                     $leaveStatus = $leaveStatusMap[$empCode][$attendanceDate] ?? null;
@@ -1195,22 +1230,44 @@ class EmployeeAttendanceSummaryApiController extends Controller
                 // Only deduct absent without leave (LOP days)
                 $paidDays = $workingDays - $absentWithoutLeave;
 
-                // Update the record
-                $summary->update([
-                    'totalPresent' => $totalPresent,
-                    'workingDays' => $workingDays,
-                    'holidays' => count($holidayDates),
-                    'weekOff' => count($weekOffDates),
-                    'leave' => $totalLeave,
-                    'paidDays' => $paidDays,
-                    'absent' => $totalAbsent,
-                ]);
-                $updatedCount++;
+                if ($summary) {
+                    $summary->update([
+                        'totalPresent' => $totalPresent,
+                        'workingDays' => $workingDays,
+                        'holidays' => count($holidayDates),
+                        'weekOff' => count($weekOffDates),
+                        'leave' => $totalLeave,
+                        'paidDays' => $paidDays,
+                        'absent' => $totalAbsent,
+                    ]);
+                    $updatedCount++;
+                } else {
+                    EmployeeAttendanceSummary::create([
+                        'corpId' => $corpId,
+                        'empCode' => $empCode,
+                        'companyName' => $companyName,
+                        'totalPresent' => $totalPresent,
+                        'workingDays' => $workingDays,
+                        'holidays' => count($holidayDates),
+                        'weekOff' => count($weekOffDates),
+                        'leave' => $totalLeave,
+                        'paidDays' => $paidDays,
+                        'absent' => $totalAbsent,
+                        'month' => $month,
+                        'year' => $year,
+                    ]);
+                    $createdCount++;
+                }
             }
 
             return response()->json([
                 'status' => true,
-                'message' => "Successfully recalculated attendance for {$updatedCount} employees.",
+                'message' => "Successfully recalculated attendance summaries.",
+                'summary' => [
+                    'updated' => $updatedCount,
+                    'created' => $createdCount,
+                    'total_employees' => count($employeeCodes),
+                ],
                 'period' => "{$month} {$year}",
                 'company' => $companyName,
             ]);
