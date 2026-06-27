@@ -481,12 +481,12 @@ class EmployeeAttendanceSummaryApiController extends Controller
         try {
             // Validate input parameters
             $validator = Validator::make($request->all(), [
-                'corpId' => 'sometimes|string|max:10',
-                'companyName' => 'sometimes|string|max:100',
-                'empCode' => 'sometimes|string|max:20',
-                'month' => 'sometimes|string|max:30',
-                'year' => 'sometimes|string|max:4',
-                'per_page' => 'sometimes|integer|min:1|max:500'
+                'corpId'     => 'sometimes|nullable|string|max:10',
+                'companyName'=> 'sometimes|nullable|string|max:100',
+                'empCode'    => 'sometimes|nullable|string|max:20',
+                'month'      => 'sometimes|nullable|string|max:30',
+                'year'       => 'sometimes|nullable|string|max:4',
+                'per_page'   => 'sometimes|nullable|integer|min:1|max:500'
             ]);
 
             if ($validator->fails()) {
@@ -544,8 +544,8 @@ class EmployeeAttendanceSummaryApiController extends Controller
                 $appliedFilters['year'] = $request->year;
             }
 
-            // Get paginated results
-            $perPage = $request->input('per_page', 500);
+            // Get paginated results — treat null/0 from nullable validation as 500
+            $perPage = (int) ($request->input('per_page') ?: 500);
             $attendanceSummaries = $query->orderBy('eas.created_at', 'desc')->paginate($perPage);
 
             if ($attendanceSummaries->isEmpty()) {
