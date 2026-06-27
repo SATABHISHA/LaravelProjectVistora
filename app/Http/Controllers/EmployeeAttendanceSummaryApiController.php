@@ -486,7 +486,7 @@ class EmployeeAttendanceSummaryApiController extends Controller
                 'empCode' => 'sometimes|string|max:20',
                 'month' => 'sometimes|string|max:30',
                 'year' => 'sometimes|string|max:4',
-                'per_page' => 'sometimes|integer|min:1|max:100'
+                'per_page' => 'sometimes|integer|min:1|max:500'
             ]);
 
             if ($validator->fails()) {
@@ -545,7 +545,7 @@ class EmployeeAttendanceSummaryApiController extends Controller
             }
 
             // Get paginated results
-            $perPage = $request->input('per_page', 15);
+            $perPage = $request->input('per_page', 500);
             $attendanceSummaries = $query->orderBy('eas.created_at', 'desc')->paginate($perPage);
 
             if ($attendanceSummaries->isEmpty()) {
@@ -553,7 +553,14 @@ class EmployeeAttendanceSummaryApiController extends Controller
                     'status' => true,
                     'message' => 'No attendance summary records found',
                     'applied_filters' => $appliedFilters,
-                    'data' => []
+                    'total_records' => 0,
+                    'data' => [
+                        'current_page' => 1,
+                        'data' => [],
+                        'total' => 0,
+                        'per_page' => $perPage,
+                        'last_page' => 1,
+                    ],
                 ]);
             }
 
