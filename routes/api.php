@@ -569,6 +569,7 @@ Route::post('/employee-salary-structure/add-or-update', [EmployeeSalaryStructure
 Route::get('/employee-salary-structure/{empCode}/{companyName}/{corpId}', [EmployeeSalaryStructureApiController::class, 'fetchByEmpDetails']);
 Route::delete('/employee-salary-structure/delete/{puid}', [EmployeeSalaryStructureApiController::class, 'destroy']);
 Route::post('/employee-salary-structure/salary-revision', [EmployeeSalaryStructureApiController::class, 'salaryRevisionProcess']);
+Route::post('/employee-salary-structure/copy-previous-year', [EmployeeSalaryStructureApiController::class, 'copyPreviousYearStructure']);
 
 // Attendance Routes
 Route::post('/attendance/check', [AttendanceApiController::class, 'checkInOrOut']);

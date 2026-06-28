@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use Illuminate\Http\Request;
 use App\Models\EmployeeSalaryStructure;
+use Illuminate\Support\Facades\DB;
 
 class EmployeeSalaryStructureApiController extends Controller
 {
@@ -626,5 +627,110 @@ class EmployeeSalaryStructureApiController extends Controller
         $timestamp = time();
         $random = mt_rand(1000, 9999);
         return strtoupper($corpId) . '_' . $empCode . '_' . $year . '_' . $timestamp . '_' . $random;
+    }
+
+    /**
+     * Copy previous year's salary structure into selected year (idempotent).
+     * If target year already exists, this API returns success without creating duplicates.
+     */
+    public function copyPreviousYearStructure(Request $request)
+    {
+        try {
+            $request->validate([
+                'corpId' => 'required|string|max:10',
+                'companyName' => 'required|string|max:100',
+                'empCode' => 'required|string|max:20',
+                'year' => 'required|digits:4',
+            ]);
+
+            $corpId = $request->corpId;
+            $companyName = $request->companyName;
+            $empCode = $request->empCode;
+            $targetYear = (string)$request->year;
+
+            return DB::transaction(function () use ($corpId, $companyName, $empCode, $targetYear) {
+                $targetExists = EmployeeSalaryStructure::where('corpId', $corpId)
+                    ->where('companyName', $companyName)
+                    ->where('empCode', $empCode)
+                    ->where('year', $targetYear)
+                    ->first();
+
+                if ($targetExists) {
+                    return response()->json([
+                        'status' => true,
+                        'alreadyExists' => true,
+                        'copied' => false,
+                        'message' => "Salary structure already exists for year {$targetYear}.",
+                        'data' => [
+                            'targetYear' => $targetYear,
+                            'record' => $targetExists,
+                        ]
+                    ]);
+                }
+
+                $previousRecord = EmployeeSalaryStructure::where('corpId', $corpId)
+                    ->where('companyName', $companyName)
+                    ->where('empCode', $empCode)
+                    ->where('year', '<', $targetYear)
+                    ->orderBy('year', 'desc')
+                    ->first();
+
+                if (!$previousRecord) {
+                    return response()->json([
+                        'status' => false,
+                        'message' => "No previous year salary structure found for employee {$empCode} before year {$targetYear}.",
+                        'data' => []
+                    ], 404);
+                }
+
+                $copyData = $previousRecord->only([
+                    'corpId',
+                    'empCode',
+                    'companyName',
+                    'salaryRevisionMonth',
+                    'arrearWithEffectFrom',
+                    'payGroup',
+                    'ctc',
+                    'ctcYearly',
+                    'monthlyBasic',
+                    'leaveEnchashOnGross',
+                    'performanceBonus',
+                    'grossList',
+                    'otherAlowances',
+                    'otherBenifits',
+                    'recurringDeductions',
+                    'aplb',
+                    'increment',
+                ]);
+
+                $copyData['year'] = $targetYear;
+                $copyData['puid'] = $this->generatePuid($corpId, $empCode, $targetYear);
+
+                $created = EmployeeSalaryStructure::create($copyData);
+
+                return response()->json([
+                    'status' => true,
+                    'alreadyExists' => false,
+                    'copied' => true,
+                    'message' => "Salary structure copied from year {$previousRecord->year} to {$targetYear} successfully.",
+                    'data' => [
+                        'sourceYear' => $previousRecord->year,
+                        'targetYear' => $targetYear,
+                        'record' => $created,
+                    ]
+                ]);
+            });
+        } catch (\Illuminate\Validation\ValidationException $e) {
+            return response()->json([
+                'status' => false,
+                'message' => 'Validation error',
+                'errors' => $e->errors()
+            ], 422);
+        } catch (\Exception $e) {
+            return response()->json([
+                'status' => false,
+                'message' => 'Error copying previous year salary structure: ' . $e->getMessage(),
+            ], 500);
+        }
     }
 }
