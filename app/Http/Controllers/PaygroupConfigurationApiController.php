@@ -160,9 +160,19 @@ class PaygroupConfigurationApiController extends Controller
             }
         }
 
+        // Also include V1 pay groups (paygroupconfigurationv1) for this corpId.
+        // These are pay groups created via Payroll Settings > Pay Group
+        // Configuration.  They may not exist in the old table.
+        $v1GroupNames = DB::table('paygroup_configuration_v1s')
+            ->where('corpId', $corp_id)
+            ->pluck('GroupName')
+            ->toArray();
+
+        $result = array_values(array_unique(array_merge($result, $v1GroupNames)));
+
         return response()->json([
             'status' => true,
-            'data' => array_values(array_unique($result))
+            'data' => $result
         ]);
     }
 
@@ -332,9 +342,11 @@ class PaygroupConfigurationApiController extends Controller
             $calculatedValue = $percentage; // referenceValue is the fixed amount
             $formula = 'Fixed: ₹' . number_format($percentage, 2);
         } elseif (strtolower($formulaType) === 'variable') {
-            // Variable amounts are manually entered
-            $calculatedValue = 0.0;
-            $formula = 'Variable';
+            // Variable amounts use referenceValue as the flat amount
+            // (e.g. LTA = ₹1000/year).  Previously this returned 0 which
+            // caused "With LTA" components to appear blank.
+            $calculatedValue = $percentage; // referenceValue is the flat amount
+            $formula = 'Variable: ₹' . number_format($percentage, 2);
         } else {
             // Unknown formula type
             $calculatedValue = 0.0;

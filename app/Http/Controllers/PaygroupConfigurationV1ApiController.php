@@ -181,6 +181,21 @@ class PaygroupConfigurationV1ApiController extends Controller
             // Get all formula_builders for this paygroup puid
             $formulaBuilders = FormulaBuilder::where('paygroupPuid', $paygroupPuid)->get()->keyBy('componentName');
 
+            // ── Merge formula_builder-defined components into the processing list ──
+            // A component (e.g. LTA) may be configured in the formula builder for
+            // this pay group but accidentally omitted from IncludedComponents.
+            // Including formula_builder names ensures those components are always
+            // calculated and displayed.
+            $fbComponentNames = array_values(array_filter(
+                $formulaBuilders->keys()->toArray(),
+                function ($name) {
+                    return strtolower(trim($name)) !== 'ctc';
+                }
+            ));
+            $includedComponents = array_values(array_unique(
+                array_merge(array_values($includedComponents), $fbComponentNames)
+            ));
+
             // For non-maco: CTC is annual, so all resolved values are annual
             // For maco: CTC is monthly, so all resolved values are monthly
             $annualCtc = $isMaco ? ($ctc * 12) : $ctc;
@@ -206,8 +221,26 @@ class PaygroupConfigurationV1ApiController extends Controller
                     ->where('corpId', $corpId)
                     ->first();
 
+                // Fallback 1: try old pay_components table (for components shared
+                // between old and new systems)
                 if (!$payComponent) {
-                    continue;
+                    $payComponent = DB::table('pay_components')
+                        ->where('componentName', $componentName)
+                        ->first();
+                }
+
+                // Fallback 2: if the component has a formula_builder entry use
+                // payType 'Earning' so it still appears in the breakdown
+                if (!$payComponent) {
+                    $fb = $formulaBuilders->get($componentName);
+                    if (!$fb) {
+                        continue;
+                    }
+                    $payComponent = (object) [
+                        'componentName' => $componentName,
+                        'payType'       => 'Earning',
+                        'paymentNature' => null,
+                    ];
                 }
 
                 $annualValue = round($resolvedValues[$componentName] ?? 0, 0);
@@ -363,7 +396,11 @@ class PaygroupConfigurationV1ApiController extends Controller
                     if ($formulaType === 'fixed') {
                         $resolved[$name] = round($referenceValue, 0);
                     } elseif ($formulaType === 'variable') {
-                        $resolved[$name] = 0;
+                        // Variable type: referenceValue is the flat annual
+                        // amount configured in the Formula Builder
+                        // (e.g. LTA = ₹1000/year). Store on annual basis;
+                        // monthly conversion happens during display.
+                        $resolved[$name] = round($referenceValue, 0);
                     } elseif ($formulaType === 'percent' && $referenceValue > 0) {
                         if (isset($resolved[$refersTo])) {
                             $resolved[$name] = round(($referenceValue / 100) * $resolved[$refersTo], 0);
@@ -396,7 +433,8 @@ class PaygroupConfigurationV1ApiController extends Controller
                     if ($formulaType === 'fixed') {
                         $resolved[$name] = round($referenceValue, 0);
                     } elseif ($formulaType === 'variable') {
-                        $resolved[$name] = 0;
+                        // Variable type (reverse path): use referenceValue
+                        $resolved[$name] = round($referenceValue, 0);
                     } elseif ($formulaType === 'percent' && $referenceValue > 0) {
                         if (isset($resolved[$sourceComponent])) {
                             // component = referenceValue% of sourceComponent
