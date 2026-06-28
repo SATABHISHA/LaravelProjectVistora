@@ -285,6 +285,29 @@ class PaygroupConfigurationV1ApiController extends Controller
             $benefitsMonthly = round(array_sum(array_column($benefitComponents, 'calculatedValue')), 0);
             $benefitsAnnual = round(array_sum(array_column($benefitComponents, 'annualCalculatedValue')), 0);
 
+            // Backward-compatible extension: expose employer contributions separately
+            // without changing existing gross/deductions/benefits buckets.
+            $employerContributionComponents = [];
+            foreach (array_merge($grossComponents, $benefitComponents, $deductionComponents) as $component) {
+                $nameLower = strtolower(trim((string)($component['componentName'] ?? '')));
+                $payTypeLower = strtolower(trim((string)($component['payType'] ?? '')));
+                if (
+                    str_contains($nameLower, 'employer') ||
+                    str_contains($nameLower, 'contribution') ||
+                    str_contains($nameLower, 'pf employer') ||
+                    str_contains($nameLower, 'eps') ||
+                    str_contains($nameLower, 'retiral') ||
+                    str_contains($nameLower, 'retirement') ||
+                    str_contains($payTypeLower, 'employer') ||
+                    str_contains($payTypeLower, 'contribution')
+                ) {
+                    $employerContributionComponents[] = $component;
+                }
+            }
+
+            $totalEmployerContribMonthly = round(array_sum(array_column($employerContributionComponents, 'calculatedValue')), 0);
+            $totalEmployerContribAnnual = round(array_sum(array_column($employerContributionComponents, 'annualCalculatedValue')), 0);
+
             $netSalaryMonthly = round($grossMonthly - $totalDeductionsMonthly, 0);
             $netSalaryAnnual = round($grossAnnual - $totalDeductionsAnnual, 0);
             $totalCTCMonthly = round($grossMonthly + $benefitsMonthly, 0);
@@ -301,9 +324,11 @@ class PaygroupConfigurationV1ApiController extends Controller
                     'annualCTC' => round($annualCtc, 0),
                     'basicSalary' => $basicSalaryMonthly,
                     'annualBasicSalary' => $basicSalaryAnnual,
+                    'salaryStructureVersion' => 'v1',
                     'gross' => $grossComponents,
                     'deductions' => $deductionComponents,
                     'otherBenefitsAllowances' => $benefitComponents,
+                    'employerContributions' => $employerContributionComponents,
                     'summary' => [
                         'totalGross' => [
                             'monthly' => round($grossMonthly, 0),
@@ -316,6 +341,10 @@ class PaygroupConfigurationV1ApiController extends Controller
                         'totalBenefits' => [
                             'monthly' => round($benefitsMonthly, 0),
                             'annual' => round($benefitsAnnual, 0)
+                        ],
+                        'totalEmployerContributions' => [
+                            'monthly' => round($totalEmployerContribMonthly, 0),
+                            'annual' => round($totalEmployerContribAnnual, 0)
                         ],
                         'netSalary' => [
                             'monthly' => round($netSalaryMonthly, 0),
