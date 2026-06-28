@@ -1022,6 +1022,146 @@ class EmployeePayrollSalaryProcessApiController extends Controller
     }
 
     /**
+     * Fetch attendance summary for payslip by trying month name first, then month number.
+     */
+    private function getAttendanceSummaryForPayslip($corpId, $empCode, $year, $monthName, $monthNumber)
+    {
+        $query = \App\Models\EmployeeAttendanceSummary::where('corpId', $corpId)
+            ->where('empCode', $empCode)
+            ->where('year', $year);
+
+        $summary = (clone $query)->where('month', $monthName)->first();
+        if ($summary) {
+            return $summary;
+        }
+
+        return (clone $query)->where('month', (string)$monthNumber)->first();
+    }
+
+    /**
+     * Derive attendance arrear days from available summary fields.
+     */
+    private function resolveAttendanceArrearDays($attendanceSummary)
+    {
+        if (!$attendanceSummary) {
+            return 0;
+        }
+
+        $candidateKeys = [
+            'attendanceArrearDays',
+            'attendance_arrear_days',
+            'arrearDays',
+            'arrear_days',
+            'attendanceArrear',
+            'attendance_arrear',
+        ];
+
+        foreach ($candidateKeys as $key) {
+            $value = data_get($attendanceSummary, $key);
+            if ($value !== null && is_numeric($value)) {
+                return (float)$value;
+            }
+        }
+
+        return 0;
+    }
+
+    /**
+     * Convert revision effective date to increment arrear days for the payslip month.
+     */
+    private function calculateIncrementArrearDaysForStructure($salaryStructure, $payrollMonthName, $payrollYear)
+    {
+        if (!$salaryStructure || empty($salaryStructure->arrearWithEffectFrom)) {
+            return 0;
+        }
+
+        try {
+            $raw = (string)$salaryStructure->arrearWithEffectFrom;
+            try {
+                $effectiveFrom = \Carbon\Carbon::createFromFormat('d/m/Y', $raw)->startOfDay();
+            } catch (\Exception $e) {
+                $effectiveFrom = \Carbon\Carbon::parse($raw)->startOfDay();
+            }
+
+            $currentMonth = \Carbon\Carbon::createFromFormat(
+                'Y-F-d',
+                $payrollYear . '-' . $payrollMonthName . '-01'
+            )->startOfDay();
+
+            if (!$effectiveFrom->lt($currentMonth)) {
+                return 0;
+            }
+
+            return (float)$effectiveFrom->diffInDays($currentMonth);
+        } catch (\Exception $e) {
+            return 0;
+        }
+    }
+
+    /**
+     * Build earnings rows with split monthly/arrear columns for payslip rendering.
+     */
+    private function buildPayslipEarningsBreakup(array $grossList, array $otherAllowances, array $otherBenefits)
+    {
+        $rows = [];
+        $totalMonthly = 0;
+        $totalArrear = 0;
+        $hasArrearRow = false;
+
+        $allEarnings = array_merge($grossList, $otherAllowances, $otherBenefits);
+        foreach ($allEarnings as $item) {
+            $componentName = (string)($item['componentName'] ?? 'Component');
+            $value = (float)($item['calculatedValue'] ?? 0);
+            $isArrear = strtolower($componentName) === 'arrears';
+
+            if ($isArrear) {
+                $hasArrearRow = true;
+                $rows[] = [
+                    'componentName' => 'Arrears',
+                    'monthlyValue' => 0,
+                    'arrearValue' => round($value, 2),
+                    'totalValue' => round($value, 2),
+                ];
+                $totalArrear += $value;
+                continue;
+            }
+
+            $rows[] = [
+                'componentName' => $componentName,
+                'monthlyValue' => round($value, 2),
+                'arrearValue' => 0,
+                'totalValue' => round($value, 2),
+            ];
+            $totalMonthly += $value;
+        }
+
+        if (!$hasArrearRow) {
+            foreach ($otherAllowances as $allowance) {
+                if (strtolower((string)($allowance['componentName'] ?? '')) === 'arrears') {
+                    $value = (float)($allowance['calculatedValue'] ?? 0);
+                    if ($value > 0) {
+                        $rows[] = [
+                            'componentName' => 'Arrears',
+                            'monthlyValue' => 0,
+                            'arrearValue' => round($value, 2),
+                            'totalValue' => round($value, 2),
+                        ];
+                        $totalArrear += $value;
+                    }
+                    break;
+                }
+            }
+        }
+
+        return [
+            'rows' => $rows,
+            'totalMonthly' => round($totalMonthly, 2),
+            'totalArrear' => round($totalArrear, 2),
+            'totalCombined' => round($totalMonthly + $totalArrear, 2),
+        ];
+    }
+
+    /**
      * Ensure a single arrears component exists in allowances when amount > 0.
      */
     private function appendArrearsComponentToAllowances(array $allowances, $arrearsAmount)
@@ -1973,19 +2113,33 @@ class EmployeePayrollSalaryProcessApiController extends Controller
             $statutoryDetail = \App\Models\EmployeeStatutoryDetail::where('corp_id', $corpId)->where('EmpCode', $empCode)->first();
             $bankDetail = \App\Models\EmployeeBankDetail::where('corp_id', $corpId)->where('empcode', $empCode)->first();
             
-            // Attendance table uses camelCase and stores month as string month name
-            $attendanceSummary = \App\Models\EmployeeAttendanceSummary::where('corpId', $corpId)
+            // Attendance table stores mixed month formats across data sets.
+            $attendanceSummary = $this->getAttendanceSummaryForPayslip(
+                $corpId,
+                $empCode,
+                $year,
+                $monthName,
+                $monthNumber
+            );
+
+            $salaryStructure = \App\Models\EmployeeSalaryStructure::where('corpId', $corpId)
+                ->where('companyName', $payroll->companyName)
                 ->where('empCode', $empCode)
                 ->where('year', $year)
-                ->where('month', $monthName)
                 ->first();
 
             // Process payroll data
-            $earnings = json_decode($payroll->grossList, true) ?: [];
+            $grossList = json_decode($payroll->grossList, true) ?: [];
+            $otherAllowances = json_decode($payroll->otherAllowances, true) ?: [];
+            $otherBenefits = json_decode($payroll->otherBenefits, true) ?: [];
+            $earningsBreakup = $this->buildPayslipEarningsBreakup($grossList, $otherAllowances, $otherBenefits);
+            $earnings = $earningsBreakup['rows'];
             $deductions = json_decode($payroll->recurringDeduction, true) ?: [];
-            $totalEarnings = array_sum(array_column($earnings, 'calculatedValue'));
+            $totalEarnings = (float)($earningsBreakup['totalCombined'] ?? 0);
             $totalDeductions = array_sum(array_column($deductions, 'calculatedValue'));
             $netPay = $totalEarnings - $totalDeductions;
+            $attendanceArrearDays = $this->resolveAttendanceArrearDays($attendanceSummary);
+            $incrementArrearDays = $this->calculateIncrementArrearDaysForStructure($salaryStructure, $monthName, $year);
 
             // Prepare data for the view
             $data = [
@@ -2000,11 +2154,15 @@ class EmployeePayrollSalaryProcessApiController extends Controller
                 'attendance' => $attendanceSummary,
                 'earnings' => $earnings,
                 'deductions' => $deductions,
+                'totalMonthlyEarnings' => (float)($earningsBreakup['totalMonthly'] ?? 0),
+                'totalArrearEarnings' => (float)($earningsBreakup['totalArrear'] ?? 0),
                 'totalEarnings' => $totalEarnings,
                 'totalDeductions' => $totalDeductions,
                 'netPay' => $netPay,
                 'netPayInWords' => $this->numberToWords($netPay),
                 'payDays' => $attendanceSummary ? $attendanceSummary->paidDays : 30,
+                'attendanceArrearDays' => $attendanceArrearDays,
+                'incrementArrearDays' => $incrementArrearDays,
             ];
 
             // Generate PDF
@@ -2087,12 +2245,19 @@ class EmployeePayrollSalaryProcessApiController extends Controller
             $statutoryDetails = \App\Models\EmployeeStatutoryDetail::where('corp_id', $request->corpId)->whereIn('EmpCode', $empCodes)->get()->keyBy('EmpCode');
             $bankDetails = \App\Models\EmployeeBankDetail::where('corp_id', $request->corpId)->whereIn('empcode', $empCodes)->get()->keyBy('empcode');
             
-            // Attendance table uses camelCase and stores month as string month name
-            $attendanceSummaries = \App\Models\EmployeeAttendanceSummary::where('corpId', $request->corpId)
+            $salaryStructures = \App\Models\EmployeeSalaryStructure::where('corpId', $request->corpId)
+                ->where('companyName', $request->companyName)
                 ->where('year', $request->year)
-                ->where('month', $monthName)
                 ->whereIn('empCode', $empCodes)
                 ->get()->keyBy('empCode');
+
+            // Attendance table uses camelCase and stores mixed month formats
+            $attendanceSummaries = \App\Models\EmployeeAttendanceSummary::where('corpId', $request->corpId)
+                ->where('year', $request->year)
+                ->whereIn('month', [$monthName, (string)$monthNumber])
+                ->whereIn('empCode', $empCodes)
+                ->get()
+                ->groupBy('empCode');
 
             // 4. Prepare for PDF Generation
             $tempDir = storage_path('app/temp/custom_salary_slips_' . time());
@@ -2104,12 +2269,20 @@ class EmployeePayrollSalaryProcessApiController extends Controller
                 $empCode = $payroll->empCode;
                 
                 // Process Payroll Data
-                $earnings = json_decode($payroll->grossList, true) ?: [];
+                $grossList = json_decode($payroll->grossList, true) ?: [];
+                $otherAllowances = json_decode($payroll->otherAllowances, true) ?: [];
+                $otherBenefits = json_decode($payroll->otherBenefits, true) ?: [];
+                $earningsBreakup = $this->buildPayslipEarningsBreakup($grossList, $otherAllowances, $otherBenefits);
+                $earnings = $earningsBreakup['rows'];
                 $deductions = json_decode($payroll->recurringDeduction, true) ?: [];
-                $totalEarnings = array_sum(array_column($earnings, 'calculatedValue'));
+                $totalEarnings = (float)($earningsBreakup['totalCombined'] ?? 0);
                 $totalDeductions = array_sum(array_column($deductions, 'calculatedValue'));
                 $netPay = $totalEarnings - $totalDeductions;
-                $attendance = $attendanceSummaries->get($empCode);
+                $attendanceGroup = $attendanceSummaries->get($empCode, collect());
+                $attendance = $attendanceGroup->firstWhere('month', $monthName) ?? $attendanceGroup->first();
+                $salaryStructure = $salaryStructures->get($empCode);
+                $attendanceArrearDays = $this->resolveAttendanceArrearDays($attendance);
+                $incrementArrearDays = $this->calculateIncrementArrearDaysForStructure($salaryStructure, $monthName, $request->year);
 
                 // Prepare Data for View
                 $data = [
@@ -2124,11 +2297,15 @@ class EmployeePayrollSalaryProcessApiController extends Controller
                     'attendance' => $attendance,
                     'earnings' => $earnings,
                     'deductions' => $deductions,
+                    'totalMonthlyEarnings' => (float)($earningsBreakup['totalMonthly'] ?? 0),
+                    'totalArrearEarnings' => (float)($earningsBreakup['totalArrear'] ?? 0),
                     'totalEarnings' => $totalEarnings,
                     'totalDeductions' => $totalDeductions,
                     'netPay' => $netPay,
                     'netPayInWords' => $this->numberToWords($netPay),
                     'payDays' => $attendance->paidDays ?? 30,
+                    'attendanceArrearDays' => $attendanceArrearDays,
+                    'incrementArrearDays' => $incrementArrearDays,
                 ];
 
                 // Generate HTML and PDF
@@ -3976,18 +4153,32 @@ class EmployeePayrollSalaryProcessApiController extends Controller
             $statutoryDetail = \App\Models\EmployeeStatutoryDetail::where('corp_id', $corpId)->where('EmpCode', $empCode)->first();
             $bankDetail = \App\Models\EmployeeBankDetail::where('corp_id', $corpId)->where('empcode', $empCode)->first();
 
-            $attendanceSummary = \App\Models\EmployeeAttendanceSummary::where('corpId', $corpId)
+            $attendanceSummary = $this->getAttendanceSummaryForPayslip(
+                $corpId,
+                $empCode,
+                $year,
+                $monthName,
+                $monthNumber
+            );
+
+            $salaryStructure = \App\Models\EmployeeSalaryStructure::where('corpId', $corpId)
+                ->where('companyName', $payroll->companyName)
                 ->where('empCode', $empCode)
                 ->where('year', $year)
-                ->where('month', $monthName)
                 ->first();
 
             // Process payroll data
-            $earnings = json_decode($payroll->grossList, true) ?: [];
+            $grossList = json_decode($payroll->grossList, true) ?: [];
+            $otherAllowances = json_decode($payroll->otherAllowances, true) ?: [];
+            $otherBenefits = json_decode($payroll->otherBenefits, true) ?: [];
+            $earningsBreakup = $this->buildPayslipEarningsBreakup($grossList, $otherAllowances, $otherBenefits);
+            $earnings = $earningsBreakup['rows'];
             $deductions = json_decode($payroll->recurringDeduction, true) ?: [];
-            $totalEarnings = array_sum(array_column($earnings, 'calculatedValue'));
+            $totalEarnings = (float)($earningsBreakup['totalCombined'] ?? 0);
             $totalDeductions = array_sum(array_column($deductions, 'calculatedValue'));
             $netPay = $totalEarnings - $totalDeductions;
+            $attendanceArrearDays = $this->resolveAttendanceArrearDays($attendanceSummary);
+            $incrementArrearDays = $this->calculateIncrementArrearDaysForStructure($salaryStructure, $monthName, $year);
 
             // Prepare data for the dynamic view (no hardcoded company defaults)
             $data = [
@@ -4003,11 +4194,15 @@ class EmployeePayrollSalaryProcessApiController extends Controller
                 'attendance' => $attendanceSummary,
                 'earnings' => $earnings,
                 'deductions' => $deductions,
+                'totalMonthlyEarnings' => (float)($earningsBreakup['totalMonthly'] ?? 0),
+                'totalArrearEarnings' => (float)($earningsBreakup['totalArrear'] ?? 0),
                 'totalEarnings' => $totalEarnings,
                 'totalDeductions' => $totalDeductions,
                 'netPay' => $netPay,
                 'netPayInWords' => $this->numberToWords($netPay),
                 'payDays' => $attendanceSummary ? $attendanceSummary->paidDays : 30,
+                'attendanceArrearDays' => $attendanceArrearDays,
+                'incrementArrearDays' => $incrementArrearDays,
             ];
 
             // Generate PDF using the dynamic template (no MACO defaults)
@@ -4088,11 +4283,18 @@ class EmployeePayrollSalaryProcessApiController extends Controller
             $statutoryDetails = \App\Models\EmployeeStatutoryDetail::where('corp_id', $request->corpId)->whereIn('EmpCode', $empCodes)->get()->keyBy('EmpCode');
             $bankDetails = \App\Models\EmployeeBankDetail::where('corp_id', $request->corpId)->whereIn('empcode', $empCodes)->get()->keyBy('empcode');
 
-            $attendanceSummaries = \App\Models\EmployeeAttendanceSummary::where('corpId', $request->corpId)
+            $salaryStructures = \App\Models\EmployeeSalaryStructure::where('corpId', $request->corpId)
+                ->where('companyName', $request->companyName)
                 ->where('year', $request->year)
-                ->where('month', $monthName)
                 ->whereIn('empCode', $empCodes)
                 ->get()->keyBy('empCode');
+
+            $attendanceSummaries = \App\Models\EmployeeAttendanceSummary::where('corpId', $request->corpId)
+                ->where('year', $request->year)
+                ->whereIn('month', [$monthName, (string)$monthNumber])
+                ->whereIn('empCode', $empCodes)
+                ->get()
+                ->groupBy('empCode');
 
             // Prepare for PDF generation
             $tempDir = storage_path('app/temp/dynamic_salary_slips_' . time());
@@ -4103,12 +4305,20 @@ class EmployeePayrollSalaryProcessApiController extends Controller
             foreach ($payrollRecords as $payroll) {
                 $empCode = $payroll->empCode;
 
-                $earnings = json_decode($payroll->grossList, true) ?: [];
+                $grossList = json_decode($payroll->grossList, true) ?: [];
+                $otherAllowances = json_decode($payroll->otherAllowances, true) ?: [];
+                $otherBenefits = json_decode($payroll->otherBenefits, true) ?: [];
+                $earningsBreakup = $this->buildPayslipEarningsBreakup($grossList, $otherAllowances, $otherBenefits);
+                $earnings = $earningsBreakup['rows'];
                 $deductions = json_decode($payroll->recurringDeduction, true) ?: [];
-                $totalEarnings = array_sum(array_column($earnings, 'calculatedValue'));
+                $totalEarnings = (float)($earningsBreakup['totalCombined'] ?? 0);
                 $totalDeductions = array_sum(array_column($deductions, 'calculatedValue'));
                 $netPay = $totalEarnings - $totalDeductions;
-                $attendance = $attendanceSummaries->get($empCode);
+                $attendanceGroup = $attendanceSummaries->get($empCode, collect());
+                $attendance = $attendanceGroup->firstWhere('month', $monthName) ?? $attendanceGroup->first();
+                $salaryStructure = $salaryStructures->get($empCode);
+                $attendanceArrearDays = $this->resolveAttendanceArrearDays($attendance);
+                $incrementArrearDays = $this->calculateIncrementArrearDaysForStructure($salaryStructure, $monthName, $request->year);
 
                 $data = [
                     'company' => $companyDetails,
@@ -4123,11 +4333,15 @@ class EmployeePayrollSalaryProcessApiController extends Controller
                     'attendance' => $attendance,
                     'earnings' => $earnings,
                     'deductions' => $deductions,
+                    'totalMonthlyEarnings' => (float)($earningsBreakup['totalMonthly'] ?? 0),
+                    'totalArrearEarnings' => (float)($earningsBreakup['totalArrear'] ?? 0),
                     'totalEarnings' => $totalEarnings,
                     'totalDeductions' => $totalDeductions,
                     'netPay' => $netPay,
                     'netPayInWords' => $this->numberToWords($netPay),
                     'payDays' => $attendance->paidDays ?? 30,
+                    'attendanceArrearDays' => $attendanceArrearDays,
+                    'incrementArrearDays' => $incrementArrearDays,
                 ];
 
                 // Use the dynamic template (no hardcoded company defaults)

@@ -197,8 +197,8 @@
             </tr>
             <tr>
                 <td style="text-align:center;">{{ number_format($payDays, 2) }}</td>
-                <td style="text-align:center;">0.00</td>
-                <td style="text-align:center;">0.00</td>
+                <td style="text-align:center;">{{ number_format($attendanceArrearDays ?? 0, 2) }}</td>
+                <td style="text-align:center;">{{ number_format($incrementArrearDays ?? 0, 2) }}</td>
             </tr>
         </table>
         <div class="flex-container">
@@ -217,15 +217,15 @@
                         @foreach($earnings as $item)
                         <tr>
                             <td>{{ $item['componentName'] }}</td>
-                            <td>{{ number_format($item['calculatedValue'], 2) }}</td>
-                            <td>0.00</td>
-                            <td>{{ number_format($item['calculatedValue'], 2) }}</td>
+                            <td>{{ number_format($item['monthlyValue'] ?? 0, 2) }}</td>
+                            <td>{{ number_format($item['arrearValue'] ?? 0, 2) }}</td>
+                            <td>{{ number_format($item['totalValue'] ?? 0, 2) }}</td>
                         </tr>
                         @endforeach
                         <tr class="totals-row">
                             <td>TOTAL EARNINGS</td>
-                            <td>{{ number_format($totalEarnings, 2) }}</td>
-                            <td>0.00</td>
+                            <td>{{ number_format($totalMonthlyEarnings ?? 0, 2) }}</td>
+                            <td>{{ number_format($totalArrearEarnings ?? 0, 2) }}</td>
                             <td>{{ number_format($totalEarnings, 2) }}</td>
                         </tr>
                     </tbody>
