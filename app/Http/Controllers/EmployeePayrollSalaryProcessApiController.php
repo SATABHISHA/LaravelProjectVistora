@@ -217,6 +217,20 @@ class EmployeePayrollSalaryProcessApiController extends Controller
         $otherBenefits = json_decode($payroll->otherBenefits, true) ?: [];
         $recurringDeduction = json_decode($payroll->recurringDeduction, true) ?: [];
 
+        // Backward compatibility: if arrears exists in allowances for old data,
+        // expose it in gross so payroll gross benefits UI can render it.
+        $hasArrearsInGross = collect($grossList)->contains(function ($item) {
+            return strtolower((string)($item['componentName'] ?? '')) === 'arrears';
+        });
+        if (!$hasArrearsInGross) {
+            foreach ($otherAllowances as $allowance) {
+                if (strtolower((string)($allowance['componentName'] ?? '')) === 'arrears') {
+                    $grossList[] = $allowance;
+                    break;
+                }
+            }
+        }
+
         // Calculate salary totals
         $salarySummary = $this->calculateSalaryTotals(
             $grossList,
@@ -352,9 +366,9 @@ class EmployeePayrollSalaryProcessApiController extends Controller
                     $request->year
                 );
 
-                $otherAllowances = $this->safeJsonDecode($structure->otherAlowances);
-                $otherAllowances = $this->appendArrearsComponentToAllowances(
-                    $otherAllowances,
+                $grossList = $this->safeJsonDecode($structure->grossList);
+                $grossList = $this->appendArrearsComponentToGross(
+                    $grossList,
                     $arrearsContext['arrearsAmount']
                 );
 
@@ -365,8 +379,8 @@ class EmployeePayrollSalaryProcessApiController extends Controller
                     'companyName' => $structure->companyName,
                     'year' => $request->year,
                     'month' => $month, // Use normalized month name
-                    'grossList' => $structure->grossList,
-                    'otherAllowances' => json_encode($otherAllowances),
+                    'grossList' => json_encode($grossList),
+                    'otherAllowances' => $structure->otherAlowances,
                     'otherBenefits' => $structure->otherBenifits,
                     'recurringDeduction' => $structure->recurringDeductions,
                     'status' => $request->status,
@@ -1032,11 +1046,55 @@ class EmployeePayrollSalaryProcessApiController extends Controller
         return $cleaned;
     }
 
+    /**
+     * Ensure a single arrears component exists in gross list when amount > 0.
+     */
+    private function appendArrearsComponentToGross(array $grossList, $arrearsAmount)
+    {
+        $cleaned = $this->removeArrearsComponentFromGross($grossList);
+
+        if ((float)$arrearsAmount <= 0) {
+            return $cleaned;
+        }
+
+        $cleaned[] = [
+            'componentName' => 'Arrears',
+            'payType' => 'Fixed Amount',
+            'paymentNature' => 'Payroll Arrears',
+            'formula' => 'Revision arrears payout',
+            'calculatedValue' => round((float)$arrearsAmount, 2),
+            'annualCalculatedValue' => round((float)$arrearsAmount, 2),
+            'isPartOfCtcYn' => 0,
+            'componentDescription' => 'Auto-calculated arrears based on revision and effective month'
+        ];
+
+        return $cleaned;
+    }
+
     private function removeArrearsComponentFromAllowances(array $allowances)
     {
         return array_values(array_filter($allowances, function ($item) {
             return strtolower((string)($item['componentName'] ?? '')) !== 'arrears';
         }));
+    }
+
+    private function removeArrearsComponentFromGross(array $grossList)
+    {
+        return array_values(array_filter($grossList, function ($item) {
+            return strtolower((string)($item['componentName'] ?? '')) !== 'arrears';
+        }));
+    }
+
+    /**
+     * Resolve payroll status after release mode is applied.
+     */
+    private function deriveReleasedStatusByMode($releaseMode, $arrearsAmount)
+    {
+        if ($releaseMode === 'incremented_only' && (float)$arrearsAmount > 0) {
+            return 'Increment Released';
+        }
+
+        return 'Released';
     }
 
     /**
@@ -1058,6 +1116,15 @@ class EmployeePayrollSalaryProcessApiController extends Controller
         $usedPreviousSalary = false;
         $arrearsAmount = 0;
 
+        if ($structure) {
+            $arrearsContext = $this->calculateArrearsContextForStructure(
+                $structure,
+                $payrollRecord->month,
+                $payrollRecord->year
+            );
+            $arrearsAmount = (float)($arrearsContext['arrearsAmount'] ?? 0);
+        }
+
         if ($releaseMode === 'previous_salary') {
             $previousStructure = EmployeeSalaryStructure::where('corpId', $payrollRecord->corpId)
                 ->where('companyName', $payrollRecord->companyName)
@@ -1074,18 +1141,15 @@ class EmployeePayrollSalaryProcessApiController extends Controller
                 $usedPreviousSalary = true;
             }
 
+            $grossList = $this->removeArrearsComponentFromGross($grossList);
             $otherAllowances = $this->removeArrearsComponentFromAllowances($otherAllowances);
         } elseif ($releaseMode === 'incremented_only') {
+            $grossList = $this->removeArrearsComponentFromGross($grossList);
             $otherAllowances = $this->removeArrearsComponentFromAllowances($otherAllowances);
         } else {
             if ($structure) {
-                $arrearsContext = $this->calculateArrearsContextForStructure(
-                    $structure,
-                    $payrollRecord->month,
-                    $payrollRecord->year
-                );
-                $arrearsAmount = (float)($arrearsContext['arrearsAmount'] ?? 0);
-                $otherAllowances = $this->appendArrearsComponentToAllowances($otherAllowances, $arrearsAmount);
+                $grossList = $this->appendArrearsComponentToGross($grossList, $arrearsAmount);
+                $otherAllowances = $this->removeArrearsComponentFromAllowances($otherAllowances);
             }
         }
 
@@ -1335,6 +1399,8 @@ class EmployeePayrollSalaryProcessApiController extends Controller
             'year' => 'required|string|max:4',
             'month' => 'required|string|max:50',
             'releaseMode' => 'nullable|string|in:incremented_with_arrears,incremented_only,previous_salary',
+            'empCodes' => 'nullable|array',
+            'empCodes.*' => 'string|max:20',
         ]);
 
         try {
@@ -1353,6 +1419,10 @@ class EmployeePayrollSalaryProcessApiController extends Controller
                 ->where('companyName', $request->companyName)
                 ->where('year', $request->year)
                 ->where('month', $month);
+
+            if ($request->has('empCodes') && is_array($request->empCodes) && !empty($request->empCodes)) {
+                $payrollQuery->whereIn('empCode', $request->empCodes);
+            }
 
             // Log the SQL query for debugging
             Log::info('Release Salary Query', [
@@ -1404,12 +1474,13 @@ class EmployeePayrollSalaryProcessApiController extends Controller
 
             foreach ($toUpdateRecords as $record) {
                 $payload = $this->buildPayrollPayloadByReleaseMode($record, $releaseMode);
+                $nextStatus = $this->deriveReleasedStatusByMode($releaseMode, $payload['arrearsAmount'] ?? 0);
 
                 $record->grossList = json_encode($payload['grossList']);
                 $record->otherAllowances = json_encode($payload['otherAllowances']);
                 $record->otherBenefits = json_encode($payload['otherBenefits']);
                 $record->recurringDeduction = json_encode($payload['recurringDeduction']);
-                $record->status = 'Released';
+                $record->status = $nextStatus;
                 $record->updated_at = now();
                 $record->save();
 
@@ -1474,6 +1545,8 @@ class EmployeePayrollSalaryProcessApiController extends Controller
             'year' => 'required|string|max:4',
             'month' => 'required|string|max:50',
             'releaseMode' => 'nullable|string|in:incremented_with_arrears,incremented_only,previous_salary',
+            'empCodes' => 'nullable|array',
+            'empCodes.*' => 'string|max:20',
         ]);
 
         try {
@@ -1492,6 +1565,10 @@ class EmployeePayrollSalaryProcessApiController extends Controller
                 ->where('companyName', $request->companyName)
                 ->where('year', $request->year)
                 ->where('month', $month);
+
+            if ($request->has('empCodes') && is_array($request->empCodes) && !empty($request->empCodes)) {
+                $payrollQuery->whereIn('empCode', $request->empCodes);
+            }
 
             $allPayrollRecords = $payrollQuery->get();
 
@@ -1538,12 +1615,13 @@ class EmployeePayrollSalaryProcessApiController extends Controller
 
             foreach ($initiatedRecords as $record) {
                 $payload = $this->buildPayrollPayloadByReleaseMode($record, $releaseMode);
+                $nextStatus = $this->deriveReleasedStatusByMode($releaseMode, $payload['arrearsAmount'] ?? 0);
 
                 $record->grossList = json_encode($payload['grossList']);
                 $record->otherAllowances = json_encode($payload['otherAllowances']);
                 $record->otherBenefits = json_encode($payload['otherBenefits']);
                 $record->recurringDeduction = json_encode($payload['recurringDeduction']);
-                $record->status = 'Released';
+                $record->status = $nextStatus;
                 $record->updated_at = now();
                 $record->save();
 
@@ -2196,9 +2274,9 @@ class EmployeePayrollSalaryProcessApiController extends Controller
                         $request->year
                     );
 
-                    $otherAllowances = $this->safeJsonDecode($structure->otherAlowances);
-                    $otherAllowances = $this->appendArrearsComponentToAllowances(
-                        $otherAllowances,
+                    $grossList = $this->safeJsonDecode($structure->grossList);
+                    $grossList = $this->appendArrearsComponentToGross(
+                        $grossList,
                         $arrearsContext['arrearsAmount']
                     );
 
@@ -2209,8 +2287,8 @@ class EmployeePayrollSalaryProcessApiController extends Controller
                         'companyName' => $structure->companyName,
                         'year' => $request->year,
                         'month' => $month, // Use normalized month name
-                        'grossList' => $structure->grossList,
-                        'otherAllowances' => json_encode($otherAllowances),
+                        'grossList' => json_encode($grossList),
+                        'otherAllowances' => $structure->otherAlowances,
                         'otherBenefits' => $structure->otherBenifits,
                         'recurringDeduction' => $structure->recurringDeductions,
                         'status' => $request->status,
@@ -2329,7 +2407,7 @@ class EmployeePayrollSalaryProcessApiController extends Controller
                 ->where('year', $request->year)
                 ->where('month', $month)
                 ->whereIn('empCode', $empCodes)
-                ->get(['empCode', 'status', 'otherAllowances'])
+                ->get(['empCode', 'status', 'grossList', 'otherAllowances'])
                 ->keyBy('empCode')
                 ->toArray();
 
@@ -2367,6 +2445,9 @@ class EmployeePayrollSalaryProcessApiController extends Controller
                         case 'Initiated':
                             $status = 'Initiated';
                             break;
+                        case 'Increment Released':
+                            $status = 'Increment Released';
+                            break;
                         case 'On Hold':
                             $status = 'On Hold';
                             break;
@@ -2382,13 +2463,37 @@ class EmployeePayrollSalaryProcessApiController extends Controller
                 }
 
                 $arrearsAmount = 0;
-                if ($payrollRecord && !empty($payrollRecord['otherAllowances'])) {
-                    $otherAllowances = $this->safeJsonDecode($payrollRecord['otherAllowances']);
-                    foreach ($otherAllowances as $allowance) {
-                        if (strtolower((string)($allowance['componentName'] ?? '')) === 'arrears') {
-                            $arrearsAmount = (float)($allowance['calculatedValue'] ?? 0);
+                if ($payrollRecord) {
+                    $grossList = $this->safeJsonDecode($payrollRecord['grossList'] ?? '[]');
+                    foreach ($grossList as $gross) {
+                        if (strtolower((string)($gross['componentName'] ?? '')) === 'arrears') {
+                            $arrearsAmount = (float)($gross['calculatedValue'] ?? 0);
                             break;
                         }
+                    }
+
+                    if ($arrearsAmount <= 0 && !empty($payrollRecord['otherAllowances'])) {
+                        $otherAllowances = $this->safeJsonDecode($payrollRecord['otherAllowances']);
+                        foreach ($otherAllowances as $allowance) {
+                            if (strtolower((string)($allowance['componentName'] ?? '')) === 'arrears') {
+                                $arrearsAmount = (float)($allowance['calculatedValue'] ?? 0);
+                                break;
+                            }
+                        }
+                    }
+
+                    if (
+                        $arrearsAmount <= 0 &&
+                        (($payrollRecord['status'] ?? '') === 'Increment Released') &&
+                        $salaryStructures->has($employee->EmpCode)
+                    ) {
+                        $structure = $salaryStructures->get($employee->EmpCode);
+                        $arrearsContext = $this->calculateArrearsContextForStructure(
+                            $structure,
+                            $month,
+                            $request->year
+                        );
+                        $arrearsAmount = (float)($arrearsContext['arrearsAmount'] ?? 0);
                     }
                 }
 
