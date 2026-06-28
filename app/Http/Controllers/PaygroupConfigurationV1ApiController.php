@@ -256,15 +256,22 @@ class PaygroupConfigurationV1ApiController extends Controller
                 ];
 
                 $payType = $payComponent->payType;
-
                 $payTypeLower = strtolower($payType);
+                $componentNameLower = strtolower(trim($componentName));
+                $formulaLower = strtolower(trim($formula));
 
-                if ($payTypeLower === 'addition' || $payTypeLower === 'earning' || $payTypeLower === 'earnings') {
-                    $grossComponents[] = $componentResult;
-                } elseif ($payTypeLower === 'deduction' || $payTypeLower === 'addition & deduction' || $payTypeLower === 'earning and deduction') {
+                $treatAsAllowance =
+                    str_contains($componentNameLower, 'lta') ||
+                    str_contains($componentNameLower, 'allowance') ||
+                    str_contains($componentNameLower, 'reimb') ||
+                    str_contains($formulaLower, 'variable');
+
+                if ($payTypeLower === 'deduction' || $payTypeLower === 'addition & deduction' || $payTypeLower === 'earning and deduction') {
                     $deductionComponents[] = $componentResult;
-                } elseif ($payTypeLower === 'benefits' || $payTypeLower === 'benefit') {
+                } elseif ($payTypeLower === 'benefits' || $payTypeLower === 'benefit' || $treatAsAllowance) {
                     $benefitComponents[] = $componentResult;
+                } else {
+                    $grossComponents[] = $componentResult;
                 }
             }
 
