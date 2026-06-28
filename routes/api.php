@@ -652,6 +652,9 @@ Route::post('/payroll-salary-process/release-salary', [EmployeePayrollSalaryProc
 // Release salary only for 'Initiated' status records
 Route::post('/payroll-salary-process/release-salary-initiated-only', [EmployeePayrollSalaryProcessApiController::class, 'releaseSalaryInitiatedOnly']);
 
+// Check release options visibility for current payroll period
+Route::get('/payroll-salary-process/release-options-availability/{corpId}/{companyName}/{year}/{month}', [EmployeePayrollSalaryProcessApiController::class, 'getReleaseOptionsAvailability']);
+
 // Export Excel for released payroll
 Route::get('/payroll-salary-process/export-excel', [EmployeePayrollSalaryProcessApiController::class, 'exportPayrollExcel']);
 

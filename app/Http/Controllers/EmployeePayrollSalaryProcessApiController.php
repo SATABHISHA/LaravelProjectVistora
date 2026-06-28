@@ -6,6 +6,7 @@ use Illuminate\Http\Request;
 use App\Models\EmployeePayrollSalaryProcess;
 use App\Models\EmployeeDetail;
 use App\Models\EmploymentDetail;
+use App\Models\EmployeeSalaryStructure;
 use App\Exports\PayrollExport;
 use App\Exports\ReleasedPayrollExport;
 use App\Exports\PayrollArrearsExport;
@@ -345,6 +346,18 @@ class EmployeePayrollSalaryProcessApiController extends Controller
         // Process each salary structure
         foreach ($salaryStructures as $structure) {
             try {
+                $arrearsContext = $this->calculateArrearsContextForStructure(
+                    $structure,
+                    $month,
+                    $request->year
+                );
+
+                $otherAllowances = $this->safeJsonDecode($structure->otherAlowances);
+                $otherAllowances = $this->appendArrearsComponentToAllowances(
+                    $otherAllowances,
+                    $arrearsContext['arrearsAmount']
+                );
+
                 // Create payroll entry (using create instead of updateOrCreate to prevent duplicates)
                 EmployeePayrollSalaryProcess::create([
                     'corpId' => $structure->corpId,
@@ -353,7 +366,7 @@ class EmployeePayrollSalaryProcessApiController extends Controller
                     'year' => $request->year,
                     'month' => $month, // Use normalized month name
                     'grossList' => $structure->grossList,
-                    'otherAllowances' => $structure->otherAlowances,
+                    'otherAllowances' => json_encode($otherAllowances),
                     'otherBenefits' => $structure->otherBenifits,
                     'recurringDeduction' => $structure->recurringDeductions,
                     'status' => $request->status,
@@ -929,6 +942,164 @@ class EmployeePayrollSalaryProcessApiController extends Controller
     }
 
     /**
+     * Normalize month value to the month-name format used in payroll records.
+     */
+    private function normalizeMonthName($month)
+    {
+        if (is_numeric($month) && $month >= 1 && $month <= 12) {
+            return date('F', mktime(0, 0, 0, (int)$month, 1));
+        }
+
+        return ucfirst(strtolower((string)$month));
+    }
+
+    /**
+     * Compute arrears payout context from salary revision details.
+     */
+    private function calculateArrearsContextForStructure($salaryStructure, $payrollMonthName, $payrollYear)
+    {
+        $hasRevisionWithArrears =
+            !empty($salaryStructure->salaryRevisionMonth) &&
+            !empty($salaryStructure->arrearWithEffectFrom) &&
+            ((float)($salaryStructure->increment ?? 0) > 0);
+
+        if (!$hasRevisionWithArrears) {
+            return [
+                'arrearsAmount' => 0,
+                'arrearsMonths' => 0,
+            ];
+        }
+
+        try {
+            $raw = (string)$salaryStructure->arrearWithEffectFrom;
+
+            try {
+                $effectiveFrom = \Carbon\Carbon::createFromFormat('d/m/Y', $raw);
+            } catch (\Exception $e) {
+                $effectiveFrom = \Carbon\Carbon::parse($raw);
+            }
+
+            $currentMonth = \Carbon\Carbon::createFromFormat(
+                'Y-F-d',
+                $payrollYear . '-' . $payrollMonthName . '-01'
+            );
+
+            if (!$effectiveFrom || !$effectiveFrom->lt($currentMonth)) {
+                return [
+                    'arrearsAmount' => 0,
+                    'arrearsMonths' => 0,
+                ];
+            }
+
+            $monthsDiff = $effectiveFrom->startOfMonth()->diffInMonths($currentMonth->startOfMonth());
+            $incrementAmount = (float)($salaryStructure->increment ?? 0);
+            $arrearsAmount = round($incrementAmount * $monthsDiff, 2);
+
+            return [
+                'arrearsAmount' => $arrearsAmount,
+                'arrearsMonths' => $monthsDiff,
+            ];
+        } catch (\Exception $e) {
+            return [
+                'arrearsAmount' => 0,
+                'arrearsMonths' => 0,
+            ];
+        }
+    }
+
+    /**
+     * Ensure a single arrears component exists in allowances when amount > 0.
+     */
+    private function appendArrearsComponentToAllowances(array $allowances, $arrearsAmount)
+    {
+        $cleaned = $this->removeArrearsComponentFromAllowances($allowances);
+
+        if ((float)$arrearsAmount <= 0) {
+            return $cleaned;
+        }
+
+        $cleaned[] = [
+            'componentName' => 'Arrears',
+            'payType' => 'Fixed Amount',
+            'paymentNature' => 'Payroll Arrears',
+            'formula' => 'Revision arrears payout',
+            'calculatedValue' => round((float)$arrearsAmount, 2),
+            'annualCalculatedValue' => round((float)$arrearsAmount, 2),
+            'isPartOfCtcYn' => 0,
+            'componentDescription' => 'Auto-calculated arrears based on revision and effective month'
+        ];
+
+        return $cleaned;
+    }
+
+    private function removeArrearsComponentFromAllowances(array $allowances)
+    {
+        return array_values(array_filter($allowances, function ($item) {
+            return strtolower((string)($item['componentName'] ?? '')) !== 'arrears';
+        }));
+    }
+
+    /**
+     * Build payroll line items according to requested release mode.
+     */
+    private function buildPayrollPayloadByReleaseMode($payrollRecord, $releaseMode)
+    {
+        $grossList = $this->safeJsonDecode($payrollRecord->grossList);
+        $otherAllowances = $this->safeJsonDecode($payrollRecord->otherAllowances);
+        $otherBenefits = $this->safeJsonDecode($payrollRecord->otherBenefits);
+        $recurringDeduction = $this->safeJsonDecode($payrollRecord->recurringDeduction);
+
+        $structure = EmployeeSalaryStructure::where('corpId', $payrollRecord->corpId)
+            ->where('companyName', $payrollRecord->companyName)
+            ->where('empCode', $payrollRecord->empCode)
+            ->where('year', $payrollRecord->year)
+            ->first();
+
+        $usedPreviousSalary = false;
+        $arrearsAmount = 0;
+
+        if ($releaseMode === 'previous_salary') {
+            $previousStructure = EmployeeSalaryStructure::where('corpId', $payrollRecord->corpId)
+                ->where('companyName', $payrollRecord->companyName)
+                ->where('empCode', $payrollRecord->empCode)
+                ->where('year', '<', $payrollRecord->year)
+                ->orderBy('year', 'desc')
+                ->first();
+
+            if ($previousStructure) {
+                $grossList = $this->safeJsonDecode($previousStructure->grossList);
+                $otherAllowances = $this->safeJsonDecode($previousStructure->otherAlowances);
+                $otherBenefits = $this->safeJsonDecode($previousStructure->otherBenifits);
+                $recurringDeduction = $this->safeJsonDecode($previousStructure->recurringDeductions);
+                $usedPreviousSalary = true;
+            }
+
+            $otherAllowances = $this->removeArrearsComponentFromAllowances($otherAllowances);
+        } elseif ($releaseMode === 'incremented_only') {
+            $otherAllowances = $this->removeArrearsComponentFromAllowances($otherAllowances);
+        } else {
+            if ($structure) {
+                $arrearsContext = $this->calculateArrearsContextForStructure(
+                    $structure,
+                    $payrollRecord->month,
+                    $payrollRecord->year
+                );
+                $arrearsAmount = (float)($arrearsContext['arrearsAmount'] ?? 0);
+                $otherAllowances = $this->appendArrearsComponentToAllowances($otherAllowances, $arrearsAmount);
+            }
+        }
+
+        return [
+            'grossList' => $grossList,
+            'otherAllowances' => $otherAllowances,
+            'otherBenefits' => $otherBenefits,
+            'recurringDeduction' => $recurringDeduction,
+            'arrearsAmount' => $arrearsAmount,
+            'usedPreviousSalary' => $usedPreviousSalary,
+        ];
+    }
+
+    /**
      * Get list of all branches for a company (for filtering purposes)
      *
      * @param Request $request
@@ -1163,9 +1334,12 @@ class EmployeePayrollSalaryProcessApiController extends Controller
             'companyName' => 'required|string|max:100',
             'year' => 'required|string|max:4',
             'month' => 'required|string|max:50',
+            'releaseMode' => 'nullable|string|in:incremented_with_arrears,incremented_only,previous_salary',
         ]);
 
         try {
+            $releaseMode = $request->input('releaseMode', 'incremented_with_arrears');
+
             // Normalize month: accept numeric (1-12) or month name ("January", etc.)
             $month = $request->month;
             if (is_numeric($month) && $month >= 1 && $month <= 12) {
@@ -1223,16 +1397,31 @@ class EmployeePayrollSalaryProcessApiController extends Controller
             $alreadyReleasedCount = $payrollRecords->where('status', 'Released')->count();
             $toBeUpdatedCount = $payrollRecords->where('status', '!=', 'Released')->count();
 
-            // Update all records to 'Released' status
-            $updatedCount = EmployeePayrollSalaryProcess::where('corpId', $request->corpId)
-                ->where('companyName', $request->companyName)
-                ->where('year', $request->year)
-                ->where('month', $month)
-                ->where('status', '!=', 'Released') // Only update non-released records
-                ->update([
-                    'status' => 'Released',
-                    'updated_at' => now()
-                ]);
+            $toUpdateRecords = $payrollRecords->where('status', '!=', 'Released');
+            $updatedCount = 0;
+            $releasedWithArrearsCount = 0;
+            $previousSalaryAppliedCount = 0;
+
+            foreach ($toUpdateRecords as $record) {
+                $payload = $this->buildPayrollPayloadByReleaseMode($record, $releaseMode);
+
+                $record->grossList = json_encode($payload['grossList']);
+                $record->otherAllowances = json_encode($payload['otherAllowances']);
+                $record->otherBenefits = json_encode($payload['otherBenefits']);
+                $record->recurringDeduction = json_encode($payload['recurringDeduction']);
+                $record->status = 'Released';
+                $record->updated_at = now();
+                $record->save();
+
+                if (($payload['arrearsAmount'] ?? 0) > 0) {
+                    $releasedWithArrearsCount++;
+                }
+                if (!empty($payload['usedPreviousSalary'])) {
+                    $previousSalaryAppliedCount++;
+                }
+
+                $updatedCount++;
+            }
 
             $filterDescription = "corpId: {$request->corpId}, companyName: {$request->companyName}, year: {$request->year}, month: {$month}";
 
@@ -1254,7 +1443,10 @@ class EmployeePayrollSalaryProcessApiController extends Controller
                     'total_records' => $payrollRecords->count(),
                     'updated_to_released' => $updatedCount,
                     'already_released' => $alreadyReleasedCount,
-                    'previous_status_breakdown' => $statusBreakdown
+                    'previous_status_breakdown' => $statusBreakdown,
+                    'release_mode_applied' => $releaseMode,
+                    'released_with_arrears' => $releasedWithArrearsCount,
+                    'released_with_previous_salary' => $previousSalaryAppliedCount
                 ]
             ]);
 
@@ -1281,9 +1473,12 @@ class EmployeePayrollSalaryProcessApiController extends Controller
             'companyName' => 'required|string|max:100',
             'year' => 'required|string|max:4',
             'month' => 'required|string|max:50',
+            'releaseMode' => 'nullable|string|in:incremented_with_arrears,incremented_only,previous_salary',
         ]);
 
         try {
+            $releaseMode = $request->input('releaseMode', 'incremented_with_arrears');
+
             // Normalize month: accept numeric (1-12) or month name ("January", etc.)
             $month = $request->month;
             if (is_numeric($month) && $month >= 1 && $month <= 12) {
@@ -1337,16 +1532,30 @@ class EmployeePayrollSalaryProcessApiController extends Controller
                 return $group->count();
             })->toArray();
 
-            // Update only 'Initiated' records to 'Released' status
-            $updatedCount = EmployeePayrollSalaryProcess::where('corpId', $request->corpId)
-                ->where('companyName', $request->companyName)
-                ->where('year', $request->year)
-                ->where('month', $month)
-                ->where('status', 'Initiated') // Only update 'Initiated' records
-                ->update([
-                    'status' => 'Released',
-                    'updated_at' => now()
-                ]);
+            $updatedCount = 0;
+            $releasedWithArrearsCount = 0;
+            $previousSalaryAppliedCount = 0;
+
+            foreach ($initiatedRecords as $record) {
+                $payload = $this->buildPayrollPayloadByReleaseMode($record, $releaseMode);
+
+                $record->grossList = json_encode($payload['grossList']);
+                $record->otherAllowances = json_encode($payload['otherAllowances']);
+                $record->otherBenefits = json_encode($payload['otherBenefits']);
+                $record->recurringDeduction = json_encode($payload['recurringDeduction']);
+                $record->status = 'Released';
+                $record->updated_at = now();
+                $record->save();
+
+                if (($payload['arrearsAmount'] ?? 0) > 0) {
+                    $releasedWithArrearsCount++;
+                }
+                if (!empty($payload['usedPreviousSalary'])) {
+                    $previousSalaryAppliedCount++;
+                }
+
+                $updatedCount++;
+            }
 
             $filterDescription = "corpId: {$request->corpId}, companyName: {$request->companyName}, year: {$request->year}, month: {$month}";
 
@@ -1368,7 +1577,10 @@ class EmployeePayrollSalaryProcessApiController extends Controller
                     'other_status_records' => $otherStatusCount,
                     'previous_status_breakdown' => $statusBreakdown,
                     'updated_from' => 'Initiated',
-                    'updated_to' => 'Released'
+                    'updated_to' => 'Released',
+                    'release_mode_applied' => $releaseMode,
+                    'released_with_arrears' => $releasedWithArrearsCount,
+                    'released_with_previous_salary' => $previousSalaryAppliedCount
                 ]
             ]);
 
@@ -1978,6 +2190,18 @@ class EmployeePayrollSalaryProcessApiController extends Controller
             // Process each salary structure
             foreach ($salaryStructures as $structure) {
                 try {
+                    $arrearsContext = $this->calculateArrearsContextForStructure(
+                        $structure,
+                        $month,
+                        $request->year
+                    );
+
+                    $otherAllowances = $this->safeJsonDecode($structure->otherAlowances);
+                    $otherAllowances = $this->appendArrearsComponentToAllowances(
+                        $otherAllowances,
+                        $arrearsContext['arrearsAmount']
+                    );
+
                     // Create payroll entry
                     $payrollData = [
                         'corpId' => $structure->corpId,
@@ -1986,7 +2210,7 @@ class EmployeePayrollSalaryProcessApiController extends Controller
                         'year' => $request->year,
                         'month' => $month, // Use normalized month name
                         'grossList' => $structure->grossList,
-                        'otherAllowances' => $structure->otherAlowances,
+                        'otherAllowances' => json_encode($otherAllowances),
                         'otherBenefits' => $structure->otherBenifits,
                         'recurringDeduction' => $structure->recurringDeductions,
                         'status' => $request->status,
@@ -2105,8 +2329,16 @@ class EmployeePayrollSalaryProcessApiController extends Controller
                 ->where('year', $request->year)
                 ->where('month', $month)
                 ->whereIn('empCode', $empCodes)
-                ->pluck('status', 'empCode')
+                ->get(['empCode', 'status', 'otherAllowances'])
+                ->keyBy('empCode')
                 ->toArray();
+
+            $salaryStructures = EmployeeSalaryStructure::where('corpId', $request->corpId)
+                ->where('companyName', $request->companyName)
+                ->where('year', $request->year)
+                ->whereIn('empCode', $empCodes)
+                ->get(['empCode', 'salaryRevisionMonth', 'arrearWithEffectFrom', 'increment'])
+                ->keyBy('empCode');
 
             // Format employee details with status
             $formattedEmployees = [];
@@ -2128,8 +2360,9 @@ class EmployeePayrollSalaryProcessApiController extends Controller
 
                 // Determine status
                 $status = 'Not Initiated';
-                if (isset($payrollStatuses[$employee->EmpCode])) {
-                    $payrollStatus = $payrollStatuses[$employee->EmpCode];
+                $payrollRecord = $payrollStatuses[$employee->EmpCode] ?? null;
+                if ($payrollRecord && isset($payrollRecord['status'])) {
+                    $payrollStatus = $payrollRecord['status'];
                     switch ($payrollStatus) {
                         case 'Initiated':
                             $status = 'Initiated';
@@ -2148,6 +2381,26 @@ class EmployeePayrollSalaryProcessApiController extends Controller
                     }
                 }
 
+                $arrearsAmount = 0;
+                if ($payrollRecord && !empty($payrollRecord['otherAllowances'])) {
+                    $otherAllowances = $this->safeJsonDecode($payrollRecord['otherAllowances']);
+                    foreach ($otherAllowances as $allowance) {
+                        if (strtolower((string)($allowance['componentName'] ?? '')) === 'arrears') {
+                            $arrearsAmount = (float)($allowance['calculatedValue'] ?? 0);
+                            break;
+                        }
+                    }
+                }
+
+                $hasRevisionWithArrears = false;
+                if ($salaryStructures->has($employee->EmpCode)) {
+                    $structure = $salaryStructures->get($employee->EmpCode);
+                    $hasRevisionWithArrears =
+                        !empty($structure->salaryRevisionMonth) &&
+                        !empty($structure->arrearWithEffectFrom) &&
+                        ((float)($structure->increment ?? 0) > 0);
+                }
+
                 $formattedEmployees[] = [
                     'serial_no' => $serialNo++,
                     'empcode' => $employee->EmpCode,
@@ -2159,7 +2412,9 @@ class EmployeePayrollSalaryProcessApiController extends Controller
                     'department' => $employee->Department ?? 'N/A',
                     'current_year' => $request->year,
                     'current_month' => $request->month,
-                    'status' => $status
+                    'status' => $status,
+                    'arrears_amount' => round($arrearsAmount, 2),
+                    'has_revision_with_arrears' => $hasRevisionWithArrears
                 ];
             }
 
@@ -2187,6 +2442,64 @@ class EmployeePayrollSalaryProcessApiController extends Controller
                 'message' => 'Error retrieving employee details: ' . $e->getMessage(),
                 'filter' => "corpId: {$request->corpId}, companyName: {$request->companyName}",
                 'data' => []
+            ], 500);
+        }
+    }
+
+    /**
+     * Determine whether arrears-driven release options should be visible.
+     */
+    public function getReleaseOptionsAvailability($corpId, $companyName, $year, $month)
+    {
+        try {
+            $monthName = $this->normalizeMonthName($month);
+
+            $payrollRecords = EmployeePayrollSalaryProcess::where('corpId', $corpId)
+                ->where('companyName', $companyName)
+                ->where('year', $year)
+                ->where('month', $monthName)
+                ->get(['empCode']);
+
+            if ($payrollRecords->isEmpty()) {
+                return response()->json([
+                    'status' => true,
+                    'data' => [
+                        'showIncrementedWithArrearsButton' => false,
+                        'showIncrementedOnlyButton' => false,
+                        'showPreviousSalaryButton' => true,
+                        'employeesWithRevisionArrears' => 0
+                    ]
+                ]);
+            }
+
+            $empCodes = $payrollRecords->pluck('empCode')->unique()->values()->toArray();
+
+            $employeesWithRevisionArrears = EmployeeSalaryStructure::where('corpId', $corpId)
+                ->where('companyName', $companyName)
+                ->where('year', $year)
+                ->whereIn('empCode', $empCodes)
+                ->whereNotNull('salaryRevisionMonth')
+                ->where('salaryRevisionMonth', '!=', '')
+                ->whereNotNull('arrearWithEffectFrom')
+                ->where('arrearWithEffectFrom', '!=', '')
+                ->whereRaw('CAST(COALESCE(increment, 0) AS DECIMAL(12,2)) > 0')
+                ->count();
+
+            $showArrearsModes = $employeesWithRevisionArrears > 0;
+
+            return response()->json([
+                'status' => true,
+                'data' => [
+                    'showIncrementedWithArrearsButton' => $showArrearsModes,
+                    'showIncrementedOnlyButton' => $showArrearsModes,
+                    'showPreviousSalaryButton' => true,
+                    'employeesWithRevisionArrears' => $employeesWithRevisionArrears
+                ]
+            ]);
+        } catch (\Exception $e) {
+            return response()->json([
+                'status' => false,
+                'message' => 'Error checking release options: ' . $e->getMessage()
             ], 500);
         }
     }
