@@ -1067,6 +1067,17 @@ class EmployeePayrollSalaryProcessApiController extends Controller
     }
 
     /**
+     * Extract arrears amount from an existing payroll record payload.
+     */
+    private function getExistingArrearsAmountFromPayrollRecord($payrollRecord)
+    {
+        $grossList = $this->safeJsonDecode($payrollRecord->grossList);
+        $otherAllowances = $this->safeJsonDecode($payrollRecord->otherAllowances);
+
+        return $this->extractArrearsAmountFromPayload($grossList, $otherAllowances);
+    }
+
+    /**
      * Check whether arrears for the current revision were already released earlier.
      */
     private function hasPriorArrearsSettlement($salaryStructure, $effectiveMonthStart, $currentMonthStart)
@@ -1097,6 +1108,52 @@ class EmployeePayrollSalaryProcessApiController extends Controller
         }
 
         return false;
+    }
+
+    /**
+     * Remove arrears from future non-released payroll entries after current arrears are settled.
+     */
+    private function clearFutureUnreleasedArrearsForEmployee($currentPayrollRecord)
+    {
+        $currentMonthStart = $this->parsePayrollMonthStart($currentPayrollRecord->year, $currentPayrollRecord->month);
+        if (!$currentMonthStart) {
+            return 0;
+        }
+
+        $futureRecords = EmployeePayrollSalaryProcess::where('corpId', $currentPayrollRecord->corpId)
+            ->where('companyName', $currentPayrollRecord->companyName)
+            ->where('empCode', $currentPayrollRecord->empCode)
+            ->where('status', '!=', 'Released')
+            ->get();
+
+        $updated = 0;
+
+        foreach ($futureRecords as $futureRecord) {
+            if ((int)$futureRecord->id === (int)$currentPayrollRecord->id) {
+                continue;
+            }
+
+            $futureMonthStart = $this->parsePayrollMonthStart($futureRecord->year, $futureRecord->month);
+            if (!$futureMonthStart || !$futureMonthStart->gt($currentMonthStart)) {
+                continue;
+            }
+
+            $grossList = $this->safeJsonDecode($futureRecord->grossList);
+            $otherAllowances = $this->safeJsonDecode($futureRecord->otherAllowances);
+
+            $before = $this->extractArrearsAmountFromPayload($grossList, $otherAllowances);
+            if ($before <= 0) {
+                continue;
+            }
+
+            $futureRecord->grossList = json_encode($this->removeArrearsComponentFromGross($grossList));
+            $futureRecord->otherAllowances = json_encode($this->removeArrearsComponentFromAllowances($otherAllowances));
+            $futureRecord->updated_at = now();
+            $futureRecord->save();
+            $updated++;
+        }
+
+        return $updated;
     }
 
     /**
@@ -1324,6 +1381,7 @@ class EmployeePayrollSalaryProcessApiController extends Controller
         $otherAllowances = $this->safeJsonDecode($payrollRecord->otherAllowances);
         $otherBenefits = $this->safeJsonDecode($payrollRecord->otherBenefits);
         $recurringDeduction = $this->safeJsonDecode($payrollRecord->recurringDeduction);
+        $existingArrearsAmount = $this->extractArrearsAmountFromPayload($grossList, $otherAllowances);
 
         $structure = EmployeeSalaryStructure::where('corpId', $payrollRecord->corpId)
             ->where('companyName', $payrollRecord->companyName)
@@ -1342,6 +1400,8 @@ class EmployeePayrollSalaryProcessApiController extends Controller
             );
             $arrearsAmount = (float)($arrearsContext['arrearsAmount'] ?? 0);
         }
+
+        $effectiveArrearsAmount = max((float)$arrearsAmount, (float)$existingArrearsAmount);
 
         if ($releaseMode === 'previous_salary') {
             $previousStructure = EmployeeSalaryStructure::where('corpId', $payrollRecord->corpId)
@@ -1365,10 +1425,9 @@ class EmployeePayrollSalaryProcessApiController extends Controller
             $grossList = $this->removeArrearsComponentFromGross($grossList);
             $otherAllowances = $this->removeArrearsComponentFromAllowances($otherAllowances);
         } else {
-            if ($structure) {
-                $grossList = $this->appendArrearsComponentToGross($grossList, $arrearsAmount);
-                $otherAllowances = $this->removeArrearsComponentFromAllowances($otherAllowances);
-            }
+            // Preserve already initiated arrears if structure lookup/calculation cannot reproduce them.
+            $grossList = $this->appendArrearsComponentToGross($grossList, $effectiveArrearsAmount);
+            $otherAllowances = $this->removeArrearsComponentFromAllowances($otherAllowances);
         }
 
         return [
@@ -1376,7 +1435,7 @@ class EmployeePayrollSalaryProcessApiController extends Controller
             'otherAllowances' => $otherAllowances,
             'otherBenefits' => $otherBenefits,
             'recurringDeduction' => $recurringDeduction,
-            'arrearsAmount' => $arrearsAmount,
+            'arrearsAmount' => $effectiveArrearsAmount,
             'usedPreviousSalary' => $usedPreviousSalary,
         ];
     }
@@ -1690,6 +1749,7 @@ class EmployeePayrollSalaryProcessApiController extends Controller
             $releasedWithArrearsCount = 0;
             $previousSalaryAppliedCount = 0;
             $modeRestrictedSkippedCount = 0;
+            $futureArrearsClearedCount = 0;
 
             foreach ($toUpdateRecords as $record) {
                 $currentStatus = strtolower((string)$record->status);
@@ -1713,6 +1773,10 @@ class EmployeePayrollSalaryProcessApiController extends Controller
 
                 if (($payload['arrearsAmount'] ?? 0) > 0) {
                     $releasedWithArrearsCount++;
+
+                    if ($releaseMode === 'incremented_with_arrears') {
+                        $futureArrearsClearedCount += $this->clearFutureUnreleasedArrearsForEmployee($record);
+                    }
                 }
                 if (!empty($payload['usedPreviousSalary'])) {
                     $previousSalaryAppliedCount++;
@@ -1748,7 +1812,8 @@ class EmployeePayrollSalaryProcessApiController extends Controller
                     'release_mode_applied' => $releaseMode,
                     'released_with_arrears' => $releasedWithArrearsCount,
                     'released_with_previous_salary' => $previousSalaryAppliedCount,
-                    'mode_restricted_skipped' => $modeRestrictedSkippedCount
+                    'mode_restricted_skipped' => $modeRestrictedSkippedCount,
+                    'future_unreleased_arrears_cleared' => $futureArrearsClearedCount
                 ]
             ]);
 
@@ -1843,6 +1908,7 @@ class EmployeePayrollSalaryProcessApiController extends Controller
             $updatedCount = 0;
             $releasedWithArrearsCount = 0;
             $previousSalaryAppliedCount = 0;
+            $futureArrearsClearedCount = 0;
 
             foreach ($initiatedRecords as $record) {
                 $payload = $this->buildPayrollPayloadByReleaseMode($record, $releaseMode);
@@ -1858,6 +1924,10 @@ class EmployeePayrollSalaryProcessApiController extends Controller
 
                 if (($payload['arrearsAmount'] ?? 0) > 0) {
                     $releasedWithArrearsCount++;
+
+                    if ($releaseMode === 'incremented_with_arrears') {
+                        $futureArrearsClearedCount += $this->clearFutureUnreleasedArrearsForEmployee($record);
+                    }
                 }
                 if (!empty($payload['usedPreviousSalary'])) {
                     $previousSalaryAppliedCount++;
@@ -1889,7 +1959,8 @@ class EmployeePayrollSalaryProcessApiController extends Controller
                     'updated_to' => 'Released',
                     'release_mode_applied' => $releaseMode,
                     'released_with_arrears' => $releasedWithArrearsCount,
-                    'released_with_previous_salary' => $previousSalaryAppliedCount
+                    'released_with_previous_salary' => $previousSalaryAppliedCount,
+                    'future_unreleased_arrears_cleared' => $futureArrearsClearedCount
                 ]
             ]);
 
@@ -1915,101 +1986,24 @@ class EmployeePayrollSalaryProcessApiController extends Controller
      */
     public function downloadSalarySlipPdf($corpId, $empCode, $year, $month, $companyName = null)
     {
-        try {
-            // Normalize month: accept numeric (1-12) or month name ("January", etc.)
-            if (is_numeric($month)) {
-                $monthNumber = (int)$month;
-                $monthName = date('F', mktime(0, 0, 0, $monthNumber, 1));
-            } else {
-                $monthName = ucfirst(strtolower($month));
-                $monthNumber = (int)date('n', strtotime($monthName));
-            }
+        $resolvedCompanyName = $companyName;
 
-            $query = EmployeePayrollSalaryProcess::where('corpId', $corpId)
+        if (empty($resolvedCompanyName)) {
+            $latestPayroll = EmployeePayrollSalaryProcess::where('corpId', $corpId)
                 ->where('empCode', $empCode)
                 ->where('year', $year)
-                ->where('month', $monthName);
+                ->orderBy('id', 'desc')
+                ->first(['companyName']);
 
-            if ($companyName) {
-                $query->where('companyName', $companyName);
-            }
-
-            $payroll = $query->first();
-
-            if (!$payroll) {
-                abort(404, 'Payroll record not found for the specified employee and period.');
-            }
-
-            $employeeDetail = EmployeeDetail::where('corp_id', $corpId)->where('EmpCode', $empCode)->first();
-            $employmentDetail = EmploymentDetail::where('corp_id', $corpId)->where('EmpCode', $empCode)->first();
-
-            // Get full employee name
-            $fullName = $this->getFullEmployeeName($employeeDetail);
-
-            // Decode JSON data
-            $grossList = json_decode($payroll->grossList, true) ?: [];
-            $otherBenefitsAllowances = array_merge(
-                json_decode($payroll->otherAllowances, true) ?: [],
-                json_decode($payroll->otherBenefits, true) ?: []
-            );
-            $deductions = json_decode($payroll->recurringDeduction, true) ?: [];
-
-            // Calculate totals
-            $totalGrossMonthly = array_sum(array_column($grossList, 'calculatedValue'));
-            $totalBenefitsMonthly = array_sum(array_column($otherBenefitsAllowances, 'calculatedValue'));
-            $totalDeductionsMonthly = array_sum(array_column($deductions, 'calculatedValue'));
-            $netSalaryMonthly = $totalGrossMonthly + $totalBenefitsMonthly - $totalDeductionsMonthly;
-
-            $data = [
-                'corpId' => $corpId,
-                'empCode' => $empCode,
-                'companyName' => $payroll->companyName,
-                'year' => $year,
-                'month' => $monthName,
-                'status' => $payroll->status,
-                'gross' => $grossList,
-                'otherBenefitsAllowances' => $otherBenefitsAllowances,
-                'deductions' => $deductions,
-            ];
-
-            $employeeDetails = [
-                'full_name' => $fullName,
-                'designation' => $employmentDetail->Designation ?? 'N/A',
-                'department' => $employmentDetail->Department ?? 'N/A',
-                'date_of_joining' => $employmentDetail->dateOfJoining ?? 'N/A',
-            ];
-
-            $summary = [
-                'totalGross' => ['monthly' => $totalGrossMonthly],
-                'totalBenefits' => ['monthly' => $totalBenefitsMonthly],
-                'totalDeductions' => ['monthly' => $totalDeductionsMonthly],
-                'netSalary' => ['monthly' => $netSalaryMonthly],
-            ];
-
-            // Generate PDF using Dompdf
-            $html = view('salary-slip-pdf', compact('data', 'employeeDetails', 'summary'))->render();
-
-            $options = new \Dompdf\Options();
-            $options->set('isHtml5ParserEnabled', true);
-            $options->set('isRemoteEnabled', true);
-
-            $dompdf = new \Dompdf\Dompdf($options);
-            $dompdf->loadHtml($html);
-            $dompdf->setPaper('A4', 'portrait');
-            $dompdf->render();
-
-            $filename = "Salary_Slip_{$empCode}_{$monthName}_{$year}.pdf";
-
-            return response()->streamDownload(function() use ($dompdf) {
-                echo $dompdf->output();
-            }, $filename, [
-                'Content-Type' => 'application/pdf',
-            ]);
-
-        } catch (\Exception $e) {
-            Log::error('Error generating salary slip PDF: ' . $e->getMessage());
-            abort(500, 'Error generating salary slip: ' . $e->getMessage());
+            $resolvedCompanyName = $latestPayroll->companyName ?? null;
         }
+
+        if (empty($resolvedCompanyName)) {
+            abort(404, 'Company name could not be resolved for salary slip generation.');
+        }
+
+        // Route legacy endpoint to dynamic generator so arrears/monthly split is always consistent.
+        return $this->downloadDynamicSalarySlipPdf($corpId, $empCode, $year, $month, $resolvedCompanyName);
     }
 
     /**
