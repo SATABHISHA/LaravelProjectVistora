@@ -1392,6 +1392,77 @@ class EmployeePayrollSalaryProcessApiController extends Controller
     }
 
     /**
+     * Resolve payslip earning component sources with salary-structure fallback.
+     * This protects slips generated from older initiated payroll rows that may
+     * have empty otherAllowances/otherBenefits despite structure configuration.
+     */
+    private function resolvePayslipEarningComponents($payroll, $salaryStructure = null)
+    {
+        $grossList = $this->safeJsonDecode($payroll->grossList ?? '[]');
+        $otherAllowances = $this->safeJsonDecode($payroll->otherAllowances ?? '[]');
+        $otherBenefits = $this->safeJsonDecode($payroll->otherBenefits ?? '[]');
+
+        $nonArrearRows = array_filter(
+            array_merge($otherAllowances, $otherBenefits),
+            function ($item) {
+                $name = $this->extractPayslipComponentName($item);
+                $value = $this->extractPayslipComponentAmount($item);
+                return !$this->isArrearPayslipComponent($name) && $value > 0;
+            }
+        );
+
+        if (count($nonArrearRows) === 0 && $salaryStructure) {
+            $structureAllowances = $this->safeJsonDecode($salaryStructure->otherAlowances ?? '[]');
+            $structureBenefits = $this->safeJsonDecode($salaryStructure->otherBenifits ?? '[]');
+
+            $otherAllowances = $this->mergePayslipComponentsByName($otherAllowances, $structureAllowances);
+            $otherBenefits = $this->mergePayslipComponentsByName($otherBenefits, $structureBenefits);
+        }
+
+        return [
+            'grossList' => $grossList,
+            'otherAllowances' => $otherAllowances,
+            'otherBenefits' => $otherBenefits,
+        ];
+    }
+
+    private function mergePayslipComponentsByName(array $primary, array $fallback)
+    {
+        $merged = [];
+        $seen = [];
+
+        foreach (array_merge($primary, $fallback) as $item) {
+            if (!is_array($item)) {
+                continue;
+            }
+
+            $nameKey = strtolower(trim($this->extractPayslipComponentName($item)));
+            if ($nameKey === '') {
+                continue;
+            }
+
+            if (isset($seen[$nameKey])) {
+                continue;
+            }
+
+            $seen[$nameKey] = true;
+            $merged[] = $item;
+        }
+
+        return $merged;
+    }
+
+    private function calculatePayslipDeductionsTotal(array $deductions)
+    {
+        $total = 0.0;
+        foreach ($deductions as $item) {
+            $total += $this->extractPayslipComponentAmount($item);
+        }
+
+        return round($total, 2);
+    }
+
+    /**
      * Ensure a single arrears component exists in allowances when amount > 0.
      */
     private function appendArrearsComponentToAllowances(array $allowances, $arrearsAmount)
@@ -2309,14 +2380,15 @@ class EmployeePayrollSalaryProcessApiController extends Controller
                 ->first();
 
             // Process payroll data
-            $grossList = json_decode($payroll->grossList, true) ?: [];
-            $otherAllowances = json_decode($payroll->otherAllowances, true) ?: [];
-            $otherBenefits = json_decode($payroll->otherBenefits, true) ?: [];
+            $earningSources = $this->resolvePayslipEarningComponents($payroll, $salaryStructure);
+            $grossList = $earningSources['grossList'];
+            $otherAllowances = $earningSources['otherAllowances'];
+            $otherBenefits = $earningSources['otherBenefits'];
             $earningsBreakup = $this->buildPayslipEarningsBreakup($grossList, $otherAllowances, $otherBenefits);
             $earnings = $earningsBreakup['rows'];
-            $deductions = json_decode($payroll->recurringDeduction, true) ?: [];
+            $deductions = $this->safeJsonDecode($payroll->recurringDeduction);
             $totalEarnings = (float)($earningsBreakup['totalCombined'] ?? 0);
-            $totalDeductions = array_sum(array_column($deductions, 'calculatedValue'));
+            $totalDeductions = $this->calculatePayslipDeductionsTotal($deductions);
             $netPay = $totalEarnings - $totalDeductions;
             $attendanceArrearDays = $this->resolveAttendanceArrearDays($attendanceSummary);
             $incrementArrearDays = $this->calculateIncrementArrearDaysForStructure($salaryStructure, $monthName, $year);
@@ -2449,20 +2521,21 @@ class EmployeePayrollSalaryProcessApiController extends Controller
             // 5. Loop and Generate PDFs
             foreach ($payrollRecords as $payroll) {
                 $empCode = $payroll->empCode;
+                $salaryStructure = $salaryStructures->get($empCode);
                 
                 // Process Payroll Data
-                $grossList = json_decode($payroll->grossList, true) ?: [];
-                $otherAllowances = json_decode($payroll->otherAllowances, true) ?: [];
-                $otherBenefits = json_decode($payroll->otherBenefits, true) ?: [];
+                $earningSources = $this->resolvePayslipEarningComponents($payroll, $salaryStructure);
+                $grossList = $earningSources['grossList'];
+                $otherAllowances = $earningSources['otherAllowances'];
+                $otherBenefits = $earningSources['otherBenefits'];
                 $earningsBreakup = $this->buildPayslipEarningsBreakup($grossList, $otherAllowances, $otherBenefits);
                 $earnings = $earningsBreakup['rows'];
-                $deductions = json_decode($payroll->recurringDeduction, true) ?: [];
+                $deductions = $this->safeJsonDecode($payroll->recurringDeduction);
                 $totalEarnings = (float)($earningsBreakup['totalCombined'] ?? 0);
-                $totalDeductions = array_sum(array_column($deductions, 'calculatedValue'));
+                $totalDeductions = $this->calculatePayslipDeductionsTotal($deductions);
                 $netPay = $totalEarnings - $totalDeductions;
                 $attendanceGroup = $attendanceSummaries->get($empCode, collect());
                 $attendance = $attendanceGroup->firstWhere('month', $monthName) ?? $attendanceGroup->first();
-                $salaryStructure = $salaryStructures->get($empCode);
                 $attendanceArrearDays = $this->resolveAttendanceArrearDays($attendance);
                 $incrementArrearDays = $this->calculateIncrementArrearDaysForStructure($salaryStructure, $monthName, $request->year);
                 $leaveBalances = $this->buildPayslipLeaveBalances($request->corpId, $empCode, $request->companyName, $request->year);
@@ -4389,17 +4462,19 @@ class EmployeePayrollSalaryProcessApiController extends Controller
                 ->first();
 
             // Process payroll data
-            $grossList = json_decode($payroll->grossList, true) ?: [];
-            $otherAllowances = json_decode($payroll->otherAllowances, true) ?: [];
-            $otherBenefits = json_decode($payroll->otherBenefits, true) ?: [];
+            $earningSources = $this->resolvePayslipEarningComponents($payroll, $salaryStructure);
+            $grossList = $earningSources['grossList'];
+            $otherAllowances = $earningSources['otherAllowances'];
+            $otherBenefits = $earningSources['otherBenefits'];
             $earningsBreakup = $this->buildPayslipEarningsBreakup($grossList, $otherAllowances, $otherBenefits);
             $earnings = $earningsBreakup['rows'];
-            $deductions = json_decode($payroll->recurringDeduction, true) ?: [];
+            $deductions = $this->safeJsonDecode($payroll->recurringDeduction);
             $totalEarnings = (float)($earningsBreakup['totalCombined'] ?? 0);
-            $totalDeductions = array_sum(array_column($deductions, 'calculatedValue'));
+            $totalDeductions = $this->calculatePayslipDeductionsTotal($deductions);
             $netPay = $totalEarnings - $totalDeductions;
             $attendanceArrearDays = $this->resolveAttendanceArrearDays($attendanceSummary);
             $incrementArrearDays = $this->calculateIncrementArrearDaysForStructure($salaryStructure, $monthName, $year);
+            $leaveBalances = $this->buildPayslipLeaveBalances($corpId, $empCode, $companyName, $year);
 
             // Prepare data for the dynamic view (no hardcoded company defaults)
             $data = [
@@ -4424,6 +4499,7 @@ class EmployeePayrollSalaryProcessApiController extends Controller
                 'payDays' => $attendanceSummary ? $attendanceSummary->paidDays : 30,
                 'attendanceArrearDays' => $attendanceArrearDays,
                 'incrementArrearDays' => $incrementArrearDays,
+                'leaveBalances' => $leaveBalances,
             ];
 
             // Generate PDF using the dynamic template (no MACO defaults)
@@ -4525,21 +4601,23 @@ class EmployeePayrollSalaryProcessApiController extends Controller
             // Loop and generate PDFs
             foreach ($payrollRecords as $payroll) {
                 $empCode = $payroll->empCode;
+                $salaryStructure = $salaryStructures->get($empCode);
 
-                $grossList = json_decode($payroll->grossList, true) ?: [];
-                $otherAllowances = json_decode($payroll->otherAllowances, true) ?: [];
-                $otherBenefits = json_decode($payroll->otherBenefits, true) ?: [];
+                $earningSources = $this->resolvePayslipEarningComponents($payroll, $salaryStructure);
+                $grossList = $earningSources['grossList'];
+                $otherAllowances = $earningSources['otherAllowances'];
+                $otherBenefits = $earningSources['otherBenefits'];
                 $earningsBreakup = $this->buildPayslipEarningsBreakup($grossList, $otherAllowances, $otherBenefits);
                 $earnings = $earningsBreakup['rows'];
-                $deductions = json_decode($payroll->recurringDeduction, true) ?: [];
+                $deductions = $this->safeJsonDecode($payroll->recurringDeduction);
                 $totalEarnings = (float)($earningsBreakup['totalCombined'] ?? 0);
-                $totalDeductions = array_sum(array_column($deductions, 'calculatedValue'));
+                $totalDeductions = $this->calculatePayslipDeductionsTotal($deductions);
                 $netPay = $totalEarnings - $totalDeductions;
                 $attendanceGroup = $attendanceSummaries->get($empCode, collect());
                 $attendance = $attendanceGroup->firstWhere('month', $monthName) ?? $attendanceGroup->first();
-                $salaryStructure = $salaryStructures->get($empCode);
                 $attendanceArrearDays = $this->resolveAttendanceArrearDays($attendance);
                 $incrementArrearDays = $this->calculateIncrementArrearDaysForStructure($salaryStructure, $monthName, $request->year);
+                $leaveBalances = $this->buildPayslipLeaveBalances($request->corpId, $empCode, $request->companyName, $request->year);
 
                 $data = [
                     'company' => $companyDetails,
@@ -4563,6 +4641,7 @@ class EmployeePayrollSalaryProcessApiController extends Controller
                     'payDays' => $attendance->paidDays ?? 30,
                     'attendanceArrearDays' => $attendanceArrearDays,
                     'incrementArrearDays' => $incrementArrearDays,
+                    'leaveBalances' => $leaveBalances,
                 ];
 
                 // Use the dynamic template (no hardcoded company defaults)
