@@ -10,6 +10,7 @@ use App\Models\EmployeeSalaryStructure;
 use App\Exports\PayrollExport;
 use App\Exports\ReleasedPayrollExport;
 use App\Exports\PayrollArrearsExport;
+use App\Models\EmployeeLeaveBalance;
 use Maatwebsite\Excel\Facades\Excel;
 use ZipArchive;
 use Illuminate\Support\Facades\File;
@@ -1245,9 +1246,13 @@ class EmployeePayrollSalaryProcessApiController extends Controller
 
         $allEarnings = array_merge($grossList, $otherAllowances, $otherBenefits);
         foreach ($allEarnings as $item) {
-            $componentName = (string)($item['componentName'] ?? 'Component');
-            $value = (float)($item['calculatedValue'] ?? 0);
-            $isArrear = strtolower($componentName) === 'arrears';
+            $componentName = $this->extractPayslipComponentName($item);
+            $value = $this->extractPayslipComponentAmount($item);
+            $isArrear = $this->isArrearPayslipComponent($componentName);
+
+            if ($value <= 0 && !$isArrear) {
+                continue;
+            }
 
             if ($isArrear) {
                 $hasArrearRow = true;
@@ -1272,8 +1277,8 @@ class EmployeePayrollSalaryProcessApiController extends Controller
 
         if (!$hasArrearRow) {
             foreach ($otherAllowances as $allowance) {
-                if (strtolower((string)($allowance['componentName'] ?? '')) === 'arrears') {
-                    $value = (float)($allowance['calculatedValue'] ?? 0);
+                if ($this->isArrearPayslipComponent($this->extractPayslipComponentName($allowance))) {
+                    $value = $this->extractPayslipComponentAmount($allowance);
                     if ($value > 0) {
                         $rows[] = [
                             'componentName' => 'Arrears',
@@ -1294,6 +1299,96 @@ class EmployeePayrollSalaryProcessApiController extends Controller
             'totalArrear' => round($totalArrear, 2),
             'totalCombined' => round($totalMonthly + $totalArrear, 2),
         ];
+    }
+
+    private function extractPayslipComponentName($item)
+    {
+        if (!is_array($item)) {
+            return 'Component';
+        }
+
+        $name = $item['componentName']
+            ?? $item['component_name']
+            ?? $item['name']
+            ?? $item['component']
+            ?? 'Component';
+
+        return trim((string)$name) !== '' ? trim((string)$name) : 'Component';
+    }
+
+    private function extractPayslipComponentAmount($item)
+    {
+        if (!is_array($item)) {
+            return 0.0;
+        }
+
+        $value = $item['calculatedValue']
+            ?? $item['calculated_value']
+            ?? $item['monthlyValue']
+            ?? $item['monthly_value']
+            ?? $item['monthlyRemuneration']
+            ?? $item['monthly_remuneration']
+            ?? $item['amount']
+            ?? $item['value']
+            ?? 0;
+
+        return (float)$value;
+    }
+
+    private function isArrearPayslipComponent($componentName)
+    {
+        $normalized = strtolower(trim((string)$componentName));
+
+        return str_contains($normalized, 'arrear');
+    }
+
+    /**
+     * Build leave balance rows for payslip from employee leave balance v1 data.
+     */
+    private function buildPayslipLeaveBalances($corpId, $empCode, $companyName, $year)
+    {
+        $leaveBalances = EmployeeLeaveBalance::where('corp_id', $corpId)
+            ->where('emp_code', $empCode)
+            ->where('year', (int)$year)
+            ->where('company_name', $companyName)
+            ->orderBy('leave_code')
+            ->get();
+
+        if ($leaveBalances->isEmpty()) {
+            return [];
+        }
+
+        $deduped = [];
+        foreach ($leaveBalances as $row) {
+            $name = strtolower(trim((string)($row->leave_name ?? '')));
+            if (!isset($deduped[$name])) {
+                $deduped[$name] = $row;
+                continue;
+            }
+
+            $existing = $deduped[$name];
+            $existingTs = $existing->updated_at ? strtotime((string)$existing->updated_at) : 0;
+            $currentTs = $row->updated_at ? strtotime((string)$row->updated_at) : 0;
+            if ($currentTs >= $existingTs) {
+                $deduped[$name] = $row;
+            }
+        }
+
+        $rows = [];
+        foreach ($deduped as $row) {
+            $used = (float)($row->used ?? 0);
+            $balance = (float)($row->balance ?? 0);
+            $opening = (float)($row->total_allotted ?? ($used + $balance));
+
+            $rows[] = [
+                'leaveType' => (string)($row->leave_name ?? $row->leave_code ?? 'Leave'),
+                'openingBalance' => round($opening, 2),
+                'availedLeave' => round($used, 2),
+                'closingBalance' => round($balance, 2),
+            ];
+        }
+
+        return $rows;
     }
 
     /**
@@ -2225,6 +2320,7 @@ class EmployeePayrollSalaryProcessApiController extends Controller
             $netPay = $totalEarnings - $totalDeductions;
             $attendanceArrearDays = $this->resolveAttendanceArrearDays($attendanceSummary);
             $incrementArrearDays = $this->calculateIncrementArrearDaysForStructure($salaryStructure, $monthName, $year);
+            $leaveBalances = $this->buildPayslipLeaveBalances($corpId, $empCode, $companyName, $year);
 
             // Prepare data for the view
             $data = [
@@ -2248,6 +2344,7 @@ class EmployeePayrollSalaryProcessApiController extends Controller
                 'payDays' => $attendanceSummary ? $attendanceSummary->paidDays : 30,
                 'attendanceArrearDays' => $attendanceArrearDays,
                 'incrementArrearDays' => $incrementArrearDays,
+                'leaveBalances' => $leaveBalances,
             ];
 
             // Generate PDF
@@ -2368,6 +2465,7 @@ class EmployeePayrollSalaryProcessApiController extends Controller
                 $salaryStructure = $salaryStructures->get($empCode);
                 $attendanceArrearDays = $this->resolveAttendanceArrearDays($attendance);
                 $incrementArrearDays = $this->calculateIncrementArrearDaysForStructure($salaryStructure, $monthName, $request->year);
+                $leaveBalances = $this->buildPayslipLeaveBalances($request->corpId, $empCode, $request->companyName, $request->year);
 
                 // Prepare Data for View
                 $data = [
@@ -2391,6 +2489,7 @@ class EmployeePayrollSalaryProcessApiController extends Controller
                     'payDays' => $attendance->paidDays ?? 30,
                     'attendanceArrearDays' => $attendanceArrearDays,
                     'incrementArrearDays' => $incrementArrearDays,
+                    'leaveBalances' => $leaveBalances,
                 ];
 
                 // Generate HTML and PDF

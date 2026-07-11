@@ -287,12 +287,18 @@
                 </tr>
             </thead>
             <tbody>
+                @forelse(($leaveBalances ?? []) as $leave)
                 <tr>
-                    <td>&nbsp;</td>
-                    <td>&nbsp;</td>
-                    <td>&nbsp;</td>
-                    <td>&nbsp;</td>
+                    <td>{{ $leave['leaveType'] ?? 'Leave' }}</td>
+                    <td>{{ number_format((float)($leave['openingBalance'] ?? 0), 2) }}</td>
+                    <td>{{ number_format((float)($leave['availedLeave'] ?? 0), 2) }}</td>
+                    <td>{{ number_format((float)($leave['closingBalance'] ?? 0), 2) }}</td>
                 </tr>
+                @empty
+                <tr>
+                    <td colspan="4" style="text-align:center;">No leave balance data available</td>
+                </tr>
+                @endforelse
             </tbody>
         </table>
         <div class="cut-here">Cut Here ....................................................................................................................................................................................................</div>
